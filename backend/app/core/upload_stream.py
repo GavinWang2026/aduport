@@ -1,0 +1,72 @@
+"""Async helpers: chunked upload read into SpillBuffer (true streaming ingress)."""
+
+from __future__ import annotations
+
+import os
+import tempfile
+
+from fastapi import UploadFile
+
+from app.config import settings
+from app.core.exceptions import EmptyFileError, FileTooLargeError
+from app.core.spill import SpillBuffer
+
+
+async def read_upload_streaming(
+    upload: UploadFile,
+    *,
+    chunk_size: int = 1024 * 1024,
+    prefix: str = "mdbridge-up-",
+) -> SpillBuffer:
+    """
+    Read UploadFile in chunks. Once size crosses spill threshold, switch to a
+    temp file so peak RAM stays near chunk_size + threshold (not full file).
+    """
+    max_bytes = settings.max_upload_bytes
+    threshold = max(0, settings.spill_threshold_mb) * 1024 * 1024
+    mem = bytearray()
+    path: str | None = None
+    fd: int | None = None
+    total = 0
+
+    try:
+        while True:
+            chunk = await upload.read(chunk_size)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise FileTooLargeError(
+                    f"文件过大，限制 {settings.max_upload_mb} MB（当前 ≥{total} bytes）"
+                )
+
+            if path is None and threshold > 0 and total >= threshold:
+                fd, path = tempfile.mkstemp(prefix=prefix, suffix=".bin")
+                if mem:
+                    os.write(fd, mem)
+                    mem.clear()
+                os.write(fd, chunk)
+                os.fchmod(fd, 0o600)
+            elif path is not None and fd is not None:
+                os.write(fd, chunk)
+            else:
+                mem.extend(chunk)
+    finally:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+    if total == 0:
+        if path:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        raise EmptyFileError("上传文件为空")
+
+    if path:
+        return SpillBuffer.from_path(path, total)
+
+    return SpillBuffer(bytes(mem), prefix=prefix)

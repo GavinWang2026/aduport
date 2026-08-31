@@ -1,0 +1,8 @@
+# Overlay: use slim backend (no docling). MD→DOCX/PDF + MD roundtrip only.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.slim.yml up --build
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.slim
+    image: md-bridge-backend:slim

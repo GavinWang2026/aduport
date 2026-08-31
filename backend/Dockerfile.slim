@@ -1,0 +1,34 @@
+# Slim image: Markdown + DOCX/PDF *export* only (no docling / torch).
+# Typical size reduction vs full office image: ~60–80% (no ML stack).
+#
+# Build:
+#   docker build -f backend/Dockerfile.slim -t md-bridge-backend:slim .
+# Or from repo root with compose overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.slim.yml build
+
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libffi-dev \
+    shared-mime-info \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY backend/pyproject.toml ./
+COPY backend/app ./app
+COPY backend/main.py ./
+
+RUN pip install --upgrade pip && pip install .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,464 @@
+"""FastAPI routes for md-bridge."""
+
+from __future__ import annotations
+
+import asyncio
+import io
+import json
+import re
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
+from urllib.parse import quote
+
+from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi.responses import JSONResponse, Response
+
+from app.config import settings
+from app.core.cache import result_cache
+from app.core.converter import (
+    MIME_TYPES,
+    SUPPORTED_FORMATS,
+    SUPPORTED_SOURCE_FORMATS,
+    SUPPORTED_TARGET_FORMATS,
+    convert,
+)
+from app.core.css_sanitize import sanitize_custom_css, sanitize_font_family
+from app.core.exceptions import (
+    EmptyFileError,
+    FileTooLargeError,
+    InvalidDocumentError,
+    MdBridgeError,
+    UnsupportedFormatError,
+)
+from app.core.format_detect import detect_source_format
+from app.core.jobs import JobStatus, job_store
+from app.core.metrics import metrics
+from app.core.upload_stream import read_upload_streaming
+
+router = APIRouter(prefix="/api", tags=["convert"])
+
+_SAFE_STEM = re.compile(r"[^A-Za-z0-9._\-\u4e00-\u9fff]+")
+_executor = ThreadPoolExecutor(max_workers=max(1, settings.batch_workers))
+
+
+def _resolve_source_format(
+    source_format: str | None,
+    filename: str | None,
+    content: bytes | None = None,
+) -> str:
+    raw = (source_format or "").strip().lower().lstrip(".")
+    if raw and raw not in ("auto", ""):
+        if raw not in SUPPORTED_SOURCE_FORMATS:
+            raise UnsupportedFormatError(f"不支持的源格式: {source_format}")
+        return raw
+    detected = detect_source_format(filename, content)
+    if not detected:
+        raise UnsupportedFormatError(
+            "无法自动识别源格式，请显式指定 source_format"
+            f"（支持: {sorted(SUPPORTED_SOURCE_FORMATS)}）"
+        )
+    return detected
+
+def _parse_bool(val: str | None) -> bool | None:
+    if val is None or val == "":
+        return None
+    return str(val).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _pdf_form_opts(
+    pdf_font_family: str | None,
+    pdf_custom_css: str | None,
+    pdf_page_size: str | None = None,
+    pdf_orientation: str | None = None,
+    pdf_header: str | None = None,
+    pdf_footer: str | None = None,
+    pdf_page_numbers: str | None = None,
+    pdf_toc: str | None = None,
+) -> dict:
+    return {
+        "pdf_font_family": sanitize_font_family(pdf_font_family, settings.pdf_font_family),
+        "pdf_custom_css": sanitize_custom_css(pdf_custom_css),
+        "pdf_page_size": pdf_page_size,
+        "pdf_orientation": pdf_orientation,
+        "pdf_header": pdf_header,
+        "pdf_footer": pdf_footer,
+        "pdf_page_numbers": _parse_bool(pdf_page_numbers),
+        "pdf_toc": _parse_bool(pdf_toc),
+    }
+
+
+
+@router.get("/health")
+async def health() -> dict[str, object]:
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "version": "0.11.0",
+        "ocr_enabled": settings.ocr_enabled,
+        "max_upload_mb": settings.max_upload_mb,
+        "auth_required": bool(settings.api_key or settings.basic_auth),
+        "max_batch_files": settings.max_batch_files,
+        "cache": result_cache.stats(),
+        "metrics": metrics.snapshot(),
+        "jobs": job_store.stats(),
+        "rate_limit_per_minute": settings.rate_limit_per_minute,
+        "memory_budget_mb": settings.memory_budget_mb,
+        "virus_scan": settings.virus_scan,
+        "ocr": {
+            "enabled": settings.ocr_enabled,
+            "feature": "scanned_pdf_to_structured_markdown",
+            "engine": "docling+tesseract",
+            "hint": "启用 MDBRIDGE_OCR_ENABLED=true 可将扫描版 PDF 转为带标题/表格结构的 Markdown",
+        },
+    }
+
+
+@router.get("/formats")
+async def list_formats() -> dict[str, list[str]]:
+    return {
+        "formats": sorted(SUPPORTED_FORMATS),
+        "source": sorted(SUPPORTED_SOURCE_FORMATS),
+        "target": sorted(SUPPORTED_TARGET_FORMATS),
+    }
+
+
+@router.get("/metrics")
+async def prometheus_metrics() -> Response:
+    return Response(content=metrics.prometheus_text(), media_type="text/plain; version=0.0.4")
+
+
+@router.post("/jobs")
+async def create_job(
+    request: Request,
+    file: UploadFile = File(...),
+    source_format: Optional[str] = Form(None),
+    target_format: str = Form(...),
+    pdf_font_family: Optional[str] = Form(None),
+    pdf_custom_css: Optional[str] = Form(None),
+    pdf_page_size: Optional[str] = Form(None),
+    pdf_orientation: Optional[str] = Form(None),
+    pdf_header: Optional[str] = Form(None),
+    pdf_footer: Optional[str] = Form(None),
+    pdf_page_numbers: Optional[str] = Form(None),
+    pdf_toc: Optional[str] = Form(None),
+) -> JSONResponse:
+    """Enqueue an async conversion job; poll GET /api/jobs/{id} then download result."""
+    spill = await read_upload_streaming(file, prefix="mdbridge-job-up-")
+    try:
+        content = spill.read()
+        filename = file.filename or "input"
+        src = _resolve_source_format(source_format, filename, content)
+        tgt = target_format.lower().lstrip(".")
+        if tgt not in SUPPORTED_TARGET_FORMATS:
+            raise UnsupportedFormatError(f"不支持的目标格式: {target_format}")
+
+        pdf_opts = _pdf_form_opts(
+            pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
+            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+        )
+        client = request.client.host if request.client else ""
+        if not file.filename:
+            filename = f"input.{src}"
+        out_name = _safe_output_filename(filename, tgt)
+
+        job = job_store.submit(
+            content=content,
+            filename=filename,
+            source_format=src,
+            target_format=tgt,
+            client=client,
+            result_filename=out_name,
+            **pdf_opts,
+        )
+        return JSONResponse(status_code=202, content=job.to_dict())
+    finally:
+        spill.release()
+
+
+
+@router.get("/jobs")
+async def list_jobs() -> dict[str, object]:
+    return {"jobs": [j.to_dict() for j in job_store.list_recent()]}
+
+
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str) -> dict[str, object]:
+    job = job_store.get(job_id)
+    if not job:
+        raise MdBridgeError(f"任务不存在或已过期: {job_id}", code="job_not_found", status_code=404)
+    return job.to_dict()
+
+
+@router.get("/jobs/{job_id}/result")
+async def get_job_result(job_id: str) -> Response:
+    job = job_store.get(job_id)
+    if not job:
+        raise MdBridgeError(f"任务不存在或已过期: {job_id}", code="job_not_found", status_code=404)
+    if job.status == JobStatus.error:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": True,
+                "code": job.code or "conversion_error",
+                "message": job.error or "转换失败",
+                "status_code": 422,
+            },
+        )
+    result = job.read_result()
+    if job.status != JobStatus.done or result is None:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": True,
+                "code": "job_not_ready",
+                "message": f"任务尚未完成（状态: {job.status.value}）",
+                "status_code": 409,
+                "progress": job.progress,
+            },
+        )
+    media_type = MIME_TYPES.get(job.target_format, "application/octet-stream")
+    name = job.result_filename or f"converted.{job.target_format}"
+    return Response(
+        content=result,
+        media_type=media_type,
+        headers={"Content-Disposition": _content_disposition(name)},
+    )
+
+
+@router.post("/convert")
+async def convert_file(
+    request: Request,
+    file: UploadFile = File(...),
+    source_format: Optional[str] = Form(None),
+    target_format: str = Form(...),
+    pdf_font_family: Optional[str] = Form(None),
+    pdf_custom_css: Optional[str] = Form(None),
+    pdf_page_size: Optional[str] = Form(None),
+    pdf_orientation: Optional[str] = Form(None),
+    pdf_header: Optional[str] = Form(None),
+    pdf_footer: Optional[str] = Form(None),
+    pdf_page_numbers: Optional[str] = Form(None),
+    pdf_toc: Optional[str] = Form(None),
+) -> Response:
+    spill = await read_upload_streaming(file, prefix="mdbridge-cvt-up-")
+    try:
+        content = spill.read()
+        filename = file.filename or "input"
+        src = _resolve_source_format(source_format, filename, content)
+        tgt = target_format.lower().lstrip(".")
+        if tgt not in SUPPORTED_TARGET_FORMATS:
+            raise UnsupportedFormatError(f"不支持的目标格式: {target_format}")
+
+        pdf_opts = _pdf_form_opts(
+            pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
+            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+        )
+        client = request.client.host if request.client else ""
+
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: convert(
+                content,
+                src,
+                tgt,
+                filename=file.filename or f"input.{src}",
+                client=client,
+                **pdf_opts,
+            ),
+        )
+
+        out_name = _safe_output_filename(file.filename, tgt)
+        media_type = MIME_TYPES.get(tgt, "application/octet-stream")
+        return Response(
+            content=result,
+            media_type=media_type,
+            headers={"Content-Disposition": _content_disposition(out_name)},
+        )
+    finally:
+        spill.release()
+
+
+
+@router.post("/convert/batch")
+async def convert_batch(
+    files: list[UploadFile] = File(...),
+    source_format: Optional[str] = Form(None),
+    target_format: str = Form(...),
+    pdf_font_family: Optional[str] = Form(None),
+    pdf_custom_css: Optional[str] = Form(None),
+    pdf_page_size: Optional[str] = Form(None),
+    pdf_orientation: Optional[str] = Form(None),
+    pdf_header: Optional[str] = Form(None),
+    pdf_footer: Optional[str] = Form(None),
+    pdf_page_numbers: Optional[str] = Form(None),
+    pdf_toc: Optional[str] = Form(None),
+) -> Response:
+    """
+    Batch convert multiple uploaded files (bounded concurrency).
+
+    Successful conversions are returned as a ZIP archive.
+    Partial failures recorded in errors.json inside the ZIP.
+    When source_format is omitted or "auto", each file is detected independently.
+    """
+    tgt = target_format.lower().lstrip(".")
+    if tgt not in SUPPORTED_TARGET_FORMATS:
+        raise UnsupportedFormatError(f"不支持的目标格式: {target_format}")
+    if not files:
+        raise EmptyFileError("未上传任何文件")
+    if len(files) > settings.max_batch_files:
+        raise InvalidDocumentError(
+            f"批量文件数超限：最多 {settings.max_batch_files} 个，当前 {len(files)}"
+        )
+
+    pdf_opts = _pdf_form_opts(
+        pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
+        pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+    )
+
+    payloads: list[tuple[str, bytes]] = []
+    total_size = 0
+    for upload in files:
+        name = upload.filename or "input"
+        up_spill = await read_upload_streaming(upload, prefix="mdbridge-batch-")
+        try:
+            content = up_spill.read()
+        finally:
+            up_spill.release()
+        total_size += len(content)
+        if total_size > settings.max_batch_total_bytes:
+            raise FileTooLargeError(
+                f"批量总大小超限：最多 {settings.max_batch_total_mb} MB"
+            )
+        payloads.append((name, content))
+
+    loop = asyncio.get_running_loop()
+    sem = asyncio.Semaphore(max(1, settings.batch_workers))
+
+    async def _one(name: str, content: bytes) -> tuple[str, bytes | None, dict | None]:
+        async with sem:
+            try:
+                if not content:
+                    raise EmptyFileError(f"文件为空: {name}")
+                if len(content) > settings.max_upload_bytes:
+                    raise FileTooLargeError(
+                        f"文件过大: {name}，限制 {settings.max_upload_mb} MB"
+                    )
+                src = _resolve_source_format(source_format, name, content)
+                converted = await loop.run_in_executor(
+                    _executor,
+                    lambda: convert(
+                        content,
+                        src,
+                        tgt,
+                        filename=name,
+                        **pdf_opts,
+                    ),
+                )
+                return _safe_output_filename(name, tgt), converted, None
+            except MdBridgeError as exc:
+                return name, None, {"file": name, "code": exc.code, "message": exc.message}
+            except Exception as exc:
+                msg = str(exc) if settings.debug else "转换失败，请检查文件格式"
+                return name, None, {"file": name, "code": "conversion_error", "message": msg}
+
+    results = await asyncio.gather(*[_one(n, c) for n, c in payloads])
+
+    successes: list[tuple[str, bytes]] = []
+    failures: list[dict[str, str]] = []
+    for out_name, data, err in results:
+        if err:
+            failures.append(err)
+        elif data is not None:
+            successes.append((out_name, data))
+
+    if not successes:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": True,
+                "code": "batch_failed",
+                "message": "批量转换全部失败",
+                "status_code": 422,
+                "total": len(files),
+                "succeeded": 0,
+                "failed": len(failures),
+                "items": failures,
+            },
+        )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        used_names: set[str] = set()
+        for out_name, data in successes:
+            safe = _unique_zip_name(out_name, used_names)
+            zf.writestr(safe, data)
+        if failures:
+            zf.writestr(
+                "errors.json",
+                json.dumps(
+                    {
+                        "total": len(files),
+                        "succeeded": len(successes),
+                        "failed": len(failures),
+                        "items": failures,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+            )
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": _content_disposition("converted_batch.zip"),
+            "X-Batch-Total": str(len(files)),
+            "X-Batch-Succeeded": str(len(successes)),
+            "X-Batch-Failed": str(len(failures)),
+        },
+    )
+
+
+def _safe_output_filename(original: str | None, target_format: str) -> str:
+    """Basename-only, strip path traversal, produce safe download / ZIP entry name."""
+    raw = original or f"converted.{target_format}"
+    # Drop any directory components (ZIP Slip / path traversal)
+    base = raw.replace("\\", "/").split("/")[-1]
+    base = base.lstrip(".")  # avoid hidden / empty weirdness
+    if "." in base:
+        stem = base.rsplit(".", 1)[0]
+    else:
+        stem = base
+    stem = _SAFE_STEM.sub("_", stem).strip("._") or "converted"
+    # Cap length
+    stem = stem[:120]
+    return f"{stem}.{target_format}"
+
+
+def _unique_zip_name(name: str, used: set[str]) -> str:
+    if name not in used:
+        used.add(name)
+        return name
+    stem, _, ext = name.rpartition(".")
+    n = 2
+    while True:
+        candidate = f"{stem}_{n}.{ext}" if ext else f"{name}_{n}"
+        if candidate not in used:
+            used.add(candidate)
+            return candidate
+        n += 1
+
+
+def _ascii_fallback(filename: str) -> str:
+    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
+    ext = filename.rsplit(".", 1)[-1] if "." in filename else ""
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._") or "converted"
+    return f"{safe}.{ext}" if ext else safe
+
+
+def _content_disposition(filename: str) -> str:
+    fallback = _ascii_fallback(filename)
+    encoded = quote(filename, safe="")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}"
