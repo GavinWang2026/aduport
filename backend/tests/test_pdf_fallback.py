@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from app.importers.pdf_font_fix import normalize_pdf_text
-from app.importers.pdf_importer import _is_hub_network_error
 from app.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
+from app.importers.pdf_importer import _is_hub_network_error
+
 
 MIN_PDF = b"""%PDF-1.4
 1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj

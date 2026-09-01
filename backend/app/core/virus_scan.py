@@ -34,7 +34,9 @@ def scan_bytes(data: bytes, filename: str = "upload.bin") -> None:
     if not binary:
         msg = "已启用病毒扫描但未找到 clamscan/clamdscan"
         if settings.virus_scan_fail_closed:
-            raise InvalidDocumentError(msg)
+            raise MdBridgeError(
+                msg, code="virus_scan_unavailable", status_code=503
+            )
         _log.warning(msg)
         return
 

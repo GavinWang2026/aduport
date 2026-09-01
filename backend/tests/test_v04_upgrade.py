@@ -143,6 +143,6 @@ def test_memory_budget(monkeypatch):
 
 def test_health_v04(client):
     h = client.get("/api/health").json()
-    assert h["version"] == "0.11.0"
+    assert h["version"] == "0.16.0"
     assert "jobs" in h
     assert "memory_budget_mb" in h

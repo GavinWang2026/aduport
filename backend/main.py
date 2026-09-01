@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import __version__
 from app.api.auth import APIKeyMiddleware
 from app.api.rate_limit import RateLimitMiddleware
 from app.api.routes import router
@@ -27,7 +28,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     description="Local document bidirectional converter (PDF/DOCX/Markdown/TXT/HTML/PPTX/EPUB/MOBI)",
-    version="0.11.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -82,4 +83,4 @@ async def unhandled_error_handler(_request: Request, exc: Exception) -> JSONResp
 
 @app.get("/")
 async def root() -> dict[str, str]:
-    return {"message": "md-bridge API", "docs": "/docs", "version": "0.11.0"}
+    return {"message": "md-bridge API", "docs": "/docs", "version": __version__}

@@ -20,7 +20,14 @@ def _ensure_logger() -> None:
     _logger.setLevel(logging.INFO)
     path = Path(settings.audit_log_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(path, encoding="utf-8")
+    from logging.handlers import RotatingFileHandler
+
+    handler = RotatingFileHandler(
+        path,
+        maxBytes=max(1_000_000, int(getattr(settings, "audit_max_bytes", 50 * 1024 * 1024))),
+        backupCount=max(1, int(getattr(settings, "audit_backup_count", 10))),
+        encoding="utf-8",
+    )
     handler.setFormatter(logging.Formatter("%(message)s"))
     _logger.addHandler(handler)
     _logger.propagate = False
@@ -51,10 +58,26 @@ def audit_event(
     cached: bool = False,
     bytes_in: int = 0,
     bytes_out: int = 0,
+    tenant_id: str | None = None,
+    importer: str = "",
 ) -> None:
     if not settings.audit_enabled:
         return
     _ensure_logger()
+    if not client:
+        try:
+            from app.core.request_context import current_client
+
+            client = current_client()
+        except Exception:
+            client = ""
+    if tenant_id is None:
+        try:
+            from app.core.request_context import current_tenant_id
+
+            tenant_id = current_tenant_id()
+        except Exception:
+            tenant_id = None
     record = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "action": action,
@@ -64,9 +87,12 @@ def audit_event(
         "success": success,
         "detail": _sanitize_detail(detail) if detail else "",
         "client": client,
+        "tenant_id": tenant_id,
         "cached": cached,
         "bytes_in": bytes_in,
         "bytes_out": bytes_out,
+        # anydoc_fast_md | anydoc | native | native_fallback | "" (passthrough/unknown)
+        "importer": importer or "",
     }
     with _lock:
         _logger.info(json.dumps(record, ensure_ascii=False))

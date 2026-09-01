@@ -31,10 +31,6 @@ def export_md(model: DocumentModel) -> str:
     if model.title:
         lines.append(f"# {model.title}")
         lines.append("")
-    if model.metadata:
-        for k, v in model.metadata.items():
-            lines.append(f"<!-- meta:{k} {v} -->")
-        lines.append("")
 
     for node in model.nodes:
         if isinstance(node, Heading):
@@ -122,8 +118,7 @@ def _render_rich(rich: RichText) -> str:
         types = {m.type for m in active_marks}
         if InlineMarkType.LINK in types:
             href = next((m.href for m in active_marks if m.type == InlineMarkType.LINK), "") or ""
-            if not href.startswith("#fn-"):
-                segment = f"[{segment}]({href})"
+            segment = f"[{segment}]({href})"
         if InlineMarkType.BOLD in types:
             segment = f"**{segment}**"
         if InlineMarkType.ITALIC in types:

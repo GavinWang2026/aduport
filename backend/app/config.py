@@ -34,21 +34,68 @@ class Settings(BaseSettings):
     cors_origins: str = "local"
     cors_allow_credentials: bool = False
 
-    ocr_enabled: bool = True
+    ocr_enabled: bool = False
+    # OCR router: auto | mineru | paddleocr_vl | docling | none
+    ocr_engine: str = "auto"
+    # balanced → MinerU first; accurate → PaddleOCR-VL first
+    ocr_mode: str = "balanced"
+    # Second try when primary fails / output too short
+    ocr_fallback: str = "paddleocr_vl"
+    # Soft quality gate (chars across nodes); 0 = disable
+    ocr_min_chars: int = 40
+    ocr_timeout_seconds: float = 300.0
+    # Cap pages fed to OCR engines (0 = unlimited). Full textbooks otherwise hang.
+    ocr_max_pages: int = 20
+    mineru_bin: str = "mineru"
+    mineru_backend: str = "pipeline"
+    # Formula OCR pulls Unimernet + transformers; default off for lighter installs
+    mineru_formula: bool = False
+    mineru_table: bool = True
+    # Writable cache for PaddleX / ModelScope (empty = use process HOME)
+    ocr_home: str = ""
+    # PaddleOCR-VL: auto | true | false. auto = off on macOS (SIGTRAP in short workers)
+    ocr_allow_paddle: str = "auto"
 
-    # PDF import: auto | text | docling
-    # auto = use embedded text when rich enough, else docling; Hub timeout → text fallback
+    # PDF import: auto | text | docling | mineru | paddleocr_vl
+    # auto = use embedded text when rich enough, else OCR (if enabled) / docling
     pdf_engine: str = "auto"
     pdf_text_min_chars: int = 80
     pdf_docling_tables: bool = True
     docling_artifacts_path: str = ""
     # Optional Hugging Face mirror (e.g. https://hf-mirror.com) for docling model download
     hf_endpoint: str = ""
+    # Never attempt Hub download at runtime (fail fast → text fallback)
+    docling_offline: bool = True
+    # Soft timeout for a single docling.convert call (seconds)
+    docling_timeout_seconds: float = 60.0
+
+    # --- anydoc native parser (vendored Rust, abi3) ---
+    # Master switch for the high-fidelity Office / EPUB / spreadsheet importer.
+    anydoc_enabled: bool = True
+    # Comma-separated allow-list of *shared* formats anydoc may accelerate.
+    # anydoc-only formats (xls, xlsb, ods, odp, ppt, rtf, odt, docm, …) are
+    # always owned when enabled; this list governs formats that also have a
+    # native importer. xlsx is intentionally excluded (kept native for header
+    # inference). "*" enables every supported shared format.
+    anydoc_formats: str = "docx,rtf,odt,ppt,pps,pot,pptm,ppsx,ppsm,docm"
+    # Route Markdown targets straight to anydoc's own GFM (no fidelity loss).
+    anydoc_fast_markdown: bool = True
+
+    def anydoc_format_list(self) -> set[str]:
+        """Parsed allow-list of shared formats anydoc may own."""
+        raw = (self.anydoc_formats or "").strip()
+        if raw == "*":
+            return {"*"}
+        return {f.strip().lower().lstrip(".") for f in raw.split(",") if f.strip()}
 
     pdf_font_family: str = "Noto Sans CJK SC, Helvetica Neue, Arial, sans-serif"
     pdf_custom_css: str = ""
     # Chinese typesetting enhancements for PDF
     pdf_cjk_typeset: bool = True
+    # Explicit CJK font file for pdf_simple embedding (empty = auto-discover)
+    pdf_cjk_font_path: str = ""
+    # When CJK cannot be embedded: error | ascii
+    pdf_cjk_fallback: str = "error"
     # PDF layout options (WeasyPrint @page)
     pdf_page_size: str = "A4"
     pdf_orientation: str = "portrait"  # portrait | landscape
@@ -70,6 +117,13 @@ class Settings(BaseSettings):
 
     # DOCX theme: default | academic | minimal
     docx_theme: str = "default"
+    # Prefix headings with 1 / 1.1 / 1.1.1 on export
+    heading_numbering: bool = False
+
+    # Image compress / downsample before export (requires Pillow)
+    image_compress: bool = False
+    image_max_edge: int = 1600
+    image_jpeg_quality: int = 82
 
     # Tables: treat first row as <th> (MD/GFM convention). Set false for all <td>.
     table_first_row_header: bool = True
@@ -97,6 +151,8 @@ class Settings(BaseSettings):
     cache_gzip_min_bytes: int = 2048
     audit_enabled: bool = True
     audit_log_path: str = "logs/audit.jsonl"
+    audit_max_bytes: int = 50 * 1024 * 1024
+    audit_backup_count: int = 10
     # Magic-bytes upload check
     magic_bytes_check: bool = True
 
@@ -113,14 +169,39 @@ class Settings(BaseSettings):
     job_max_entries: int = 256
     # 0 = unlimited in-flight upload budget for async jobs
     memory_budget_mb: int = 512
+    # Persist finished job metadata (empty = memory only)
+    job_db_path: str = "data/jobs.sqlite3"
+
+    # Soft warn / reject oversized DOCX AST (0 = disabled)
+    docx_max_nodes: int = 50_000
+
+    # Optional Redis URL for multi-replica rate limiting (empty = in-process)
+    redis_url: str = ""
+
+    # Run each conversion in a child process (survives native SIGABRT)
+    convert_isolate: bool = True
+    convert_timeout_seconds: int = 600
 
     # Optional virus scan (ClamAV)
     virus_scan: bool = False
-    virus_scan_fail_closed: bool = False
+    virus_scan_fail_closed: bool = True
     virus_scan_timeout_seconds: int = 60
 
     # Optional HTTP Basic Auth (user:pass). Empty = disabled.
     basic_auth: str = ""
+
+    # Multi-tenant API keys (P0-3). Formats:
+    #   JSON file path, or inline JSON array:
+    #   [{"tenant_id":"acme","api_key":"sk-…","rate_limit":120}]
+    #   Or compact: "acme:sk-aaa,beta:sk-bbb"
+    # When empty, falls back to single settings.api_key (tenant_id="default").
+    api_keys: str = ""
+
+    # Enterprise license (one-machine-one-key). Off by default for OSS self-host.
+    license_required: bool = False
+    license_key: str = ""
+    license_file: str = ""
+    license_secret: str = ""
 
     @property
     def max_upload_bytes(self) -> int:

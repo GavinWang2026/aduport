@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios'
-import type { ConvertResult, SourceFormat, TargetFormat } from './types'
+import type { ConvertResult, SourceFormatOption, TargetFormat } from './types'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '',
@@ -68,7 +68,7 @@ function sleep(ms: number) {
 /** Async job path: enqueue → poll → download result. */
 export async function convertDocumentAsync(
   file: File,
-  sourceFormat: SourceFormat,
+  sourceFormat: SourceFormatOption,
   targetFormat: TargetFormat,
   onProgress?: (p: number, status: string) => void,
 ): Promise<ConvertResult> {
@@ -110,15 +110,35 @@ export async function convertDocumentAsync(
   }
 }
 
-/** Prefer async jobs for better progress; falls back message on hard failures. */
 export async function convertDocument(
   file: File,
-  sourceFormat: SourceFormat,
+  sourceFormat: SourceFormatOption,
   targetFormat: TargetFormat,
   onProgress?: (p: number, status: string) => void,
 ): Promise<ConvertResult> {
-  // Files under 2MB still use async queue (uniform UX / memory budget)
   return convertDocumentAsync(file, sourceFormat, targetFormat, onProgress)
+}
+
+/** Multi-file ZIP via POST /api/convert/batch (source_format=auto per file when requested). */
+export async function convertBatchZip(
+  files: File[],
+  sourceFormat: SourceFormatOption,
+  targetFormat: TargetFormat,
+): Promise<{ filename: string; blob: Blob }> {
+  const form = new FormData()
+  for (const f of files) {
+    form.append('files', f, f.name)
+  }
+  form.append('source_format', sourceFormat)
+  form.append('target_format', targetFormat)
+  try {
+    const response = await api.post('/api/convert/batch', form, { responseType: 'blob' })
+    const disposition = response.headers['content-disposition'] as string | undefined
+    const filename = parseFilename(disposition, `batch-${targetFormat}.zip`)
+    return { filename, blob: response.data as Blob }
+  } catch (err) {
+    throw new Error(await extractErrorMessage(err))
+  }
 }
 
 export async function fetchHealth(): Promise<boolean> {
@@ -127,6 +147,23 @@ export async function fetchHealth(): Promise<boolean> {
     return data?.status === 'ok'
   } catch {
     return false
+  }
+}
+
+export interface FormatsPayload {
+  formats: string[]
+  source: string[]
+  target: string[]
+  export_only: string[]
+  notes?: Record<string, string>
+}
+
+export async function fetchFormats(): Promise<FormatsPayload | null> {
+  try {
+    const { data } = await api.get<FormatsPayload>('/api/formats')
+    return data
+  } catch {
+    return null
   }
 }
 
@@ -140,11 +177,18 @@ export interface ServerJob {
   error?: string | null
   result_filename?: string | null
   created_at: number
+  bytes_in?: number
+  bytes_out?: number
 }
 
 export async function listServerJobs(): Promise<ServerJob[]> {
   const { data } = await api.get<{ jobs: ServerJob[] }>('/api/jobs')
   return data.jobs || []
+}
+
+export async function getServerJob(jobId: string): Promise<ServerJob> {
+  const { data } = await api.get<ServerJob>(`/api/jobs/${jobId}`)
+  return data
 }
 
 export async function downloadServerJob(jobId: string, fallbackName: string): Promise<void> {

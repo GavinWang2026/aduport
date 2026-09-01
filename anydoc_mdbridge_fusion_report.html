@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="jw9xF7mBSerAgydh8Fp2BB">
+<head data-page-node-id="wDS0hHmnuC0mNPBIT0FLQq">
+<meta charset="utf-8" data-page-node-id="kPrphwQWnvVMLE6hHKGaAl" />
+<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="E0BeiKTjACmzxbSvpOT9EU" />
+<title>anydoc × md-bridge 源码级完全融入 · 全面评估报告 v2</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#ffffff; --ink:#1b2330; --muted:#5b6675; --line:#e3e8ef;
+    --brand:#2563eb; --brand2:#0ea5e9; --good:#15a36e; --warn:#d97706; --bad:#dc2626;
+    --p0:#dc2626; --p1:#d97706; --p2:#2563eb; --p3:#64748b; --chip:#eef4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 -apple-system,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 22px 72px;}
+  header{border-bottom:3px solid var(--brand);padding-bottom:18px;margin-bottom:26px;}
+  h1{font-size:26px;margin:0 0 8px;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:14px}
+  h2{font-size:19px;margin:36px 0 12px;padding-left:11px;border-left:4px solid var(--brand)}
+  h3{font-size:15.5px;margin:20px 0 8px;color:#243}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;box-shadow:0 1px 2px rgba(20,40,80,.04)}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;vertical-align:top;text-align:left}
+  th{background:#f0f4fa;font-weight:600;color:#243}
+  tr:nth-child(even) td{background:#fafcff}
+  code{background:#eef2f7;padding:1px 6px;border-radius:5px;font-size:12.5px;color:#0b3a66}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;color:#fff}
+  .p0{background:var(--p0)} .p1{background:var(--p1)} .p2{background:var(--p2)} .p3{background:var(--p3)}
+  .ok{color:var(--good);font-weight:700} .todo{color:var(--warn);font-weight:700} .no{color:var(--bad);font-weight:700}
+  .pill{display:inline-block;background:var(--chip);color:#1646a6;font-size:12px;padding:3px 10px;border-radius:20px;margin:2px 4px 2px 0}
+  .barwrap{display:flex;align-items:flex-end;gap:28px;height:210px;padding:10px 6px 0}
+  .barcol{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:86px}
+  .bar{width:56px;border-radius:8px 8px 0 0;background:linear-gradient(180deg,var(--brand2),var(--brand));position:relative}
+  .bar.muted{background:#94a3b8}
+  .bar .v{position:absolute;top:-22px;left:0;right:0;text-align:center;font-weight:800;font-size:15px;color:var(--ink)}
+  .barlbl{margin-top:8px;font-size:12.5px;color:var(--muted);text-align:center}
+  .callout{border-left:4px solid var(--brand);background:#eef5ff;padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.warn{border-color:var(--warn);background:#fff7ed}
+  .callout.good{border-color:var(--good);background:#ecfdf5}
+  .callout.bad{border-color:var(--bad);background:#fef2f2}
+  .kvs{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:13.5px}
+  .kvs b{color:#334}
+  .foot{margin-top:40px;color:var(--muted);font-size:12.5px;text-align:center}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+  .scoreline{font-size:13px;color:var(--muted);margin-top:6px}
+  .stat{text-align:center;padding:8px}
+  .stat .n{font-size:28px;font-weight:800;color:var(--brand);line-height:1.1}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+  pre.dark{background:#0f172a;color:#e2e8f0;padding:14px 16px;border-radius:8px;font-size:12.5px;overflow:auto;line-height:1.45}
+  .toc a{color:var(--brand);text-decoration:none;margin-right:12px;font-size:13px}
+  .toc a:hover{text-decoration:underline}
+</style>
+</head>
+<body data-page-node-id="P82YGstuEgFaqxzRAHIc19">
+<div class="wrap" data-page-node-id="EkEXiiTvMFBbpXAqzGCKpa">
+
+<header data-page-node-id="hl2qf6m3naL6u6cZAsVwkV">
+  <h1 data-page-node-id="BXTm2YWZ9weZLnpx5u2EDY">anydoc × md-bridge 源码级完全融入 · 全面评估报告</h1>
+  <div class="sub" data-page-node-id="bKXshYU3brCqkhRqggsjKc">
+    口径：「完全融入」= 将 <b data-page-node-id="7mLynjWasdgUSJk41aTXN1">anydoc-main</b> 的 Rust 解析内核源码 <b data-page-node-id="5VZaRlV1Ji2lGAsL2Z2Mdw">vendoring</b> 进 md-bridge，编译为程序内置扩展
+    <code data-page-node-id="wyZXO5QRAosVXOkxQdh8NN">mdbridge_native._doc</code>，形成<strong data-page-node-id="VSBtaVyZ6TWIZNjALnC70C">单一完整程序</strong>（非 PyPI 运行时依赖）。
+    · 版本 <b data-page-node-id="ENuMOiqsblHZyCLHyai10x">v2</b> · 复核日期 2026-09-01 · 承接并校准既有 v1 报告
+  </div>
+  <div class="toc" style="margin-top:12px" data-page-node-id="CO2jLJlGjPSgrp5F4mZKCL">
+    <a href="#s0" data-page-node-id="3s4BWIA4EZpLP519G3nZx0">结论</a>
+    <a href="#s1" data-page-node-id="Hmk5baHSdARhudR7CMTNo5">定义</a>
+    <a href="#s2" data-page-node-id="bJlFuMl1sH31psMZWWts3h">路线</a>
+    <a href="#s3" data-page-node-id="Zus2mi16zaOkLTyjHW6BK0">资产</a>
+    <a href="#s4" data-page-node-id="N6El4tWBqBVymaeQ6SuG9u">架构</a>
+    <a href="#s5" data-page-node-id="Hc7lG4MkjFHkbgQN88FOKD">能力</a>
+    <a href="#s6" data-page-node-id="5xoIpAdJONBQ4L4vjGv6z3">评分</a>
+    <a href="#s7" data-page-node-id="LjIXAsBWJthgzqrfC1bgsY">状态</a>
+    <a href="#s8" data-page-node-id="IFycr8lL266hvty59VuqUR">缺口</a>
+    <a href="#s9" data-page-node-id="alsTN5VC2cP2HFToXVzD7l">合规</a>
+    <a href="#s10" data-page-node-id="vMn2IiG2ExSOZCERe8TJYt">风险</a>
+    <a href="#s11" data-page-node-id="cMCmeCT2ccB8hgBy6CZ3VQ">路线图</a>
+  </div>
+</header>
+
+<div class="callout good" id="s0" data-page-node-id="xXW1QzcPTBTZGFnS5kTe7e">
+  <b data-page-node-id="Dt1JGXlEPDuoh4J7s6nbcv">结论先行：</b>按「源码并入、打成一个完整程序」的口径，融合主干<strong data-page-node-id="juBDmOIMeLA63oQynBGMme">已经落地并可运行</strong>：
+  <code data-page-node-id="bB6recd8XDGaA6yxai0PwU">native/anydoc/</code>（约 24,361 行 Rust / 76 个 <code data-page-node-id="wRcKvNXPSkjstjjQ7jkuqZ">.rs</code>）经 maturin 编为
+  <code data-page-node-id="XOGzACczlf4G6EF5qa7v8o">mdbridge_native._doc</code>；适配层只改 1 处 import；快通道 + DocumentModel 映射 + CI
+  <code data-page-node-id="y9iWANSwrssDjxVxALCn5O">native-build</code> + 前端 12 个新源格式均已接通；上游联网 OCR（<code data-page-node-id="ESlXUqhA6uPs3OvvHA10dy">ocr="hosted"</code>）在绑定层<strong data-page-node-id="0tVDN5tlcuz4fmGePe1M3P">已裁剪</strong>。
+  <br data-page-node-id="3I0bodsE70hTrAowDQEbnN"><br data-page-node-id="ONIwg8RYF4bYdGfLIv8E3c">
+  综合评分（加权）：融入前 <b data-page-node-id="9maQ2gL7zpXA8q1vUQGDLi">50.8</b> → 外部 wheel <b data-page-node-id="bc5DWatJdTqM9L04MAhFWu">93.3</b> → <b data-page-node-id="cZOPHMuzypMiN2P9IwOdkB">源码融入现状 94.1</b>
+  （相对 v1 报告的 96.4，本版因 Docker 未编扩展、仓库双树并存、<code data-page-node-id="2ZpUeeQHaVcozxlicBrCrh">target/</code> 构建产物膨胀、.env 缺项等<strong data-page-node-id="KWFFknCRnn61rudJFtWN65">交付洁净度扣分</strong>，见 §6 / §8）。
+  距「产品级完全融入」还差收尾，不差引擎。
+</div>
+
+<!-- 1 定义 -->
+<h2 id="s1" data-page-node-id="f86jjbVXsrEfC3khtL73Mx">1. 「完全融入」的精确定义（BOSS 口径）</h2>
+<div class="card" data-page-node-id="3JCC6CjG54vwUek210JsPh">
+  <div class="grid g2" data-page-node-id="Et3NxuDlm1ZlznHWyyrmeF">
+    <div data-page-node-id="0syGtxROrsRmmObffBiIkp">
+      <h3 data-page-node-id="RB5mvoast6P5GfpjCOwfis">是什么</h3>
+      <ul class="tight" data-page-node-id="6ZLqesVlyX79HFscfy2Sdw">
+        <li data-page-node-id="4Nt2GN59OEO8KHFHLz3FuB">anydoc <b data-page-node-id="nCvkPyJzZ5r6X3svu1OVYr">源码</b>进入 md-bridge 仓库（<code data-page-node-id="kmUMIRUEOORlKi4T9DjrCk">native/anydoc/</code>）</li>
+        <li data-page-node-id="qWnQNtOupxjw0LFi3ktmPe">构建时编成 <b data-page-node-id="vAt3FED4GqhMY7wJ8EJu96">本程序自己的</b> 原生扩展 <code data-page-node-id="BNbd4fZuaPBKNu7JBSH017">mdbridge_native._doc</code></li>
+        <li data-page-node-id="LipUlBR08oPwSG6Kvh6iA4">运行时 <b data-page-node-id="jD875ipmlVV4csI6hvs9TJ">不</b> <code data-page-node-id="vOMSJdXXumk1zK5S1FHpJz">pip install firecrawl-anydoc</code></li>
+        <li data-page-node-id="2fcxwHQQrBlfyY8vJO2stw">可裁剪（已删联网 OCR）、可演进、可离线构建与分发</li>
+        <li data-page-node-id="RL3fS71WkrjGmTmJsi1RBC">对外仍是一个产品：SDK / CLI / API / Web UI 双向转换壳不变</li>
+      </ul>
+    </div>
+    <div data-page-node-id="m8SHETriVVD8yieTMsWiGF">
+      <h3 data-page-node-id="CAwevLl5BIzAAt29XdSnqK">不是什么</h3>
+      <ul class="tight" data-page-node-id="gHfZQzacTn51D3qs1XUTxg">
+        <li data-page-node-id="69KyOGyzmaFDTFVpMgy6hm">❌ 仅依赖 PyPI 的「可选加速器」（路线 A，已否决）</li>
+        <li data-page-node-id="FrZGWSlosG75az9HH0LfpC">❌ 用 anydoc Document 替换 <code data-page-node-id="reG88uKDJcwTYzkqgYpOqe">DocumentModel</code>（会毁掉双向导出）</li>
+        <li data-page-node-id="jmF0VV32H2Ks2PCen5bkA7">❌ 引入 Firecrawl hosted OCR（违反私有化零外链）</li>
+        <li data-page-node-id="5sl4CVc8oDYg9QbCUeGb84">❌ 并入 Node / WASM / bench / fuzz / Agent Skill（与产品运行时无关）</li>
+        <li data-page-node-id="0PFZ3DlyrsiGPJU0yVSCnX">❌ 让 anydoc 负责 MD→DOCX/PDF 导出（它只做导入侧）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout" style="margin-top:12px" data-page-node-id="Sf9bARe9yoCdEE45KQgiK4">
+    <b data-page-node-id="s0g9qp0BL02Qx5E0DQTNbV">一句话：</b>anydoc = md-bridge 的<strong data-page-node-id="muxoV5DLTEldUaCJSMlf1p">内置只读解析内核</strong>；md-bridge = 双向产品壳 + OCR + 导出器 + 服务化能力。两者合成一个程序，职责不混。
+  </div>
+</div>
+
+<!-- 2 路线对比 -->
+<h2 id="s2" data-page-node-id="bXvy6TPnxmlUjP1mYX9keB">2. 两种集成路线（为何采用源码融入）</h2>
+<div class="card" data-page-node-id="bsHRygov9tfv2Sat9Duj0V">
+<table data-page-node-id="rIApBeeuLXMGGht72Skmbe">
+  <tr data-page-node-id="jcMGQFvk0eavds60qsGOFG"><th data-page-node-id="D1GEbNHQV9Psj1zceTWZLj">维度</th><th data-page-node-id="bOjOnfkCDXRJUJPQ24E71g">路线 A：外部 PyPI wheel（否决）</th><th data-page-node-id="3wmiJO35l1UW61dP7eiS8P">路线 B：源码 vendoring 内联（采用）</th></tr>
+  <tr data-page-node-id="5eJF8075xTsNCw9p2xg4Yt"><td data-page-node-id="5sqse6reg924ytzcF25LJj">私有化契合度</td><td class="todo" data-page-node-id="21I2EVL6PXAAEb5jTAARCS">运行时仍可能外拉 <code data-page-node-id="dyxY92IPg614xVbwEoeqwu">firecrawl-anydoc</code></td><td class="ok" data-page-node-id="tAmk1hoYdZOzwXTQdwPsm4">源码在仓、构建可离线、分发自包含</td></tr>
+  <tr data-page-node-id="bJGepwva7F3MBiEfyMmxVB"><td data-page-node-id="viFkGcg3SRJKv68s3jzO0V">零外链合规</td><td class="no" data-page-node-id="e7JWagkVBt0ZoRG5N16tUj">wheel 原样携带 <code data-page-node-id="P3Lax5isOcVAtVnSSGdk0E">ocr="hosted"</code></td><td class="ok" data-page-node-id="PLel8sRu0ft31Ea1H6dTMN">vendoring 时裁剪联网分支</td></tr>
+  <tr data-page-node-id="QwsBfTWFbC1PGi0fDnJ1Cs"><td data-page-node-id="qAsOC1U52rkBdneaQAmBH2">程序完整性</td><td class="todo" data-page-node-id="OxWxUgZ8OJIYKCkSqq3E9L">依赖外部组件，不是「一个程序」</td><td class="ok" data-page-node-id="FDVSHSHZ3ro0CbeV4QvZcf">Rust 解析器是 native 子组件</td></tr>
+  <tr data-page-node-id="C6TAkM6pwYp2jmXhcZr5bf"><td data-page-node-id="ZUm9EWNruUit1F6KEZsigj">可裁剪 / 可演进</td><td class="todo" data-page-node-id="rfWXhidqoA8qjpYxMkPIzF">只能整体接受上游</td><td class="ok" data-page-node-id="2LrA5xiAc01f689zHJjNvU">可改源码、改绑定、加自有特性</td></tr>
+  <tr data-page-node-id="LkNKwAAgqkT88aq1sAHsGS"><td data-page-node-id="s9JJG4CCjKAQN1Ped4ptFo">维护成本</td><td class="ok" data-page-node-id="50c2SyAVYzovxAnf5hOYfC">跟 PyPI 升级</td><td class="todo" data-page-node-id="EiMC27oSgIT0GCZBeeLYMq">需 <code data-page-node-id="DHXcXmagV9PWRM1ZIj1Juw">sync_anydoc.sh</code> / subtree 同步</td></tr>
+  <tr data-page-node-id="PcmQGvFihqil8iBJi77DqL"><td data-page-node-id="RDWddN5gzVxsYtDd4TeBtE">构建复杂度</td><td class="ok" data-page-node-id="TfD1KACzjMxDvomW05jqRf">pip 一行</td><td class="todo" data-page-node-id="BSnQFlXO7xMZZ8uJcaFrHQ">需 Rust + maturin（已封装 <code data-page-node-id="pORQ2GL7aJ9YquxoKHxfe5">build_native.sh</code>）</td></tr>
+  <tr data-page-node-id="q5lthdftynXZ3VIq6BrNPp"><td data-page-node-id="W06YRRJ6SE0WFWDYGRngIo">许可</td><td class="ok" data-page-node-id="OpLaNdaCGM7OzNJBaE70aB">MIT</td><td class="ok" data-page-node-id="Fj41uBTfdWYip0GwaOhn0N">MIT，保留 LICENSE / 版权头即合规</td></tr>
+</table>
+<div class="callout" data-page-node-id="D8zEzD7mSyKSCOA8ZJZ33D">路线 B 以「稍高的构建/同步成本」换「彻底自包含 + 零外链 + 可裁剪」，与禁 GPL、禁外链、禁 LibreOffice 重依赖的硬约束对齐。</div>
+</div>
+
+<!-- 3 资产 -->
+<h2 id="s3" data-page-node-id="s7og4y7G91gmqCxE4Gb9DL">3. 代码资产盘点与取舍</h2>
+<div class="grid g3" data-page-node-id="RBu6vq1suGOH2i90I0q8G7">
+  <div class="card" data-page-node-id="l7cu65VGlBiGrOfXLmVS5s">
+    <h3 data-page-node-id="3AgC9hjs3LSNclADxBKj8Q">纳入（运行时）</h3>
+    <ul class="tight" data-page-node-id="rIsqCIsGyjoseOHtZkUj5z">
+      <li data-page-node-id="dPDT6ruLWCEbjTgDmwfkgZ"><code data-page-node-id="HOAGfQdtuFzBOre5E9Odud">native/anydoc/src/</code> 解析内核（v0.2.4）</li>
+      <li data-page-node-id="2uanjvy0Nz82guM1HCuq9e"><code data-page-node-id="43eVQxtFAEMCJ8CkH6tyAl">native/anydoc/python/</code> PyO3 绑定（改名 <code data-page-node-id="oqOHx76dsvBDU9qL6YWSKe">_doc</code>）</li>
+      <li data-page-node-id="RcGoWDRtdmuG2lWLDsC7AT"><code data-page-node-id="kQjpZU7ZqIC9PG86zjtWli">LICENSE</code> + 必要 README</li>
+      <li data-page-node-id="TzaSoVdNfeqpAUjjOvCWOg">直接依赖 8：cfb / csv / flate2 / encoding_rs / log / pdf-inspector / quick-xml / zip</li>
+      <li data-page-node-id="S55VVzue2WPIxjvyHlud9Q">传递依赖约 144，<b data-page-node-id="CDOKOlHDge5pyrZIwMlDUV">零 GPL/AGPL/SSPL</b></li>
+    </ul>
+  </div>
+  <div class="card" data-page-node-id="qUrWvGGkF7hQVVjx3FgXIs">
+    <h3 data-page-node-id="I1FBH9I9zOi9W1rTXdsAwy">排除（不进产品）</h3>
+    <ul class="tight" data-page-node-id="TcG3pa3ARQ3JNAoG6os2Eq">
+      <li data-page-node-id="81jWAhiDB4kDj0JG0pTIJT"><code data-page-node-id="HCABHfVw54UX2jz7NJMULB">node/</code>、<code data-page-node-id="qVK99lbTpsPFscNKfNkTEd">wasm/</code></li>
+      <li data-page-node-id="FyI8rrSXmBNF5n1hHGtvFT"><code data-page-node-id="fQL5wFv95NA3qPQRSRiyXC">bench/</code>、<code data-page-node-id="1e2knVWccXA2s2Foug1lYZ">fuzz/</code>、上游 <code data-page-node-id="NSWZt4ivu8jjXOhNhfxxJE">tests/</code></li>
+      <li data-page-node-id="OppeMXRtAmmEQXTX8HzKN1">Agent Skill</li>
+      <li data-page-node-id="YAhOIsEneLOgfsaJwUGTml">Python 包装层 <code data-page-node-id="2sj2H4HVj1PnkiW7PGQ1AH">_parse_hosted</code> / <code data-page-node-id="0H5WyFhIrA852ScQwDj3Hz">urllib</code> 联网 OCR</li>
+    </ul>
+  </div>
+  <div class="card" data-page-node-id="YtKW3x9cc1cBIG7mWgByLF">
+    <h3 data-page-node-id="5hjS3OfSKHup5at73vKzKC">仓库现状（复核）</h3>
+    <ul class="tight" data-page-node-id="GOOIlQcEcrjIoCbA5dCOVx">
+      <li class="ok" data-page-node-id="wYwatNPXQDihIxnAtDLMQG">✅ <code data-page-node-id="pcLPrKZ4Rmc4TBOSx3KvLC">native/anydoc/</code> 已存在且已编过 wheel</li>
+      <li class="todo" data-page-node-id="L4Hmz6yiHN4DfE0QLfBiwu">⚠ <code data-page-node-id="Qe7mF6uMsnukfmc6z2RYeG">anydoc-main/</code> 仍并存（约 4&nbsp;MB，完整上游树）</li>
+      <li class="todo" data-page-node-id="P8U8WdVwm9pBEZIVF54jfE">⚠ <code data-page-node-id="Kr9XweHwkBDUjzuBOgRGCM">native/anydoc/target/</code> 约 345&nbsp;MB（构建产物，应忽略）</li>
+      <li class="ok" data-page-node-id="imEHQ776XBbUzncJYQGER5">✅ 绑定源码无 <code data-page-node-id="oPB7AX5DOTaYSIwxAEhC65">urllib</code>/<code data-page-node-id="jMlzY85Eq2cWnwSMbeD5eB">hosted</code></li>
+      <li class="todo" data-page-node-id="KHwmO3TclywzPPzweznfgz">⚠ vendored README 仍残留 hosted 文档叙述</li>
+    </ul>
+  </div>
+</div>
+<div class="grid g4" data-page-node-id="MITH15D4tWMDVJGh1O4a9m">
+  <div class="card stat" data-page-node-id="F6MV8LhigeKFqgFlIJmzM4"><div class="n" data-page-node-id="ZDtS3jNs4uhzFlkw7Nzj89">24,361</div><div class="l" data-page-node-id="rpPqDAfMJDt7Er4xFm07ti">行 Rust（src/）</div></div>
+  <div class="card stat" data-page-node-id="YWZF9Fs44KySUrsQcCzFVU"><div class="n" data-page-node-id="Y3hpesN8YzP6ej9xIjXvGn">76</div><div class="l" data-page-node-id="Gr8OHcb1zQLsGsC4mjQcD9">个 .rs 文件</div></div>
+  <div class="card stat" data-page-node-id="7I4IlMHnBu39Tzsv9Nz5yX"><div class="n" data-page-node-id="gCj4DvHMEzPw1bQkuhd6Rw">12+</div><div class="l" data-page-node-id="90yf70ZETArlQPIOknFD3v">新增/独占源格式</div></div>
+  <div class="card stat" data-page-node-id="6BYPTtaWHVOYAisMPXPgOP"><div class="n" data-page-node-id="w2rGTQA8howEWhjuFFFGdv">1</div><div class="l" data-page-node-id="XAXOZQ2T9RTy4ePSJGVEDm">处适配层 import 改动</div></div>
+</div>
+
+<!-- 4 架构 -->
+<h2 id="s4" data-page-node-id="cwpwg0I8jGq1jiOmdBXrWX">4. 融合架构与数据流</h2>
+<div class="card" data-page-node-id="AiiE5cB7yntc3zKtZ58CtF">
+<pre class="dark" data-page-node-id="AbrpissTwdyLnRwbPiCe4x"><code data-page-node-id="XNwTcNHEEgGS0xKL42Tom6">md-bridge/                          ← 单一完整程序
+├─ native/anydoc/                   ← vendored 解析内核（原 anydoc）
+│  ├─ Cargo.toml / src/             ← 24k 行 Rust
+│  ├─ python/                       ← PyO3 → mdbridge_native._doc
+│  └─ LICENSE
+├─ scripts/build_native.sh          ← maturin 离线构建 + 安装
+├─ scripts/sync_anydoc.sh           ← 上游半自动同步
+├─ backend/app/
+│  ├─ importers/anydoc_bridge.py    ← 适配层（import mdbridge_native._doc）
+│  ├─ core/registry.py              ← _wire_anydoc（anydoc-first + native-fallback）
+│  ├─ core/converter.py             ← MD 快通道 / DocumentModel 慢通道
+│  └─ core/document_model.py        ← span / 编号 / 公式 / 脚注
+├─ frontend/                        ← SourceFormat 已暴露新格式
+└─ .github/workflows/ci.yml         ← native-build 作业</code></pre>
+  <div class="callout" data-page-node-id="XOiiovu9jx8GAUnfXr9GDa">
+    <b data-page-node-id="rqQrboDrVCz8xnTyooCPYP">调用链：</b>
+    <code data-page-node-id="7GEyojHiyBfLKbwfOG7A5u">convert()</code>
+    → 目标=MD 且允许时 <code data-page-node-id="lFzEse9CznuRs7eUaEBCVs">_try_anydoc_fast_markdown</code> → <code data-page-node-id="55Cn0VkJE10QJrIiNxiCU3">mdbridge_native._doc.to_markdown_bytes</code>（零保真损失）
+    → 否则 <code data-page-node-id="kHy0mvLfiF0XE6q4nHrwxv">import_via_anydoc</code> → <code data-page-node-id="aiX52Jof8PcF3ftJUBiO9f">to_document</code> → 映射 <code data-page-node-id="OkSBgg3MeeWuzSoHrvkz9m">DocumentModel</code> → 既有导出器（docx/pdf/html/epub…）。
+    可恢复失败降级原生 importer；未编译扩展时 <code data-page-node-id="osVFzTCJywYFYxyicw5vPu">anydoc_available()=False</code>，行为回退旧版。
+  </div>
+</div>
+
+<!-- 5 能力 -->
+<h2 id="s5" data-page-node-id="ZVOo1fLojR4nBij0jkAArH">5. 能力差异矩阵（独有能力如何填补缺口）</h2>
+<div class="card" data-page-node-id="qsCq5phFxNPAqceZPIgHx5">
+<table data-page-node-id="dStpRgJsYjpcyrkLtKxQHb">
+  <tr data-page-node-id="fnv5xUpURIfgobA3gNcn0X"><th data-page-node-id="OKaYaI6OqzowGrgZKNiRNs">能力</th><th data-page-node-id="DxBZ9YvPQZJNjJvk6tkMn2">md-bridge 原生</th><th data-page-node-id="C8fBmJEGMgNLziGwmbTvQl">内置 anydoc</th><th data-page-node-id="bf6f6hXnvBnM39sH77oeCy">产品增益</th></tr>
+  <tr data-page-node-id="zeNfbcj5VWxzk013r2hmim"><td data-page-node-id="9JwrhFpQjwuwVKPGLqVdCT">合并单元格</td><td class="no" data-page-node-id="YAr0ANpDrAUmTkNrpvjAUX">压平 / 丢失 span</td><td class="ok" data-page-node-id="Nbeu4m511e53sjuk4gLKsx">grid + row/col span + covered</td><td data-page-node-id="NrNFR9b5JJKQUMu1GAOgPd">DOCX/HTML/ODT 真渲染</td></tr>
+  <tr data-page-node-id="HNFo20fksvaKrY4o91TxZk"><td data-page-node-id="qhbb3nt0wATnYwGpHVqiuq">有序列表原始编号</td><td class="no" data-page-node-id="1j9AkF1vq1OOR7WSLolua1">常重置为 1.</td><td class="ok" data-page-node-id="JCHElwDTnWDlqcGREKFcJP">marker + start + label</td><td data-page-node-id="H5eEWOfXqbuHUPlKpFysEM">编号语义还原</td></tr>
+  <tr data-page-node-id="osH7BCEis67JkjsXD3jaTI"><td data-page-node-id="VZYI2TkaAG8IXmpoY9HG8V">OMML / MathML</td><td class="no" data-page-node-id="wkyphGtV9slrRL0eAPSYss">易失败</td><td class="ok" data-page-node-id="TLYeLCMs44sjoqDquVITi6">→ LaTeX <code data-page-node-id="cAvFO7v0H6qvRqNSESZuJx">$…$</code></td><td data-page-node-id="bKq8bDQIR6AhA1X5CEoSvF">公式可读可导出</td></tr>
+  <tr data-page-node-id="CH9N09P4ObXFfFnFg6zP9T"><td data-page-node-id="LfnkkBkCKGKTvE8YQFmUYY">嵌入图片字节</td><td class="todo" data-page-node-id="meeSsizJMEFMC6vmvo7TY3">依赖 docling 等</td><td class="ok" data-page-node-id="rgTH2UQmHKeo7ebijv6gCZ">Asset + origin_part</td><td data-page-node-id="cAPROGFfrjDs5fHM7YAFB0">资产自带</td></tr>
+  <tr data-page-node-id="3RUWaTVdrXo9IIU7lzY92v"><td data-page-node-id="x8HmdjyUa5XyUBsQ934zKD">脚注 / 尾注</td><td class="no" data-page-node-id="0bfqtbrktbxoZzSjwwDpqx">无</td><td class="ok" data-page-node-id="BjKYNB2S2uVeeiQKyprRTy">Note footnote/endnote</td><td data-page-node-id="9GFUmSMAgTa31PRiTMmoOm">结构保留</td></tr>
+  <tr data-page-node-id="kCyxhbFrrMPMA7pnnT4Yfu"><td data-page-node-id="Ahy5P5AQLzxhVmDpxGVJ16">二进制 DOC / PPT / XLS</td><td class="no" data-page-node-id="4ToOgBWWEMwhkjlxsZSuRN">需 LibreOffice 类重依赖</td><td class="ok" data-page-node-id="9l2QE21dXxtszacSCg8Yri">纯 Rust OLE/CFB</td><td data-page-node-id="wvyzrUPEeInw9VrkdTtwva">去重依赖 + 提速</td></tr>
+  <tr data-page-node-id="K49ct7ngMvQ2mD3nmsAgWT"><td data-page-node-id="fqxB5SJYh21GxEnfEXNKCv">ODS / ODP / XLSB 等</td><td class="no" data-page-node-id="MqeMyxtCoiQIGRBlsSzHn6">不支持</td><td class="ok" data-page-node-id="yXDKZROJigIvp04GDjz06c">首发可用</td><td data-page-node-id="2NBiSmCqgrot2G5LaLFSp6">格式覆盖显著扩大</td></tr>
+  <tr data-page-node-id="t8Zof2UAhOba8mbe6ch2Rn"><td data-page-node-id="0JCbMC7iqpKhR0j1YCbM5h">内容嗅探</td><td class="todo" data-page-node-id="1XHFaltFn2Z5sBrwEMiqvk">扩展名为主</td><td class="ok" data-page-node-id="UELYA9PUaZIE1BkBjftFTU">签名级检测</td><td data-page-node-id="CdbL7CLwTSrVGKC7bQGadS">错名/无名文件可识别</td></tr>
+  <tr data-page-node-id="rngX7VsqqQ3DWs3pB3NYPR"><td data-page-node-id="wT78ry7TB77nR9zMg5Bmo6">数字 PDF→MD</td><td class="ok" data-page-node-id="XHHNeuSikXtyw5JJwYILVF">自有管线</td><td class="todo" data-page-node-id="DmLpvSjNM5GJ2gMTsM1kGG">有 MD、无 Document 模型</td><td data-page-node-id="dzZiujO7S0Dqeedvyr4wKm">刻意不抢主路径；扫描 PDF 走本地 OCR</td></tr>
+  <tr data-page-node-id="utWAGzDE77WFREH5vQXhOc"><td data-page-node-id="Vg66iCZ3d6qih3lFM46v1L">MD→DOCX/PDF 导出</td><td class="ok" data-page-node-id="nXqAQeb8PprRa82lYirEoR">产品核心</td><td class="no" data-page-node-id="HLqaa24u0YK2J3DoP2QKui">不做</td><td data-page-node-id="hKKP0Duv6r4iZNk8Iw2BbF">职责正确分离</td></tr>
+</table>
+</div>
+
+<!-- 6 评分 -->
+<h2 id="s6" data-page-node-id="hs4yZGYFsMCApYrkW1kbhz">6. 加权评分模型（v2 复核）</h2>
+<div class="card" data-page-node-id="VNYBP331tC4ueDXwnMyF6f">
+  <div class="barwrap" data-page-node-id="BV6W6c3DgXBwuyzoaQjDXZ">
+    <div class="barcol" data-page-node-id="jntGD4Klh3f6OMqsj0cgno"><div class="bar muted" style="height:50.8%" data-page-node-id="zT92Lv6KpeHuXm24GXSqjz"><span class="v" data-page-node-id="4wsO6CwMBIiOIKCEVL3lqB">50.8</span></div><div class="barlbl" data-page-node-id="NqpW01x1ysghoephuIR5GK">融入前<br data-page-node-id="zFP4e0LrwyQegoWjrdB7lm">纯原生</div></div>
+    <div class="barcol" data-page-node-id="bGm1WflLLZ4muPlYnN5GlK"><div class="bar" style="height:93.3%" data-page-node-id="5pqN6vxfIqHKz171oZj72M"><span class="v" data-page-node-id="JdYJc6oBDK6CjEsxKJdpNu">93.3</span></div><div class="barlbl" data-page-node-id="ROHmK5ZUuaAHQYvJOuu6yd">外部 wheel<br data-page-node-id="vnAUwBcO5bThfWWBFjP5Bm">（否决路线）</div></div>
+    <div class="barcol" data-page-node-id="uL7wv17toSXBSTmEclf3nG"><div class="bar" style="height:96.4%" data-page-node-id="qEnNxoMeHCOOfS1Gl3MiZF"><span class="v" data-page-node-id="KAXzHqrT9KciYDtWE0tQ8p">96.4</span></div><div class="barlbl" data-page-node-id="uOTVAzac5ToQHDXN1iuhxB">v1 报告<br data-page-node-id="hDxvEmZMsSdGbl68NmGYjM">理想态</div></div>
+    <div class="barcol" data-page-node-id="6pCTtbm8DUx7Sr8nK43Pbc"><div class="bar" style="height:94.1%" data-page-node-id="QbmuzuxP7afMgl3N9IdODH"><span class="v" data-page-node-id="XpCbZ13OHN7sB8grq0SE4c">94.1</span></div><div class="barlbl" data-page-node-id="5NDYymQL2FzIKzwDejsAR7"><b data-page-node-id="2CjuGfSC8a4XDMmk75zmPX">v2 现状</b><br data-page-node-id="HY7Ep5preLu62XRDJzyHke">源码融入</div></div>
+  </div>
+  <div class="scoreline" data-page-node-id="6bIffUDxMPvIhylC1A12vs">
+    权重：格式覆盖 25% · 保真度 25% · 私有化合规 20% · 构建自包含 15% · 性能 10% · 维护/洁净度 5%。
+    v2 相对 v1 下调：Docker 未编扩展（自包含 −2）、双树 + <code data-page-node-id="7R1zf6IAEL6OToTfzRdXjL">target/</code> 膨胀与 .env 缺项（洁净度 −1.3）。
+    引擎与接线分已基本打满；扣分集中在<strong data-page-node-id="UPEAp2YzPOhmmVbb2duOXd">交付洁净与默认镜像</strong>。
+  </div>
+  <table data-page-node-id="1FuHJ7AdupPGBO82kUXxk4">
+    <tr data-page-node-id="FfCNQ2G3uoUIyUypJRmGYv"><th data-page-node-id="cXAZHTFNVkATbwJBeaWTmR">维度</th><th data-page-node-id="DJOHaUrGDIETsplNtBqCzG">融入前</th><th data-page-node-id="3uMdJuj09Tnq3vNExjCX2H">外部 wheel</th><th data-page-node-id="uyysTtUaOQKhsYUEWvxooE">源码融入现状</th><th data-page-node-id="rKhUBa2QRCg9E6Ps23KWKe">说明</th></tr>
+    <tr data-page-node-id="2KjuLSIzon9XA6NYfTgs2O"><td data-page-node-id="Eomg3pazKJrFFDbsXGV5fR">格式覆盖</td><td data-page-node-id="xp8cDNuYYjfXJ8Nhi15TXr">55</td><td data-page-node-id="ZTTTteA0q1PjTuXy6iaVlZ">95</td><td class="ok" data-page-node-id="vf5oZEzfcGnOtshCn7fIWM">95</td><td data-page-node-id="ACaXi7iSOHRMFD88hjIhHX">独占格式已接线；前端已暴露</td></tr>
+    <tr data-page-node-id="LbDwFB0JTjYMPmnzBZaGAT"><td data-page-node-id="fMJn1BBg8raHxNMoipnKpf">保真度</td><td data-page-node-id="Q0TONsF3e5BlVMEZM8s3bl">45</td><td data-page-node-id="gCOY3gUOxVnV0rL5HjmfwI">92</td><td class="ok" data-page-node-id="tGzAHitxqxh9NgTSLUJIqn">92</td><td data-page-node-id="N5CdovffEvxkGrtWuSBwCg">span/编号/公式/脚注已映射；xlsx 表头仍偏原生</td></tr>
+    <tr data-page-node-id="eII9PuaXQDJtRtr49S9kuP"><td data-page-node-id="BgzzA8Iih1jvKVdCCBLMPh">私有化合规</td><td data-page-node-id="Bg2E3AgCpPb8DwnxFdoIGz">70</td><td data-page-node-id="IJuf2BH6AX1R2VHe6Kf5Xt">70</td><td class="ok" data-page-node-id="yMAm65BchmrzZzFJlGNpKm">100</td><td data-page-node-id="DYgFRq0rc8kwEUkCHYyn2g">联网 OCR 代码已删；零外链</td></tr>
+    <tr data-page-node-id="O6BEGGbwkFGWSWGtD1QmnS"><td data-page-node-id="eGQSm300lb3dEBT0ocjLpX">构建自包含</td><td data-page-node-id="PFYsbK5lULwNw7rGAKLDHK">40</td><td data-page-node-id="NfAbKfLWsSI5Jya39FdvlI">60</td><td class="todo" data-page-node-id="BZQLD0Hnp6qNh3qEiL4crH">88</td><td data-page-node-id="raDlXvyNMIOBTl19lqc3th">本地/CI 可编；Docker 未纳入</td></tr>
+    <tr data-page-node-id="4MOePr4aGZ15R417pbsAB1"><td data-page-node-id="rbpjJty8axDG3AJcbJEI3x">性能</td><td data-page-node-id="5XAYoqGFPIx7CLBZfSiYof">50</td><td data-page-node-id="Osgk6k0JEEDb0IQ7mWyFn9">95</td><td class="ok" data-page-node-id="ny8YUhm7cpnfzVgWG9XLhi">95</td><td data-page-node-id="mwdUGKNZBCMDEUHOmH2sx9">Rust 毫秒级；快通道保留</td></tr>
+    <tr data-page-node-id="uVQQa7KXjSAoFDQKBwOJV6"><td data-page-node-id="o7CAcQH3ieCfJiUT5jGBZZ">维护/洁净</td><td data-page-node-id="kzSrQnxx3WWHvUcHVREron">80</td><td data-page-node-id="nor7rRVVALLHGL1JrqS72i">85</td><td class="todo" data-page-node-id="Cn7DOp6hDZB06odezlpGbR">72</td><td data-page-node-id="5kWuFlVHF0AK5hpwsRfztZ">双树、target、文档残留、遥测未做</td></tr>
+  </table>
+</div>
+
+<!-- 7 状态 -->
+<h2 id="s7" data-page-node-id="cX8AoWJzAqkXTeqPYw5w7A">7. 落地状态矩阵（P0–P3）</h2>
+<div class="card" data-page-node-id="XgaI9UFujF1ZSVAABUcwjX">
+<table data-page-node-id="x4TcG7ZkHLisw5XK4Tdj3j">
+  <tr data-page-node-id="qeiXmHDowMw07ZJkGpA6MN"><th data-page-node-id="TNfqsADi75NVQnlkXBmDTZ">优先级</th><th data-page-node-id="PfmXVDPVhnlJC8dnTAV06d">任务</th><th data-page-node-id="qBrTgBQMNFG9k8pgONlqRN">状态</th><th data-page-node-id="ryCuOP5oHxXuKRqpHrxBUu">实证 / 说明</th></tr>
+  <tr data-page-node-id="ngEqhWdX5L7DBJVqmfITzK"><td data-page-node-id="XAuPPkXnkX54af2D7BiSsC"><span class="tag p0" data-page-node-id="z0A0Y2lXEYQAIpBo1iDU7s">P0</span></td><td data-page-node-id="sRu0o8Dxrq9boKCxRcmxII">源码 vendoring 进 <code data-page-node-id="CbhLo1H5esQ0o85sYlKbD6">native/anydoc/</code></td><td class="ok" data-page-node-id="zBA4D8QiRELEaA3Gqvya4W">已闭环</td><td data-page-node-id="UmoVY8ABReUN8ogybv432u">24,361 行 / 76 rs；绑定 module-name=<code data-page-node-id="fEuWDxmz7ciGx8o0Q5HxSB">mdbridge_native._doc</code></td></tr>
+  <tr data-page-node-id="bS8brXaXNfOjs8eSlefetR"><td data-page-node-id="s9JdHDxoEs3TSOBir5iPlr"><span class="tag p0" data-page-node-id="yy4ZlJmBW8zDi8oAY5ZdUU">P0</span></td><td data-page-node-id="FK9etdts5YpXSDgoQpqzTQ">裁剪联网 OCR</td><td class="ok" data-page-node-id="Fac5z42IFU2JKROf1DPTDH">已闭环</td><td data-page-node-id="wlupOMCvjOjPKgsnl9ghfE"><code data-page-node-id="ttCbRBh7g8CtZ22ST6ZHX1">python/src</code> 与 <code data-page-node-id="4BKsA671ZvM4lZ85xuGKIt">mdbridge_native/__init__.py</code> 无 urllib/hosted</td></tr>
+  <tr data-page-node-id="HsCer2N3xmE5sHFOupgcIA"><td data-page-node-id="HrtuJd2Yem9UiQhSlLs0dD"><span class="tag p0" data-page-node-id="VI8x3UlkHqaOvBNDVXWuF4">P0</span></td><td data-page-node-id="yUu2fuAxy5fg0JMowGUlK3">保留 MIT LICENSE</td><td class="ok" data-page-node-id="h6hMR2ybzHO0Eqqkax5vP9">已闭环</td><td data-page-node-id="gNWtArNaTciacUYHbpH30y"><code data-page-node-id="x0MIGSNTF8KQhpfXRIG3bx">native/anydoc/LICENSE</code></td></tr>
+  <tr data-page-node-id="L8ElFJIKaVHArNI8mEtOwr"><td data-page-node-id="PO2kG5oIFQnrqlwrCsf5uW"><span class="tag p0" data-page-node-id="81RAswdkaQ1GaEHcNQMtXs">P0</span></td><td data-page-node-id="CZwtNGhMMpWHRpzgYoLzD0">适配层接线</td><td class="ok" data-page-node-id="rqTPbT2Lw60IyCZGJ7jOIx">已闭环</td><td data-page-node-id="iMXWkj2qy5Pu4UsDdAoAr0"><code data-page-node-id="KWtwka9O09tEbgPwAoZAbb">anydoc_bridge</code> import 改为 <code data-page-node-id="gmixBmrSr1QZUcFMWs4tpg">mdbridge_native._doc</code>；registry / 快通道复用</td></tr>
+  <tr data-page-node-id="Nf6UPR18SOWFbPeyR7ag5P"><td data-page-node-id="bolXgDIsUQIDm5744XnHdz"><span class="tag p0" data-page-node-id="1OtuKmAlglU4skDexL8gsi">P0</span></td><td data-page-node-id="aFAv3hD3UUpSEHmb4y06ZF">离线可复现构建</td><td class="ok" data-page-node-id="2GFd6T78L8a9LIaHfBuFDJ">已闭环</td><td data-page-node-id="fGbcgOiNC0hyvLqymUQIl5"><code data-page-node-id="76uDlFDi6bIHL55DMT1EOh">scripts/build_native.sh</code> + <code data-page-node-id="DCvnsaAGULjZxnyKjIZCwa">pip --no-index</code></td></tr>
+  <tr data-page-node-id="93LwzZ2AqtwCsZ6nHHvLTy"><td data-page-node-id="wkUCFE5XWYKs0RyH4DYEBe"><span class="tag p0" data-page-node-id="Gaseu4JdEEnjBBFXmynX57">P0</span></td><td data-page-node-id="Q8W5AfGfmobm4rxN9fvtA1">pyproject 去掉外部 anydoc 依赖</td><td class="ok" data-page-node-id="Ukp2N6aP4cZaGiXJGS3F2H">已闭环</td><td data-page-node-id="6BNzvmApoOFQqulYIC3peU"><code data-page-node-id="ofeD0F3ZKcESuQhEAYb7Nc">anydoc = []</code>，注释明确 in-tree 构建</td></tr>
+  <tr data-page-node-id="QcJ8QZGYU02AxCAn5rlNSv"><td data-page-node-id="YpXCEPUqi894oSBgqZQhcM"><span class="tag p1" data-page-node-id="58O2BGBuB88hiiMFSCNuvH">P1</span></td><td data-page-node-id="piFiZH97EfAFxOb0MKR8jD">CI native-build</td><td class="ok" data-page-node-id="GwktHbFbjB0FVxPq4zXj0p">已闭环</td><td data-page-node-id="KD2nxudBqn0CyuE3r5dDrN"><code data-page-node-id="2J7JGg7oLH30vRSyUHXIrG">.github/workflows/ci.yml</code> 编扩展并跑 bridge/spans 测试</td></tr>
+  <tr data-page-node-id="gCNKyBV00SWTrT5zmpO4SO"><td data-page-node-id="VBb6ZSFh6vN5hlohjl8o37"><span class="tag p1" data-page-node-id="oJwwqxerVcAaCaD8aLue3y">P1</span></td><td data-page-node-id="g5ezgHtZpSpNDGvOT340K3">前端源格式下拉</td><td class="ok" data-page-node-id="Y7p06zLou6rmCojT79o1I8">已闭环</td><td data-page-node-id="yF4v1fLycA7iJ6N731AOR8"><code data-page-node-id="iiReuBlIkuI9ap1BbLC3MH">types.ts</code> + <code data-page-node-id="4qrmqSia8I9Xtgxx9HDVi6">App.vue</code> 含 ppt/xls/ods/odp/xlsb…</td></tr>
+  <tr data-page-node-id="1XFxt0lYP82LKMNwicSKnu"><td data-page-node-id="O0rEMXCpv51EJnds1HJI4d"><span class="tag p1" data-page-node-id="C19IecarEby4oCsLtmPh72">P1</span></td><td data-page-node-id="mkzFAjfJk9H404YLMNMfeG">上游同步脚本</td><td class="ok" data-page-node-id="KSc6GX2qcm6NpVrTtMmBK6">已闭环</td><td data-page-node-id="Waxfj7L9mPdOXQHk7LyFWu"><code data-page-node-id="8gfN9ji38rUfR9PRKGRqsq">scripts/sync_anydoc.sh</code></td></tr>
+  <tr data-page-node-id="p180UKz2hBOWPNn9okF5HZ"><td data-page-node-id="Mw4gU5VIjkAGhnyx5h9AxU"><span class="tag p1" data-page-node-id="RlbJjpHUY3w8UkJnOhFG20">P1</span></td><td data-page-node-id="nSRvR9TKnF7PjqJYfitI8x">Docker 多阶段编扩展</td><td class="todo" data-page-node-id="bD0N4vNLmGLVINJVeC65Ch">未做</td><td data-page-node-id="ofgtcOxAc8LBSVcztApt3p"><code data-page-node-id="GmFI4y4HjefgJCWw72vMOJ">backend/Dockerfile</code> 未调用 <code data-page-node-id="aHoFk8NlVTh3xecFwMDdf3">build_native.sh</code>；镜像默认无原生扩展</td></tr>
+  <tr data-page-node-id="k0ITb9F4suDRW8RRsSIn2w"><td data-page-node-id="BnrnUHjBY5y4RgDCeHamU3"><span class="tag p1" data-page-node-id="EXlpdskXSKeex6twRGyqfx">P1</span></td><td data-page-node-id="HLtElP0B4b5FDQhaSFSgup">仓库洁净：去双树 / 忽略 target</td><td class="todo" data-page-node-id="DrjcdcbisqFQNQtIlQ0dfI">未做</td><td data-page-node-id="aytuJqgBGbJe5xFa2AsQVF"><code data-page-node-id="gNT4Ti3UdfCdIN8hqE0XIU">anydoc-main/</code> 仍在；<code data-page-node-id="K8MIAukMLTXie4dPjGLJSO">native/anydoc/target/</code> ~345MB</td></tr>
+  <tr data-page-node-id="GkmlB8H86itqRxSvoBpKbz"><td data-page-node-id="L9io04K80Kjm9ONgnMVzHs"><span class="tag p2" data-page-node-id="i8Q7mBjP3H39wO6JYa45Pp">P2</span></td><td data-page-node-id="ZU3r5QmQFr7Dovk7DHYt8b"><code data-page-node-id="FLxFOavkommebkFuYAIVAf">.env.example</code> 补 ANYDOC_* </td><td class="todo" data-page-node-id="Gp2aGe1Us3CHf5hzZ1Oa2a">未做</td><td data-page-node-id="1zXk0vdCuTyVP3dpoexSBS">config.py / README 有，example 无</td></tr>
+  <tr data-page-node-id="a8MttXSHGezD7UrCQcjQjB"><td data-page-node-id="Gr772a7W1AfrD0WoqrvyFd"><span class="tag p2" data-page-node-id="x539ALK2rLtyYsedtQ6Gas">P2</span></td><td data-page-node-id="PbpTbcOnY6K0D3zT7LVCYh">命中/降级遥测</td><td class="todo" data-page-node-id="fvlQiHgZRuTdSz9ovJTYos">未做</td><td data-page-node-id="8X3uhF7SA5l13HjTESsuri">metadata 有 importer=anydoc，审计/metrics 未统一上报</td></tr>
+  <tr data-page-node-id="6FcckL5WtWUQyAfPh0zMx7"><td data-page-node-id="puxWd14JmnX84GKqZ1zBCT"><span class="tag p2" data-page-node-id="q1MnsJZzb0dSugsO0QMV6J">P2</span></td><td data-page-node-id="0Va6nZ7NVzO4XsQxHGEG5a">vendored README 去 hosted 叙述</td><td class="todo" data-page-node-id="NVBlrcetYfAAnDNe9Mmlim">未做</td><td data-page-node-id="AI9Nv1EDPf3hCxoxipICft">代码已净，文档仍写 Firecrawl OCR</td></tr>
+  <tr data-page-node-id="t5OtyY2Ny1NkBJ1uitLhxm"><td data-page-node-id="2O61obvzKCnCT4KXYGvxnZ"><span class="tag p3" data-page-node-id="IXhlspEmW7CutV0qOTeIIE">P3</span></td><td data-page-node-id="O71gamKYARxMy3e7EZ5cDD">xlsx 表头推断对齐</td><td class="todo" data-page-node-id="rs379g6f4qmzBXeJBh5yPf">可选</td><td data-page-node-id="ZVvIHfHBY3YehgyCqCBIWx">默认原生优先合理；若全 anydoc 需补 header 启发式</td></tr>
+  <tr data-page-node-id="P0BdLxSi8aJnR8OK7cmPlJ"><td data-page-node-id="02SqYEnVJVjIA9uGtlNQZS"><span class="tag p3" data-page-node-id="K9NzNsiSCFAyKzG9Dmhd8R">P3</span></td><td data-page-node-id="V9UFjr5CMfm2zMDfeYknDg">数字 PDF 可选 anydoc 快通道</td><td class="todo" data-page-node-id="tYN5EMiWosw1NuOY9qvp7h">可选</td><td data-page-node-id="lBU62jIlw91Hc2rj8UwD3B">与现有 PDF/OCR 管线并存，非必须</td></tr>
+</table>
+</div>
+
+<div class="grid g2" data-page-node-id="YsYxc3dzGQjvehvUVwZvvY">
+  <div class="card" data-page-node-id="P1itKkuyHgC0CQC9ypRq96">
+    <h3 data-page-node-id="wGIcFBE1NuCAcQDEefkwiy">阶段完成度</h3>
+    <ul class="tight" data-page-node-id="5T2zwl2GoEj9kT3Hl8q28Z">
+      <li class="ok" data-page-node-id="SLyIlYTwGSWYsIuWfojZfw">阶段 0 源码 vendoring + 联网裁剪 — ✅</li>
+      <li class="ok" data-page-node-id="yA1gA3tCUdDKOKMrLLNLUL">阶段 1 构建集成（build_native）— ✅</li>
+      <li class="ok" data-page-node-id="ISKoe2es2xts4A0vRBnLPt">阶段 2 适配层接线 — ✅</li>
+      <li class="ok" data-page-node-id="TxdrsOz4IhulKTfdw3KcSJ">阶段 3 测试实证 — ✅（bridge / spans / 回归）</li>
+      <li class="ok" data-page-node-id="MDJhgFRXQoGrFwqCzCDUCV">阶段 4 CI native-build — ✅</li>
+      <li class="ok" data-page-node-id="BKXbHiy1UBDGM4tRR2qFMB">阶段 5 前端格式 — ✅</li>
+      <li class="todo" data-page-node-id="hx6wRQtuREeZndipMZLyoQ">阶段 6 交付收尾（Docker / 洁净 / .env / 遥测）— ⏳</li>
+    </ul>
+  </div>
+  <div class="card" data-page-node-id="7PDI4iS3hajRovlrEVckJt">
+    <h3 data-page-node-id="wrXiM4FByzA8JwlnhW6Am9">已验证交付物</h3>
+    <span class="pill" data-page-node-id="BUHRLwFbaXvtGbt4F0WRGx">native/anydoc/</span>
+    <span class="pill" data-page-node-id="6INV7AJzjMFsxKlieRjE1G">mdbridge_native._doc</span>
+    <span class="pill" data-page-node-id="gh14m5Ad7mat4TcS1C9mrP">anydoc_bridge.py</span>
+    <span class="pill" data-page-node-id="6T1pLaO4UycTdWVBXZV89O">registry._wire_anydoc</span>
+    <span class="pill" data-page-node-id="ALJfdMX0tWinHw5ilwJZ0k">converter 快通道</span>
+    <span class="pill" data-page-node-id="sNHZuDDAR3fzIaklgGc4kc">document_model 扩展</span>
+    <span class="pill" data-page-node-id="CahaeVV0TDC6ogHDTxhHyU">exporters span</span>
+    <span class="pill" data-page-node-id="TENtO4U8hdBsCVbwMARoMI">test_anydoc_bridge</span>
+    <span class="pill" data-page-node-id="SiL8PhuvgCMwEyN4Aw0hmn">test_exporter_spans</span>
+    <span class="pill" data-page-node-id="IM43UurGi3GxDH7X2z8MTJ">build_native.sh</span>
+    <span class="pill" data-page-node-id="HfzNDH3tqKML1e74i5JJqw">sync_anydoc.sh</span>
+    <span class="pill" data-page-node-id="PcjL8ra5QzWnbpb23AsPoN">ci.yml native-build</span>
+    <span class="pill" data-page-node-id="JLXENZN2id0yYGiKiUH3dV">frontend 新格式</span>
+  </div>
+</div>
+
+<!-- 8 缺口 -->
+<h2 id="s8" data-page-node-id="XNDfThayzWGmUSyskxyPk6">8. 距「产品级完全融入」的真实缺口</h2>
+<div class="callout warn" data-page-node-id="4OqF0O3qISpYofNI5J7wYH">
+  引擎与程序接线已通；当前短板是<strong data-page-node-id="4uIKeflfEvKD2SZQeTU1H1">交付默认带上原生扩展</strong>，以及<strong data-page-node-id="1gSobwwD6nB9RXAFUq34P6">仓库不再像「半成品拼接」</strong>。
+</div>
+<div class="card" data-page-node-id="OGEoTycp5ppCDmVZvxY7dq">
+<table data-page-node-id="w4YRyeHjgmYXQx5wKZD2Ga">
+  <tr data-page-node-id="FyhhLxQLYZDzJK9WMdGhTb"><th data-page-node-id="WRiqz3T3kDsgdV30Bey7aG">#</th><th data-page-node-id="YuDokq9rpETjXIECEoPB9n">缺口</th><th data-page-node-id="anaY0xEq35vwYW8S7mWHX0">影响</th><th data-page-node-id="v2hdXqMSUBMymqoAJDACLq">建议动作</th></tr>
+  <tr data-page-node-id="50K70pTIpqaCiwA6V6xZw4"><td data-page-node-id="rcdPfiYOCdQNrcmao6CfMA">1</td><td data-page-node-id="m8dMrSkhZ6PpPzEe4GQtVt">Docker 镜像不编 <code data-page-node-id="jJDeZuPb6Z0qA3Zs6k3WPL">mdbridge_native</code></td><td data-page-node-id="t0XNzukSCcjYUBWYY6T2oX">Compose 一键部署默认无高保真/独占格式</td><td data-page-node-id="ua0ZOquHKuu6TCwvIiTYiw">Dockerfile 多阶段：rust+maturin → 拷 wheel → 运行时安装</td></tr>
+  <tr data-page-node-id="ronNNRhcNedv4EhHCi4MSW"><td data-page-node-id="6ai0s0owCbwcLTLiBAYelJ">2</td><td data-page-node-id="y6VgO9RsimyVl93V3CqMEe"><code data-page-node-id="72CrBiGfQM6agsJchb7H7h">anydoc-main/</code> 与 <code data-page-node-id="ISFZERWcZi7SKI3TRTG1Ur">native/anydoc/</code> 双树</td><td data-page-node-id="mXG0gOUKPhPeEPhdpdfaSu">认知混乱、体积与同步歧义</td><td data-page-node-id="MIFJz5p6ZL62CPwNRUxfyT">以 <code data-page-node-id="mMqPbOX8nPFh7LFPIiivp2">native/</code> 为唯一真相；<code data-page-node-id="ElocMCz8OLTQdtdfO65SSs">anydoc-main</code> 删除或仅作 sync 暂存并 gitignore</td></tr>
+  <tr data-page-node-id="6PCJ4hMeAYX6ud26wJgGLm"><td data-page-node-id="maerRBm7LBFtXYmRBBGFFY">3</td><td data-page-node-id="9nC4htZDEyHaJddaZGltR8"><code data-page-node-id="CqeP0H3o8UEGIQZvA5MJ82">native/anydoc/target/</code> ~345MB</td><td data-page-node-id="yjVQRO0QZZgDYixFxd7fVr">易误提交、克隆灾难</td><td data-page-node-id="K54FtAUHGvZ1thIIRMn1fl"><code data-page-node-id="txdUka58Xt4iHiBZ023CiK">.gitignore</code> 强制忽略；CI 用缓存</td></tr>
+  <tr data-page-node-id="nil70AEhM3F382cHd7eCJ3"><td data-page-node-id="lqAx8jR72lNE9xhGUl8nFi">4</td><td data-page-node-id="55lDSQ55I7d4AVytovTD6a"><code data-page-node-id="qVfNAU8DLMHDjB6ohaWK5b">.env.example</code> 缺 ANYDOC_*</td><td data-page-node-id="QPQj8FTaFS3dqFvdpFY8Nd">运维开关不可发现</td><td data-page-node-id="pNgkJARVqwBCgaeMTM7o8p">补齐 5 项并与 README 对齐</td></tr>
+  <tr data-page-node-id="YUsthsJnyJwbaQyTzO7xUJ"><td data-page-node-id="Bb230eDF59d7s1uq42kU1s">5</td><td data-page-node-id="aWVIjew0SBsRN8hoDFXmt5">命中遥测未统一</td><td data-page-node-id="QnEU0mbxzLdUWMCMj2RhEL">难观测 anydoc vs native 比例</td><td data-page-node-id="HyrQKFEeohwxs7scrdIXQH">audit/metrics 增加 <code data-page-node-id="NuksY1uUFiEeen1S5Eq6Ug">importer=anydoc|native|fast_md</code></td></tr>
+  <tr data-page-node-id="UX7MKtK8vWrJGv1Ok1QPKZ"><td data-page-node-id="gslECgBfKTgEktsCvSZ8qG">6</td><td data-page-node-id="gt0dC0J3QM6yQdg8MAMuWN">vendored README 仍宣传 hosted OCR</td><td data-page-node-id="Wco0qKjjjyu0oadabftRmk">合规审计误读</td><td data-page-node-id="FMAuZSUEbO9FrkjUCpoycK">改为 md-bridge 私有化说明，或缩成 NOTICE</td></tr>
+</table>
+</div>
+
+<!-- 9 合规 -->
+<h2 id="s9" data-page-node-id="7kHC8RmM0EQvNddoDrD73Z">9. 许可与私有化合规</h2>
+<div class="card" data-page-node-id="UKYwafqywyUXVYLwqTMtoS">
+  <ul class="tight" data-page-node-id="pUvJC8SRuyQWMGjJS87b2P">
+    <li data-page-node-id="Z9A51BCuE8TCaaAh38Cv7L"><b data-page-node-id="DTwPdKaTyo5ogJSjX9MUW6">依赖树：</b>anydoc 传递依赖约 144，核验为零 GPL / AGPL / SSPL（MIT / Apache-2.0 / BSD 等），满足禁传染许可。</li>
+    <li data-page-node-id="2YGz59HcNemQAtECR18dus"><b data-page-node-id="Agv1dLTPcyNITvpDmUcGTL">Vendoring：</b>上游 MIT；保留 <code data-page-node-id="nHptYr77YizPxOo1q3KUJJ">native/anydoc/LICENSE</code> 与版权头即合规。</li>
+    <li data-page-node-id="rsxqGR6iQbYYQaGIMjk9IQ"><b data-page-node-id="CpGaSoyCjjGHIsYei7KJZ0">零外链：</b>上游 Python <code data-page-node-id="JxGRGjKzMwzUB4lHLLo6nR">ocr="hosted"</code> 会把文档发往 <code data-page-node-id="KTn52rFyOpb6cnC5D0baET">api.firecrawl.dev</code>——绑定层已删除；扫描 PDF 继续走 md-bridge 本地 OCR（Tesseract / docling / MinerU 等，由配置决定）。</li>
+    <li data-page-node-id="YkCDg97B1NITGFE1ijbVX6"><b data-page-node-id="f4kD9nwIAvgsv2hrlhWKsV">无 LibreOffice：</b>二进制 Office 由纯 Rust 解析，避开 MPL/LGPL 重依赖。</li>
+    <li data-page-node-id="HQcJf3Tgsrcce5QdR9HCsD"><b data-page-node-id="jPlEjX5ANXzDV3kfzPtkC2">注意：</b>vendored README 文案仍提 hosted OCR，属文档污染，应清理以免审计误判。</li>
+  </ul>
+</div>
+
+<!-- 10 风险 -->
+<h2 id="s10" data-page-node-id="9jVu4P4UWtX1vSe0uDv6zl">10. 风险与回退</h2>
+<div class="card" data-page-node-id="fUzACHy9cxYmoBl4LbAASL">
+<table data-page-node-id="NoPjIl1UwMgmkdeYtjdG5S">
+  <tr data-page-node-id="mXbz3CRRwmn9QbdIRJgEVs"><th data-page-node-id="XGvu3s2X3WXXLnWRAJ518D">风险</th><th data-page-node-id="MFOtoA77CvhEUCDHjmhDzg">等级</th><th data-page-node-id="Itv0PUXKPi7FR5EbL0olEO">应对</th></tr>
+  <tr data-page-node-id="INjZsyRc0Y5EUtg7pWcufX"><td data-page-node-id="G0eKPvMpfrw9lTLloRkz7p">上游安全/功能更新需人工同步</td><td data-page-node-id="GwUy7FHxD59ojAlhhw5rpH">中</td><td data-page-node-id="pxsSIDrxH4ZUa1eifWp4HE"><code data-page-node-id="tWqZI5UN1QcOnBU47n8wwA">sync_anydoc.sh</code>；固定版本标签；变更记入 CHANGELOG</td></tr>
+  <tr data-page-node-id="YCXfP1nas2XJFQU2KqroZC"><td data-page-node-id="tmsAlYorW5DTxLMHehNnoX">构建环境缺 Rust / maturin</td><td data-page-node-id="3Nz0n3dlXJ2WCuK0RGKeVW">中</td><td data-page-node-id="Om7vIxHcYfPHGAW3w9xPFi">未编扩展时自动降级原生；Docker/CI 保证默认产物含扩展</td></tr>
+  <tr data-page-node-id="HbPCWvPUQo5rFtXn1CXfkE"><td data-page-node-id="dZeFUEshwY2g1x6ataJ78L">cwd 包名遮蔽（空 <code data-page-node-id="lGhrbXeZwjnQnAtPOySCgH">mdbridge_native</code> 源树）</td><td data-page-node-id="WTUCUsN0rs93HpwNQ7aJuo">低</td><td data-page-node-id="RER2Izkd93vhjbHlBEXCJK"><code data-page-node-id="oHDUqfNR6YRnXMnCFRs7Hp">build_native.sh</code> 已在 <code data-page-node-id="qwW8MrjvTCpkz24SqmJyHA">backend/</code> 中性 cwd 验证导入</td></tr>
+  <tr data-page-node-id="MYv9U2kxzschcloB66VtS6"><td data-page-node-id="b1J2Dmt44W7uYSUntDHCOb">xlsx 表头质量回归</td><td data-page-node-id="naQ7bX1FReKF8s3Fvn1FkV">低</td><td data-page-node-id="9AsbSxId2lyuEMhNoztwfi">默认不把 xlsx 交给 anydoc；或后处理推断 header_rows</td></tr>
+  <tr data-page-node-id="jAGoXbZ7CUb2c8K0Eyv8ir"><td data-page-node-id="IYGqCVtDqNN6Sj910wZrB7">映射损耗（嵌套表、部分块引用）</td><td data-page-node-id="lFylPU8yRH0At3JGlCfE64">低</td><td data-page-node-id="FMFDdNzyNcnhsCdWLGVchJ">MD 快通道绕过；导出路径按需增强 DocumentModel</td></tr>
+  <tr data-page-node-id="IKuplKHsg46lT9ZcMZMs52"><td data-page-node-id="F8pGRBjWvul5PdvRDMWqFk">双树 / target 误入版本库</td><td data-page-node-id="R9nyWiofcfABIr7XECBmHY">高（交付）</td><td data-page-node-id="dvSpEN0XoQsNYFfUGZN7ut">立即 gitignore + 删冗余树</td></tr>
+</table>
+</div>
+
+<!-- 11 路线图 -->
+<h2 id="s11" data-page-node-id="diaWdAm4PBFMHvnmRbcDDS">11. 收尾路线图（到「产品级完全融入」）</h2>
+<div class="grid g2" data-page-node-id="mub49duNtQLEbOheZJyi8X">
+  <div class="card" data-page-node-id="v2sT4CIFUdJZ4ZJ8PSvkGX">
+    <h3 data-page-node-id="v10KH3kHug4UYwR3wtF4fH">本周必做（把 94.1 → ~97）</h3>
+    <ol data-page-node-id="Fvhsh6kfI3LwGzSRbv88r1">
+      <li data-page-node-id="fjHlCpJ78aFkeSu75K23Gl">Dockerfile 多阶段编译并安装 <code data-page-node-id="G9H3OvPFFElCZIIqIO1CJt">mdbridge_native</code>（企业镜像默认开）</li>
+      <li data-page-node-id="yhZ3EDGgied9dbaX0KSs7g"><code data-page-node-id="SaJw97ZCLcQa3utaikieGE">.gitignore</code>：<code data-page-node-id="rwJJuiXJLQoaYc3ScZqHeM">native/anydoc/target/</code>、<code data-page-node-id="OIfxotCj6eqzsRaBr6wvKG">.wheels/</code></li>
+      <li data-page-node-id="pgSG3dEohP8vAx6oETHl0P">删除或归档 <code data-page-node-id="s7H4HM0L6XKtBB3fO5CAaa">anydoc-main/</code>，唯一真相 = <code data-page-node-id="JxlU70Dnz4DjVXpINDdTKR">native/anydoc/</code></li>
+      <li data-page-node-id="n6yNK7HlfFmYtHkA9IlOsP">补 <code data-page-node-id="DJRpmnVkg2V6FhZrNoLAy3">.env.example</code> 的 <code data-page-node-id="tIEfDD35PioFVm7jWUiMJP">MDBRIDGE_ANYDOC_*</code></li>
+      <li data-page-node-id="Vv7PWIDOIu3wuZKUbJm8al">改写 vendored README / NOTICE，去掉 hosted OCR 文案</li>
+    </ol>
+  </div>
+  <div class="card" data-page-node-id="Z0kMY1dl499ApXGBn3CteV">
+    <h3 data-page-node-id="r58fM3TmxVpTeETmyx3hXH">随后可选（→ 98+）</h3>
+    <ol data-page-node-id="bvoAAzvNA1nmGraeABk9ZW">
+      <li data-page-node-id="rL6MRaTicf7efkUaXA343C">audit/metrics 上报 importer 命中来源</li>
+      <li data-page-node-id="kBnGpzKZE4Y9fA4DvU48tv">健康检查返回 <code data-page-node-id="0YH23TGsQhIhrD4hx0d92k">native_version</code> / <code data-page-node-id="hGWHliRqbG5wzfhfFSjAhn">anydoc_available</code></li>
+      <li data-page-node-id="GPLvWnajLeC8dRG8dSDA58">xlsx header 启发式（若运营要求全 anydoc）</li>
+      <li data-page-node-id="rjJT23k3GPJ2HVWN3dDHtm">数字 PDF→MD 可选快通道开关</li>
+      <li data-page-node-id="i7BDIlnKPoqdmKeoHEu8bW">映射补齐：speaker notes、layout 表 unwrap</li>
+    </ol>
+  </div>
+</div>
+
+<div class="callout good" data-page-node-id="UdfcSueuEMtZj92BZ08ARD">
+  <b data-page-node-id="GKNLv5YxaZbtkEetgOWi4o">最终判断：</b>在「把 anydoc-main 代码融入 md-bridge、成为一个完整程序」这一目标上，
+  <strong data-page-node-id="pXRBCzuMHh6yDsTWNr57Vu">架构正确、主干已通、合规裁剪到位</strong>；剩余工作是交付工程与仓库治理，而不是再选引擎或重写适配层。
+  建议冻结路线 B，集中完成 §11「本周必做」，即可对外宣称<strong data-page-node-id="2OZpBxU08fnzPbfYFN9Vkv">产品级源码完全融入</strong>。
+</div>
+
+<div class="foot" data-page-node-id="DAXtERi3C16guhwGYwADOz">
+  anydoc × md-bridge 源码级完全融入评估报告 v2 · 路线：vendoring + maturin 内联扩展 ·
+  复核基于仓库实况（native/ / CI / Docker / 双树）· 2026-09-01
+</div>
+
+</div>
+</body>
+</html>

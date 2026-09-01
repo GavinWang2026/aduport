@@ -5,4 +5,6 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile.slim
+      args:
+        INSTALL_NATIVE: "${INSTALL_NATIVE:-1}"
     image: md-bridge-backend:slim

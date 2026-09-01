@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        INSTALL_NATIVE: "${INSTALL_NATIVE:-1}"
     container_name: md-bridge-backend
     # Bind to loopback only — do not expose on LAN by default
     ports:
@@ -12,6 +14,10 @@ services:
       - .env
     environment:
       - TZ=Asia/Shanghai
+      - MDBRIDGE_JOB_DB_PATH=/data/jobs.sqlite3
+      - MDBRIDGE_AUDIT_LOG_PATH=/data/logs/audit.jsonl
+    volumes:
+      - mdbridge-data:/data
 
   frontend:
     build:
@@ -23,3 +29,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  mdbridge-data:

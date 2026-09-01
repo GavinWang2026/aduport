@@ -39,3 +39,17 @@ frontend/dist/
 .workbuddy/
 outputs/
 backend/logs/
+backend/data/
+*.sqlite3
+
+.paddle_home/
+.wheels/
+
+# Vendored anydoc Rust build artifacts (source of truth: native/anydoc/{src,python})
+native/anydoc/target/
+native/**/target/
+**/target/wheels/
+# Leftover upstream snapshot (if recreated locally)
+anydoc-main/
+**/Cargo.lock.bak
+

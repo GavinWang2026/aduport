@@ -11,8 +11,9 @@ from enum import Enum
 from typing import Any
 
 from app.config import settings
-from app.core.converter import convert
+from app.core.convert_isolate import convert_isolated
 from app.core.exceptions import MdBridgeError, MemoryBudgetError
+from app.core.job_persist import load_job_snapshot, load_recent_snapshots, save_job_snapshot
 from app.core.spill import SpillBuffer
 
 
@@ -39,6 +40,7 @@ class Job:
     result_spill: SpillBuffer | None = None
     result_filename: str | None = None
     bytes_in: int = 0
+    tenant_id: str | None = None
 
     def read_result(self) -> bytes | None:
         if self.result_spill is not None:
@@ -65,6 +67,7 @@ class Job:
             "bytes_in": self.bytes_in,
             "bytes_out": out_len,
             "result_filename": self.result_filename,
+            "tenant_id": self.tenant_id,
         }
 
 
@@ -98,8 +101,11 @@ class JobStore:
         pdf_toc: bool | None = None,
         client: str = "",
         result_filename: str = "",
+        tenant_id: str | None = None,
     ) -> Job:
-        spill = SpillBuffer(content, prefix="mdbridge-job-in-")
+        tenant = (tenant_id or "").strip() or None
+        spill_prefix = f"mdbridge-job-in-{(tenant or 'anon')[:24]}-"
+        spill = SpillBuffer(content, prefix=spill_prefix)
         # Only count in-RAM portion toward budget when spilled
         charge = 0 if spill.spilled else len(content)
         budget = settings.memory_budget_mb * 1024 * 1024
@@ -117,6 +123,7 @@ class JobStore:
                 target_format=target_format,
                 bytes_in=len(content),
                 result_filename=result_filename or filename,
+                tenant_id=tenant,
             )
             self._jobs[job.id] = job
             self._inflight_bytes += charge
@@ -141,14 +148,87 @@ class JobStore:
         )
         return job
 
-    def get(self, job_id: str) -> Job | None:
+    def get(
+        self,
+        job_id: str,
+        *,
+        tenant_id: str | None = None,
+        enforce_tenant: bool = True,
+    ) -> Job | None:
         with self._lock:
-            return self._jobs.get(job_id)
+            hit = self._jobs.get(job_id)
+            if hit:
+                if enforce_tenant and not self._tenant_allows(hit.tenant_id, tenant_id):
+                    return None
+                return hit
+        snap = load_job_snapshot(job_id)
+        if not snap:
+            return None
+        snap_tenant = snap.get("tenant_id")
+        job_tenant = str(snap_tenant) if snap_tenant else None
+        if enforce_tenant and not self._tenant_allows(job_tenant, tenant_id):
+            return None
+        # Reconstruct a read-only finished job shell (result bytes not restored)
+        job = Job(
+            id=snap["id"],
+            filename=snap.get("filename") or "",
+            source_format=snap.get("source_format") or "",
+            target_format=snap.get("target_format") or "",
+            status=JobStatus(snap.get("status") or "error"),
+            progress=float(snap.get("progress") or 1.0),
+            error=snap.get("error"),
+            code=snap.get("code"),
+            created_at=float(snap.get("created_at") or time.time()),
+            finished_at=snap.get("finished_at"),
+            result_filename=snap.get("result_filename"),
+            bytes_in=int(snap.get("bytes_in") or 0),
+            tenant_id=job_tenant,
+        )
+        with self._lock:
+            self._jobs[job.id] = job
+        return job
 
-    def list_recent(self, limit: int = 50) -> list[Job]:
+    def list_recent(
+        self, limit: int = 50, *, tenant_id: str | None = None
+    ) -> list[Job]:
         with self._lock:
             jobs = sorted(self._jobs.values(), key=lambda j: j.created_at, reverse=True)
-            return jobs[:limit]
+            mem = [
+                j
+                for j in jobs
+                if self._tenant_allows(j.tenant_id, tenant_id)
+            ][:limit]
+            have = {j.id for j in mem}
+        if len(mem) >= limit:
+            return mem
+        for snap in load_recent_snapshots(limit * 2):
+            jid = snap.get("id")
+            if not jid or jid in have:
+                continue
+            snap_tenant = snap.get("tenant_id")
+            if not self._tenant_allows(
+                str(snap_tenant) if snap_tenant else None, tenant_id
+            ):
+                continue
+            restored = self.get(str(jid), tenant_id=tenant_id)
+            if restored:
+                mem.append(restored)
+                have.add(restored.id)
+            if len(mem) >= limit:
+                break
+        return sorted(mem, key=lambda j: j.created_at, reverse=True)[:limit]
+
+    @staticmethod
+    def _tenant_allows(job_tenant: str | None, viewer: str | None) -> bool:
+        """When viewer is set (API key tenant), only show that tenant's jobs.
+
+        Anonymous / unset viewer sees only jobs without a tenant_id (legacy/dev).
+        """
+        v = (viewer or "").strip() or None
+        j = (job_tenant or "").strip() or None
+        if v is None:
+            return j is None
+        return j == v
 
     def _run(
         self,
@@ -158,7 +238,7 @@ class JobStore:
         pdf_opts: dict[str, Any],
         client: str,
     ) -> None:
-        job = self.get(job_id)
+        job = self.get(job_id, enforce_tenant=False)
         if not job:
             spill.release()
             return
@@ -169,7 +249,7 @@ class JobStore:
                 job.progress = 0.1
             try:
                 content = spill.read()
-                out = convert(
+                out = convert_isolated(
                     content,
                     job.source_format,
                     job.target_format,
@@ -188,6 +268,7 @@ class JobStore:
                     job.status = JobStatus.done
                     job.progress = 1.0
                     job.finished_at = time.time()
+                save_job_snapshot(job.id, job.to_dict())
             except MdBridgeError as exc:
                 with self._lock:
                     job.status = JobStatus.error
@@ -195,6 +276,7 @@ class JobStore:
                     job.code = exc.code
                     job.progress = 1.0
                     job.finished_at = time.time()
+                save_job_snapshot(job.id, job.to_dict())
             except Exception as exc:
                 with self._lock:
                     job.status = JobStatus.error
@@ -202,6 +284,7 @@ class JobStore:
                     job.code = "conversion_error"
                     job.progress = 1.0
                     job.finished_at = time.time()
+                save_job_snapshot(job.id, job.to_dict())
         finally:
             spill.release()
             self._sem.release()

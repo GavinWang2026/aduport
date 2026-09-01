@@ -9,6 +9,7 @@ from xml.sax.saxutils import escape
 
 from app.core.document_model import Comment
 
+
 _NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _NS_CT = "http://schemas.openxmlformats.org/package/2006/content-types"

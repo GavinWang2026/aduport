@@ -1,16 +1,46 @@
-# Slim image: Markdown + DOCX/PDF *export* only (no docling / torch).
-# Typical size reduction vs full office image: ~60–80% (no ML stack).
+# Slim image: Markdown + DOCX/PDF *export* + vendored anydoc import (no docling/torch).
+# High-fidelity Office→MD via mdbridge_native; no ML stack.
 #
-# Build:
+# Build from repo root:
 #   docker build -f backend/Dockerfile.slim -t md-bridge-backend:slim .
-# Or from repo root with compose overlay:
-#   docker compose -f docker-compose.yml -f docker-compose.slim.yml build
+# Or:
+#   docker compose -f docker-compose.yml -f docker-compose.slim.yml up --build
+#
+#   --build-arg INSTALL_NATIVE=0  to skip the Rust extension
+
+ARG INSTALL_NATIVE=1
+
+FROM python:3.11-slim-bookworm AS native-builder
+
+ARG INSTALL_NATIVE=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates build-essential pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain stable --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /build
+COPY native/anydoc ./native/anydoc
+
+RUN mkdir -p /wheels \
+ && if [ "$INSTALL_NATIVE" = "1" ]; then \
+      pip install --no-cache-dir "maturin>=1.9,<2" \
+      && cd native/anydoc/python \
+      && maturin build --release \
+      && cp ../target/wheels/*.whl /wheels/; \
+    fi
 
 FROM python:3.11-slim-bookworm
 
+ARG INSTALL_NATIVE=1
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    MDBRIDGE_ANYDOC_ENABLED=true
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
@@ -25,10 +55,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY backend/pyproject.toml ./
+COPY backend/README.md ./
 COPY backend/app ./app
 COPY backend/main.py ./
 
 RUN pip install --upgrade pip && pip install .
+
+COPY --from=native-builder /wheels /wheels
+RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/*.whl >/dev/null 2>&1; then \
+      pip install --no-index --no-deps /wheels/*.whl \
+      && python -c "import mdbridge_native._doc as d; print('mdbridge_native._doc OK')"; \
+    else \
+      echo "WARN: mdbridge_native not installed"; \
+    fi \
+ && rm -rf /wheels
 
 EXPOSE 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -35,7 +35,14 @@ def _pdf_settings_key() -> tuple:
 def get_pdf_converter():
     """Shared PDF converter; rebuilt if OCR/table/artifacts settings change."""
     global _pdf_converter, _pdf_cache_key
-    key = _pdf_settings_key()
+    from app.importers.docling_ready import resolve_artifacts_path
+
+    artifacts = (settings.docling_artifacts_path or "").strip() or (resolve_artifacts_path() or "")
+    key = (
+        bool(settings.ocr_enabled),
+        bool(settings.pdf_docling_tables),
+        artifacts,
+    )
     with _lock:
         if _pdf_converter is None or _pdf_cache_key != key:
             from docling.datamodel.base_models import InputFormat
@@ -48,8 +55,8 @@ def get_pdf_converter():
                 pipeline_options.do_table_structure = bool(settings.pdf_docling_tables)
             if hasattr(pipeline_options, "enable_remote_services"):
                 pipeline_options.enable_remote_services = False
-            if settings.docling_artifacts_path:
-                pipeline_options.artifacts_path = settings.docling_artifacts_path
+            if artifacts:
+                pipeline_options.artifacts_path = artifacts
             if not settings.ocr_enabled and hasattr(pipeline_options, "force_backend_text"):
                 pipeline_options.force_backend_text = True
 

@@ -76,11 +76,10 @@ def export_pdf(
 ) -> bytes:
     try:
         from weasyprint import HTML
-    except OSError as exc:
-        raise ExportError(
-            "WeasyPrint 需要系统库 (Pango, GObject)。"
-            "参见 https://doc.courtbouillon.org/weasyprint/stable/first_steps.html"
-        ) from exc
+    except (OSError, ImportError):
+        from app.exporters.pdf_simple import export_pdf_simple
+
+        return export_pdf_simple(model)
 
     safe_font = sanitize_font_family(font_family, settings.pdf_font_family)
     raw_css = custom_css if custom_css is not None else settings.pdf_custom_css
@@ -99,7 +98,17 @@ def export_pdf(
     )
     try:
         return HTML(string=html_content, url_fetcher=_blocked_fetcher).write_pdf()
+    except OSError:
+        from app.exporters.pdf_simple import export_pdf_simple
+
+        return export_pdf_simple(model)
     except Exception as exc:
+        # Shared-library load failures often surface as generic Exception
+        msg = str(exc).lower()
+        if "pango" in msg or "gobject" in msg or "cairo" in msg or "cannot load" in msg:
+            from app.exporters.pdf_simple import export_pdf_simple
+
+            return export_pdf_simple(model)
         raise ExportError(f"PDF 渲染失败: {exc}") from exc
 
 
@@ -129,24 +138,64 @@ def _header_footer_css(
     header: str | None,
     footer: str | None,
     page_numbers: bool | None,
+    title: str = "",
 ) -> str:
     hdr = header if header is not None else settings.pdf_header
     ftr = footer if footer is not None else settings.pdf_footer
     nums = settings.pdf_page_numbers if page_numbers is None else page_numbers
+    hdr = _expand_placeholders(hdr or "", title=title)
+    ftr = _expand_placeholders(ftr or "", title=title)
     parts: list[str] = []
     if hdr:
-        safe = html.escape(hdr, quote=True)
-        parts.append(f'@top-center {{ content: "{safe}"; font-size: 9pt; color: #666; }}')
+        # {page} in header → CSS counter
+        if "{page}" in (header if header is not None else settings.pdf_header or ""):
+            raw = header if header is not None else settings.pdf_header
+            raw = _expand_placeholders(raw or "", title=title, keep_page=True)
+            css_content = _css_content_with_page(raw)
+            parts.append(f"@top-center {{ content: {css_content}; font-size: 9pt; color: #666; }}")
+        else:
+            safe = html.escape(hdr, quote=True)
+            parts.append(f'@top-center {{ content: "{safe}"; font-size: 9pt; color: #666; }}')
     if ftr or nums:
-        if nums and ftr:
+        raw_ftr = footer if footer is not None else settings.pdf_footer
+        if raw_ftr and "{page}" in raw_ftr:
+            expanded = _expand_placeholders(raw_ftr, title=title, keep_page=True)
+            css_content = _css_content_with_page(expanded)
+            parts.append(f"@bottom-center {{ content: {css_content}; font-size: 9pt; color: #666; }}")
+        elif nums and ftr:
             safe = html.escape(ftr, quote=True)
             content = f'"{safe} · " counter(page)'
+            parts.append(f"@bottom-center {{ content: {content}; font-size: 9pt; color: #666; }}")
         elif nums:
-            content = "counter(page)"
+            parts.append(
+                "@bottom-center { content: counter(page); font-size: 9pt; color: #666; }"
+            )
         else:
-            content = f'"{html.escape(ftr or "", quote=True)}"'
-        parts.append(f"@bottom-center {{ content: {content}; font-size: 9pt; color: #666; }}")
+            safe = html.escape(ftr or "", quote=True)
+            parts.append(f'@bottom-center {{ content: "{safe}"; font-size: 9pt; color: #666; }}')
     return "\n  ".join(parts)
+
+
+def _expand_placeholders(text: str, *, title: str = "", keep_page: bool = False) -> str:
+    from datetime import date
+
+    out = text.replace("{title}", title or "")
+    out = out.replace("{date}", date.today().isoformat())
+    if not keep_page:
+        out = out.replace("{page}", "")  # page handled in CSS when keep_page
+    return out
+
+
+def _css_content_with_page(template: str) -> str:
+    """Turn 'Foo {page} Bar' into '"Foo " counter(page) " Bar"'."""
+    parts = template.split("{page}")
+    chunks: list[str] = []
+    for i, part in enumerate(parts):
+        if part:
+            chunks.append(f'"{html.escape(part, quote=True)}"')
+        if i < len(parts) - 1:
+            chunks.append("counter(page)")
+    return " ".join(chunks) if chunks else '""'
 
 
 def _bookmark_css(enabled: bool) -> str:
@@ -177,7 +226,7 @@ def _render_html(
         text_indent="2em" if settings.pdf_cjk_typeset else "0",
         page_size=_normalize_page_size(page_size, orientation),
         header_footer_css=_header_footer_css(
-            header=header, footer=footer, page_numbers=page_numbers
+            header=header, footer=footer, page_numbers=page_numbers, title=model.title or ""
         ),
         bookmark_css=_bookmark_css(True),
     )

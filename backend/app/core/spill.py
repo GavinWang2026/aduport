@@ -3,22 +3,51 @@
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from pathlib import Path
 
 from app.config import settings
 
+_SAFE_TENANT = re.compile(r"[^a-zA-Z0-9._-]+")
+
+
+def tenant_spill_dir(tenant_id: str | None = None) -> Path | None:
+    """Optional per-tenant subdirectory under system temp (0600 files inside)."""
+    tid = (tenant_id or "").strip()
+    if not tid:
+        return None
+    safe = _SAFE_TENANT.sub("_", tid)[:48] or "anon"
+    root = Path(tempfile.gettempdir()) / "mdbridge-spill" / safe
+    root.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(root, 0o700)
+    except OSError:
+        pass
+    return root
+
 
 class SpillBuffer:
     """Hold bytes in memory below threshold; otherwise write to a 0600 temp file."""
 
-    def __init__(self, data: bytes, *, prefix: str = "mdbridge-spill-") -> None:
+    def __init__(
+        self,
+        data: bytes,
+        *,
+        prefix: str = "mdbridge-spill-",
+        tenant_id: str | None = None,
+    ) -> None:
         threshold = max(0, settings.spill_threshold_mb) * 1024 * 1024
         self._path: str | None = None
         self._mem: bytes | None
         self.size = len(data)
         if threshold > 0 and len(data) >= threshold:
-            fd, path = tempfile.mkstemp(prefix=prefix, suffix=".bin")
+            spill_dir = tenant_spill_dir(tenant_id)
+            fd, path = tempfile.mkstemp(
+                prefix=prefix,
+                suffix=".bin",
+                dir=str(spill_dir) if spill_dir else None,
+            )
             try:
                 os.write(fd, data)
                 os.fchmod(fd, 0o600)
@@ -32,6 +61,10 @@ class SpillBuffer:
     @property
     def spilled(self) -> bool:
         return self._path is not None
+
+    @property
+    def path(self) -> str | None:
+        return self._path
 
     def read(self) -> bytes:
         if self._mem is not None:

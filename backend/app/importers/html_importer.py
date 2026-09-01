@@ -1,4 +1,4 @@
-"""HTML importer with nested-context stack (stdlib html.parser)."""
+"""HTML importer with nested-context stack + inline marks (stdlib html.parser)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ from app.core.document_model import (
     DocumentModel,
     Heading,
     HorizontalRule,
+    InlineMark,
+    InlineMarkType,
     ListItem,
     Paragraph,
     RichText,
@@ -19,25 +21,36 @@ from app.core.exceptions import InvalidDocumentError
 
 _SKIP_TAGS = frozenset({"script", "style", "noscript", "iframe", "svg", "template"})
 _BLOCK_FLUSH = frozenset({"p", "div", "section", "article", "main", "header", "footer", "aside"})
+_MARK_TAGS = {
+    "strong": InlineMarkType.BOLD,
+    "b": InlineMarkType.BOLD,
+    "em": InlineMarkType.ITALIC,
+    "i": InlineMarkType.ITALIC,
+    "code": InlineMarkType.CODE,
+    "s": InlineMarkType.STRIKETHROUGH,
+    "del": InlineMarkType.STRIKETHROUGH,
+    "strike": InlineMarkType.STRIKETHROUGH,
+}
 
 
 class _HTMLDocParser(HTMLParser):
-    """Stack-based HTML → DocumentModel; tolerates nested div/section/blockquote."""
+    """Stack-based HTML → DocumentModel; preserves b/i/code/a as InlineMark."""
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.nodes: list = []
-        self._buf: list[str] = []
-        # Context stack entries: tag name
+        self._parts: list[str] = []
+        self._marks: list[InlineMark] = []
+        self._offset = 0
+        self._mark_stack: list[tuple[InlineMarkType, int, str | None]] = []
         self._stack: list[str] = []
-        self._list_stack: list[bool] = []  # ordered?
+        self._list_stack: list[bool] = []
         self._table_rows: list[list[str]] = []
         self._row: list[str] = []
-        self._bq_paras: list[str] = []
+        self._bq_paras: list[RichText] = []
         self._in_pre = False
         self._pre_lang = ""
         self._skip_depth = 0
-        self._list_level = 0
 
     def handle_starttag(self, tag: str, attrs) -> None:
         tag = tag.lower()
@@ -50,18 +63,17 @@ class _HTMLDocParser(HTMLParser):
         if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             self._flush_text_as_para()
             self._stack.append(tag)
-            self._buf = []
+            self._reset_buf()
         elif tag == "p":
             self._flush_text_as_para()
             self._stack.append(tag)
-            self._buf = []
+            self._reset_buf()
         elif tag in ("ul", "ol"):
             self._flush_text_as_para()
             self._list_stack.append(tag == "ol")
-            self._list_level = len(self._list_stack) - 1
             self._stack.append(tag)
         elif tag == "li":
-            self._buf = []
+            self._reset_buf()
             self._stack.append(tag)
         elif tag == "table":
             self._flush_text_as_para()
@@ -71,7 +83,7 @@ class _HTMLDocParser(HTMLParser):
             self._row = []
             self._stack.append(tag)
         elif tag in ("td", "th"):
-            self._buf = []
+            self._reset_buf()
             self._stack.append(tag)
         elif tag == "blockquote":
             self._flush_text_as_para()
@@ -83,18 +95,26 @@ class _HTMLDocParser(HTMLParser):
         elif tag == "pre":
             self._flush_text_as_para()
             self._in_pre = True
-            self._buf = []
+            self._reset_buf()
             self._stack.append(tag)
         elif tag == "br":
-            self._buf.append("\n")
+            self._append_text("\n")
         elif tag in _BLOCK_FLUSH:
             self._flush_text_as_para()
             self._stack.append(tag)
-        elif tag == "code" and not self._in_pre:
+        elif tag == "a":
+            href = None
+            for k, v in attrs:
+                if k.lower() == "href" and v and not str(v).lower().startswith("javascript:"):
+                    href = v
+                    break
+            self._mark_stack.append((InlineMarkType.LINK, self._offset, href))
             self._stack.append(tag)
-        else:
-            # ignore unknown inline/block but keep stack optional
-            pass
+        elif tag in _MARK_TAGS and not (tag == "code" and self._in_pre):
+            self._mark_stack.append((_MARK_TAGS[tag], self._offset, None))
+            self._stack.append(tag)
+        elif tag == "code" and self._in_pre:
+            self._stack.append(tag)
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -105,38 +125,38 @@ class _HTMLDocParser(HTMLParser):
         if self._skip_depth:
             return
 
+        if tag == "a" or (tag in _MARK_TAGS and not (tag == "code" and self._in_pre)):
+            self._close_mark(tag)
+            self._pop(tag)
+            return
+
         if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             level = int(tag[1])
-            text = "".join(self._buf).strip()
-            if text:
-                self.nodes.append(Heading(level=level, text=RichText(text=text)))
-            self._buf = []
+            rich = self._take_rich()
+            if rich.text.strip():
+                self.nodes.append(Heading(level=level, text=rich))
             self._pop(tag)
         elif tag == "p":
-            text = "".join(self._buf).strip()
-            if text:
+            rich = self._take_rich()
+            if rich.text.strip() or rich.marks:
                 if self._in_blockquote():
-                    self._bq_paras.append(text)
+                    self._bq_paras.append(rich)
                 else:
-                    self.nodes.append(Paragraph(text=RichText(text=text)))
-            self._buf = []
+                    self.nodes.append(Paragraph(text=rich))
             self._pop(tag)
         elif tag == "li":
-            text = "".join(self._buf).strip()
+            rich = self._take_rich()
             ordered = self._list_stack[-1] if self._list_stack else False
             level = max(0, len(self._list_stack) - 1)
-            if text:
-                self.nodes.append(ListItem(text=text, ordered=ordered, level=level))
-            self._buf = []
+            if rich.text.strip() or rich.marks:
+                self.nodes.append(ListItem(text=rich, ordered=ordered, level=level))
             self._pop(tag)
         elif tag in ("ul", "ol"):
             self._pop(tag)
             if self._list_stack:
                 self._list_stack.pop()
-            self._list_level = max(0, len(self._list_stack) - 1)
         elif tag in ("td", "th"):
-            self._row.append("".join(self._buf).strip())
-            self._buf = []
+            self._row.append(self._take_rich().text.strip())
             self._pop(tag)
         elif tag == "tr":
             if self._row:
@@ -149,21 +169,17 @@ class _HTMLDocParser(HTMLParser):
             self._table_rows = []
             self._pop(tag)
         elif tag == "blockquote":
-            # flush any remaining buffer into quote
-            text = "".join(self._buf).strip()
-            if text:
-                self._bq_paras.append(text)
-            self._buf = []
+            rich = self._take_rich()
+            if rich.text.strip() or rich.marks:
+                self._bq_paras.append(rich)
             if self._bq_paras:
-                self.nodes.append(
-                    Blockquote(paragraphs=[RichText(text=p) for p in self._bq_paras])
-                )
+                self.nodes.append(Blockquote(paragraphs=list(self._bq_paras)))
             self._bq_paras = []
             self._pop(tag)
         elif tag == "pre":
-            content = "".join(self._buf).rstrip("\n")
+            content = "".join(self._parts).rstrip("\n")
             self.nodes.append(CodeBlock(lang=self._pre_lang, content=content))
-            self._buf = []
+            self._reset_buf()
             self._in_pre = False
             self._pop(tag)
         elif tag == "code":
@@ -175,18 +191,52 @@ class _HTMLDocParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._skip_depth:
             return
-        self._buf.append(data)
+        self._append_text(data)
+
+    def _append_text(self, data: str) -> None:
+        if not data:
+            return
+        self._parts.append(data)
+        self._offset += len(data)
+
+    def _reset_buf(self) -> None:
+        self._parts = []
+        self._marks = []
+        self._offset = 0
+        self._mark_stack = []
+
+    def _close_mark(self, tag: str) -> None:
+        want = InlineMarkType.LINK if tag == "a" else _MARK_TAGS.get(tag)
+        if want is None:
+            return
+        for i in range(len(self._mark_stack) - 1, -1, -1):
+            mtype, start, href = self._mark_stack[i]
+            if mtype == want:
+                self._mark_stack.pop(i)
+                if self._offset > start:
+                    self._marks.append(
+                        InlineMark(type=mtype, start=start, end=self._offset, href=href)
+                    )
+                return
+
+    def _take_rich(self) -> RichText:
+        while self._mark_stack:
+            mtype, start, href = self._mark_stack.pop()
+            if self._offset > start:
+                self._marks.append(
+                    InlineMark(type=mtype, start=start, end=self._offset, href=href)
+                )
+        text = "".join(self._parts)
+        marks = sorted(self._marks, key=lambda m: (m.start, m.end))
+        self._reset_buf()
+        if not marks:
+            return RichText(text=text.strip())
+        return RichText(text=text, marks=marks)
 
     def _in_blockquote(self) -> bool:
         return "blockquote" in self._stack
 
     def _flush_text_as_para(self) -> None:
-        """Emit buffered text as paragraph only when not inside a structured container."""
-        text = "".join(self._buf).strip()
-        if not text:
-            self._buf = []
-            return
-        # Inside heading/li/td/pre/p — don't auto-flush as free paragraph
         if self._stack and self._stack[-1] in (
             "h1",
             "h2",
@@ -200,16 +250,22 @@ class _HTMLDocParser(HTMLParser):
             "pre",
             "p",
             "code",
+            "a",
+            "strong",
+            "b",
+            "em",
+            "i",
         ):
             return
+        rich = self._take_rich()
+        if not rich.text.strip() and not rich.marks:
+            return
         if self._in_blockquote():
-            self._bq_paras.append(text)
+            self._bq_paras.append(rich)
         else:
-            self.nodes.append(Paragraph(text=RichText(text=text)))
-        self._buf = []
+            self.nodes.append(Paragraph(text=rich))
 
     def _pop(self, tag: str) -> None:
-        # Pop until matching tag (handles mismatched nesting gracefully)
         if tag in self._stack:
             while self._stack:
                 top = self._stack.pop()
@@ -223,7 +279,6 @@ def import_html(source_bytes: bytes, filename: str = "input.html") -> DocumentMo
     except UnicodeDecodeError as exc:
         raise InvalidDocumentError("HTML 文件必须是有效的 UTF-8 编码") from exc
 
-    # Strip BOM
     if text.startswith("\ufeff"):
         text = text[1:]
 
@@ -234,12 +289,12 @@ def import_html(source_bytes: bytes, filename: str = "input.html") -> DocumentMo
     except Exception as exc:
         raise InvalidDocumentError(f"HTML 解析失败: {filename} — {exc}") from exc
 
-    trailing = "".join(parser._buf).strip()
-    if trailing:
-        parser.nodes.append(Paragraph(text=RichText(text=trailing)))
+    if parser._parts:
+        rich = parser._take_rich()
+        if rich.text.strip() or rich.marks:
+            parser.nodes.append(Paragraph(text=rich))
 
     title = ""
-    # Prefer first H1 as title if filename is generic
     for n in parser.nodes:
         if isinstance(n, Heading) and n.level == 1:
             title = n.plain_text()

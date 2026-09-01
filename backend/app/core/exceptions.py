@@ -2,6 +2,27 @@
 
 from __future__ import annotations
 
+# Machine-readable catalog (enterprise API contract). Keep codes stable.
+ERROR_CODES: dict[str, int] = {
+    "unsupported_format": 400,
+    "empty_file": 400,
+    "file_too_large": 413,
+    "corrupted_file": 422,
+    "invalid_document": 422,
+    "export_error": 500,
+    "memory_budget_exceeded": 429,
+    "docx_too_large": 422,
+    "virus_detected": 422,
+    "virus_scan_unavailable": 503,
+    "job_not_found": 404,
+    "convert_timeout": 504,
+    "worker_crash": 500,
+    "conversion_error": 422,
+    "cancelled": 499,
+    "license_invalid": 403,
+    "license_secret_weak": 403,
+}
+
 
 class MdBridgeError(Exception):
     """Base error with a machine-readable code and HTTP status hint."""
@@ -9,12 +30,20 @@ class MdBridgeError(Exception):
     code: str = "conversion_error"
     status_code: int = 422
 
-    def __init__(self, message: str, *, code: str | None = None, status_code: int | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        status_code: int | None = None,
+    ) -> None:
         super().__init__(message)
         if code is not None:
             self.code = code
         if status_code is not None:
             self.status_code = status_code
+        elif code is not None and code in ERROR_CODES:
+            self.status_code = ERROR_CODES[code]
         self.message = message
 
     def to_dict(self) -> dict[str, str | int]:

@@ -59,9 +59,14 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
             parts.append(f"<{tag}>")
             while i < len(nodes) and isinstance(nodes[i], ListItem) and nodes[i].ordered == ordered:
                 li = nodes[i]
-                box = ""
                 if li.checked is not None:
-                    box = "☑ " if li.checked else "☐ "
+                    checked = " checked" if li.checked else ""
+                    box = (
+                        f'<input type="checkbox" disabled{checked} '
+                        f'aria-checked="{"true" if li.checked else "false"}"/> '
+                    )
+                else:
+                    box = ""
                 parts.append(f"<li>{box}{_render_rich_html(ensure_rich_text(li.text))}</li>")
                 i += 1
             parts.append(f"</{tag}>")

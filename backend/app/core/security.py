@@ -14,6 +14,12 @@ _EXT_WHITELIST: dict[str, frozenset[str]] = {
     "pptx": frozenset({"pptx"}),
     "epub": frozenset({"epub"}),
     "mobi": frozenset({"mobi", "azw", "azw3"}),
+    "odt": frozenset({"odt"}),
+    "rtf": frozenset({"rtf"}),
+    "doc": frozenset({"doc"}),
+    "json": frozenset({"json"}),
+    "xlsx": frozenset({"xlsx"}),
+    "csv": frozenset({"csv"}),
 }
 
 # Declared format → acceptable magic signatures (any match)
@@ -22,10 +28,16 @@ _MAGIC: dict[str, tuple[bytes, ...]] = {
     "docx": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),  # ZIP container
     "pptx": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
     "epub": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
+    "odt": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
+    "xlsx": (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"),
+    "doc": (b"\xd0\xcf\x11\xe0",),
     "mobi": (),  # PalmDB — validated in importer (BOOKMOBI)
     "md": (),  # text — validated as UTF-8 later
     "txt": (),
     "html": (),
+    "rtf": (),
+    "json": (),
+    "csv": (),
 }
 
 
@@ -74,7 +86,7 @@ def validate_upload(
 
     # Soft sniff: if we can detect another binary type, reject mismatch
     sniffed = sniff_format(data)
-    if sniffed and fmt in ("pdf", "docx", "pptx", "epub") and sniffed != fmt:
+    if sniffed and fmt in ("pdf", "docx", "pptx", "epub", "odt", "xlsx") and sniffed != fmt:
         # ZIP-based formats share PK magic — only reject PDF vs ZIP mismatches
         if sniffed == "pdf" or fmt == "pdf":
             raise InvalidDocumentError(

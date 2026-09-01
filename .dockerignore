@@ -1,0 +1,32 @@
+# Keep Docker build context small and avoid shipping build artifacts / secrets.
+.git
+.github
+.workbuddy
+.venv
+backend/.venv
+frontend/node_modules
+frontend/dist
+**/__pycache__
+**/*.pyc
+.env
+**/.env
+.paddle_home
+.wheels
+outputs
+backend/logs
+backend/data
+*.sqlite3
+htmlcov
+.coverage
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Rust build outputs (compiled inside the image)
+native/anydoc/target
+**/target
+
+# Reports / local scratch (not needed for image)
+anydoc_mdbridge_fusion_report*.html
+verify_anydoc_fix.py
+enterprise/dist

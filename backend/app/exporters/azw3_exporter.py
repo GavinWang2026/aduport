@@ -5,6 +5,7 @@ from __future__ import annotations
 import html as html_lib
 import struct
 import time
+from io import BytesIO
 
 from app.core.document_model import DocumentModel, Image
 from app.exporters.html_render import render_body_html
@@ -66,6 +67,20 @@ def _render_body_with_images(model: DocumentModel) -> tuple[str, list[tuple[byte
     images: list[tuple[bytes, str]] = []
     # Temporarily replace Image nodes with placeholder Paragraphs carrying recindex,
     # by building HTML ourselves for images and delegating the rest.
+    from app.core.document_model import (
+        Blockquote,
+        CodeBlock,
+        Comment,
+        Footnote,
+        Heading,
+        HorizontalRule,
+        HtmlBlock,
+        ListItem,
+        MathBlock,
+        Paragraph,
+        Table,
+        ensure_rich_text,
+    )
     from app.exporters.html_render import build_toc_html  # noqa: F401
 
     parts: list[str] = []

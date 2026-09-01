@@ -39,6 +39,9 @@ def test_formats_source_target(client):
     assert "txt" in data["target"]
     assert "epub" in data["target"]
     assert "azw3" in data["target"] and "kf8" in data["target"]
+    assert "latex" in data["target"] and "csv" in data["target"]
+    assert "odt" in data["source"] and "rtf" in data["source"]
+    assert "odt" in data["target"] and "json" in data["target"] and "xlsx" in data["target"]
     assert "mobi" in data["target"]
 
 
@@ -116,7 +119,7 @@ def test_health_and_metrics(client):
     h = client.get("/api/health")
     assert h.status_code == 200
     body = h.json()
-    assert body["version"] == "0.11.0"
+    assert body["version"] == "0.16.0"
     assert "cache" in body
     assert "metrics" in body
 

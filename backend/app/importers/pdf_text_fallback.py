@@ -5,10 +5,10 @@ from __future__ import annotations
 import re
 from io import BytesIO
 
-from app.config import settings
 from app.core.document_model import DocumentModel, Heading, Paragraph, RichText
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
 from app.importers.pdf_font_fix import normalize_pdf_text
+from app.config import settings
 
 _CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 

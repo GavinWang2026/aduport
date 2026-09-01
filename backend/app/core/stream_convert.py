@@ -8,8 +8,10 @@ from collections.abc import Iterator
 from app.config import settings
 from app.core.document_model import DocumentModel
 from app.core.spill import SpillBuffer
+from app.exporters.docx_exporter import export_docx
 from app.exporters.html_exporter import export_html
 from app.exporters.md_exporter import export_md
+from app.exporters.pdf_exporter import export_pdf
 from app.exporters.txt_exporter import export_txt
 from app.importers.html_importer import import_html
 from app.importers.md_importer import import_md
@@ -23,12 +25,18 @@ _STREAM_PAIRS = frozenset(
         ("md", "md"),
         ("md", "txt"),
         ("md", "html"),
+        ("md", "docx"),
+        ("md", "pdf"),
         ("txt", "md"),
         ("txt", "txt"),
         ("txt", "html"),
+        ("txt", "docx"),
+        ("txt", "pdf"),
         ("html", "md"),
         ("html", "txt"),
         ("html", "html"),
+        ("html", "docx"),
+        ("html", "pdf"),
     }
 )
 
@@ -49,16 +57,17 @@ def convert_streaming(
 ) -> bytes:
     """
     Convert large text documents by splitting into blocks, parsing each block,
-    exporting immediately, and spilling to disk when output grows past threshold.
-
-    Reduces peak AST memory vs full-document import+export for huge MD/TXT/HTML.
+    exporting immediately (or merging into one DOCX/PDF), and spilling when large.
     """
     size = chunk_chars or max(8_000, settings.stream_chunk_chars)
     chunks = list(_iter_text_chunks(source_bytes, source_format, size))
     if len(chunks) <= 1:
-        # Small: fall back to normal single-shot via callers
         model = _import_chunk(source_bytes, source_format, filename)
         return _export_model(model, target_format)
+
+    # Binary Office targets: merge ASTs then single export (still lowers peak parse size)
+    if target_format in ("docx", "pdf"):
+        return _stream_merge_binary(chunks, source_format, target_format, filename)
 
     writer = _SpillWriter()
     first = True
@@ -70,7 +79,6 @@ def convert_streaming(
             continue
         piece = _export_model(model, target_format)
         if not first and target_format == "html":
-            # Strip duplicate html wrapper — keep body fragment only
             piece = _html_body_fragment(piece).encode("utf-8")
             writer.write(b"\n")
         elif not first:
@@ -85,6 +93,28 @@ def convert_streaming(
     return writer.getvalue()
 
 
+def _stream_merge_binary(
+    chunks: list[bytes],
+    source_format: str,
+    target_format: str,
+    filename: str,
+) -> bytes:
+    """Parse chunks sequentially, concatenate nodes, one DOCX/PDF export."""
+    merged = DocumentModel(title="", nodes=[])
+    for idx, chunk in enumerate(chunks):
+        try:
+            model = _import_chunk(chunk, source_format, f"{filename}#{idx}")
+        except Exception as exc:
+            _log.warning("stream binary chunk %s import failed: %s", idx, exc)
+            continue
+        if not merged.title and model.title:
+            merged.title = model.title
+        merged.nodes.extend(model.nodes)
+        if model.metadata:
+            merged.metadata.update(model.metadata)
+    return _export_model(merged, target_format)
+
+
 def _iter_text_chunks(data: bytes, fmt: str, size: int) -> Iterator[bytes]:
     try:
         text = data.decode("utf-8")
@@ -94,13 +124,11 @@ def _iter_text_chunks(data: bytes, fmt: str, size: int) -> Iterator[bytes]:
     if len(text) <= size:
         yield data
         return
-    # Prefer splitting on blank lines near the size boundary
     start = 0
     n = len(text)
     while start < n:
         end = min(start + size, n)
         if end < n:
-            # look for paragraph break
             br = text.rfind("\n\n", start + size // 2, end)
             if br != -1:
                 end = br + 2
@@ -126,6 +154,10 @@ def _export_model(model: DocumentModel, fmt: str) -> bytes:
         return export_txt(model).encode("utf-8")
     if fmt == "html":
         return export_html(model).encode("utf-8")
+    if fmt == "docx":
+        return export_docx(model)
+    if fmt == "pdf":
+        return export_pdf(model)
     raise ValueError(fmt)
 
 
@@ -158,7 +190,6 @@ class _SpillWriter:
 
     def write(self, data: bytes) -> None:
         if self._spill is not None:
-            # Append by rewrite (simple); for large streams re-open path
             existing = self._spill.read()
             self._spill.release()
             self._spill = SpillBuffer(existing + data, prefix="mdbridge-stream-")

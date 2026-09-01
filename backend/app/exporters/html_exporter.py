@@ -19,19 +19,7 @@ nav.toc ol {{ list-style: none; padding-left: 0; }}
 nav.toc .toc-l2 {{ padding-left: 1rem; }}
 nav.toc .toc-l3 {{ padding-left: 2rem; }}
 img {{ max-width: 100%; height: auto; }}
-.math-display {{ margin: 1em 0; overflow-x: auto; }}
-.footnote {{ font-size: 0.92em; color: #444; border-top: 1px solid #eee; padding-top: 0.5em; }}
 """
-
-_KATEX_HEAD = (
-    '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"/>'
-    '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>'
-    '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" '
-    "onload=\"renderMathInElement(document.body,{delimiters:["
-    "{left:'\\\\[',right:'\\\\]',display:true},"
-    "{left:'\\\\(',right:'\\\\)',display:false}"
-    ']})"></script>'
-)
 
 
 def export_html(
@@ -47,10 +35,9 @@ def export_html(
     style = _BASE_CSS.format(font_family=safe_font) + ("\n" + safe_css if safe_css else "")
     toc = build_toc_html(model) if toc_on else ""
     body = render_body_html(model)
-    katex = _KATEX_HEAD if settings.html_katex else ""
     return (
         "<!DOCTYPE html>\n<html><head><meta charset='utf-8'>"
-        f"<title>{_esc_title(model)}</title><style>{style}</style>{katex}</head><body>\n"
+        f"<title>{_esc_title(model)}</title><style>{style}</style></head><body>\n"
         f"{toc}\n{body}\n</body></html>\n"
     )
 

@@ -340,20 +340,37 @@ def _sanitize_html_fragment(raw: str) -> str:
 
 
 class _SafeHTMLToNodes(HTMLParser):
-    """Map simple HTML blocks into AST nodes."""
+    """Map simple HTML blocks into AST nodes with inline marks (b/i/code/a)."""
+
+    _MARK_TAGS = {
+        "strong": InlineMarkType.BOLD,
+        "b": InlineMarkType.BOLD,
+        "em": InlineMarkType.ITALIC,
+        "i": InlineMarkType.ITALIC,
+        "code": InlineMarkType.CODE,
+        "s": InlineMarkType.STRIKETHROUGH,
+        "del": InlineMarkType.STRIKETHROUGH,
+        "strike": InlineMarkType.STRIKETHROUGH,
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.nodes: list = []
-        self._buf: list[str] = []
+        self._parts: list[str] = []
+        self._marks: list[InlineMark] = []
+        self._offset = 0
+        # (mark_type, start_offset, href)
+        self._mark_stack: list[tuple[InlineMarkType, int, str | None]] = []
         self._heading_level: int | None = None
         self._in_blockquote = False
-        self._bq_paras: list[str] = []
+        self._bq_paras: list[RichText] = []
         self._skip = False
 
     def handle_starttag(self, tag: str, attrs) -> None:
         if tag in ("script", "style", "iframe"):
             self._skip = True
+            return
+        if self._skip:
             return
         if tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             self._flush_para()
@@ -368,12 +385,19 @@ class _SafeHTMLToNodes(HTMLParser):
             self._in_blockquote = True
             return
         if tag == "br":
-            self._buf.append("\n")
+            self._append_text("\n")
             return
-        if tag in ("strong", "b", "em", "i", "code"):
-            return  # text-only simplification
         if tag == "a":
+            href = None
+            for k, v in attrs:
+                if k.lower() == "href" and v and not str(v).lower().startswith("javascript:"):
+                    href = v
+                    break
+            self._mark_stack.append((InlineMarkType.LINK, self._offset, href))
             return
+        mark = self._MARK_TAGS.get(tag)
+        if mark is not None:
+            self._mark_stack.append((mark, self._offset, None))
 
     def handle_endtag(self, tag: str) -> None:
         if tag in ("script", "style", "iframe"):
@@ -381,11 +405,13 @@ class _SafeHTMLToNodes(HTMLParser):
             return
         if self._skip:
             return
+        if tag == "a" or tag in self._MARK_TAGS:
+            self._close_mark(tag)
+            return
         if tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self._heading_level:
-            text = "".join(self._buf).strip()
-            self._buf = []
-            if text:
-                self.nodes.append(Heading(level=self._heading_level, text=RichText(text=text)))
+            rich = self._take_rich()
+            if rich.text.strip():
+                self.nodes.append(Heading(level=self._heading_level, text=rich))
             self._heading_level = None
             return
         if tag in ("p", "div"):
@@ -394,27 +420,65 @@ class _SafeHTMLToNodes(HTMLParser):
         if tag == "blockquote":
             self._flush_para()
             if self._bq_paras:
-                self.nodes.append(
-                    Blockquote(paragraphs=[RichText(text=p) for p in self._bq_paras])
-                )
+                self.nodes.append(Blockquote(paragraphs=list(self._bq_paras)))
             self._bq_paras = []
             self._in_blockquote = False
-            return
 
     def handle_data(self, data: str) -> None:
         if self._skip:
             return
-        self._buf.append(data)
+        self._append_text(data)
+
+    def _append_text(self, data: str) -> None:
+        if not data:
+            return
+        self._parts.append(data)
+        self._offset += len(data)
+
+    def _close_mark(self, tag: str) -> None:
+        want = InlineMarkType.LINK if tag == "a" else self._MARK_TAGS.get(tag)
+        if want is None:
+            return
+        for i in range(len(self._mark_stack) - 1, -1, -1):
+            mtype, start, href = self._mark_stack[i]
+            if mtype == want:
+                self._mark_stack.pop(i)
+                end = self._offset
+                if end > start:
+                    self._marks.append(
+                        InlineMark(type=mtype, start=start, end=end, href=href)
+                    )
+                return
+
+    def _take_rich(self) -> RichText:
+        # Close any unclosed marks at current offset
+        while self._mark_stack:
+            mtype, start, href = self._mark_stack.pop()
+            if self._offset > start:
+                self._marks.append(
+                    InlineMark(type=mtype, start=start, end=self._offset, href=href)
+                )
+        text = "".join(self._parts)
+        marks = sorted(self._marks, key=lambda m: (m.start, m.end))
+        self._parts = []
+        self._marks = []
+        self._offset = 0
+        return RichText(text=text, marks=marks)
 
     def _flush_para(self) -> None:
-        text = "".join(self._buf).strip()
-        self._buf = []
-        if not text:
+        rich = self._take_rich()
+        if not rich.text.strip() and not rich.marks:
             return
+        # strip outer whitespace but keep mark offsets consistent by not stripping
+        # for mark fidelity; trim only if no marks
+        if not rich.marks:
+            rich = RichText(text=rich.text.strip())
+            if not rich.text:
+                return
         if self._in_blockquote:
-            self._bq_paras.append(text)
+            self._bq_paras.append(rich)
         else:
-            self.nodes.append(Paragraph(text=RichText(text=text)))
+            self.nodes.append(Paragraph(text=rich))
 
 
 def _nodes_from_inline(

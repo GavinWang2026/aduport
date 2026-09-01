@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import base64
 
+import pytest
+
 from app.api.routes import _safe_output_filename
-from app.core.converter import convert
 from app.core.css_sanitize import sanitize_custom_css, sanitize_font_family
 from app.core.document_model import Image, InlineMarkType, Table
+from app.core.converter import convert
+from app.exporters.md_exporter import export_md
 from app.importers.md_importer import import_md
 
 
@@ -29,7 +32,7 @@ def test_bold_italic_link_no_duplication():
     assert text.count("Markdown") == 1
     assert "斜体" in text
     assert "链接" in text
-    from app.core.document_model import ensure_rich_text
+    from app.core.document_model import Paragraph, ensure_rich_text
 
     rich = ensure_rich_text(paras[0].text)  # type: ignore[attr-defined]
     types = {m.type for m in rich.marks}
@@ -112,8 +115,8 @@ def test_css_ssrf_stripped():
 
 def test_circular_import_safe():
     # Must not raise ImportError
+    from app.importers.md_importer import import_md as im
     from app.core.converter import convert as cv
     from app.exporters.md_exporter import export_md as em
-    from app.importers.md_importer import import_md as im
 
     assert callable(im) and callable(cv) and callable(em)

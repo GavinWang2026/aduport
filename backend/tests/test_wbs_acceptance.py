@@ -6,6 +6,7 @@ import io
 import zipfile
 from pathlib import Path
 
+import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 

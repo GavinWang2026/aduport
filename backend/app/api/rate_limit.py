@@ -49,24 +49,62 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client = request.client.host if request.client else "unknown"
-        now = time.time()
-        window = self._hits[client]
-        while window and now - window[0] > 60:
-            window.popleft()
-        if len(window) >= limit:
+        tenant_id = getattr(request.state, "tenant_id", None)
+        bucket = f"tenant:{tenant_id}" if tenant_id else f"ip:{client}"
+        tenant_limit = getattr(request.state, "tenant_rate_limit", None)
+        effective = int(tenant_limit) if tenant_limit else limit
+
+        redis_blocked = self._redis_check(bucket, effective)
+        if redis_blocked is True:
             return JSONResponse(
                 status_code=429,
                 content={
                     "error": True,
                     "code": "rate_limited",
-                    "message": f"请求过于频繁，每分钟最多 {limit} 次",
+                    "message": f"请求过于频繁，每分钟最多 {effective} 次",
                     "status_code": 429,
+                    "tenant_id": tenant_id,
+                },
+            )
+        if redis_blocked is False:
+            return await call_next(request)
+
+        now = time.time()
+        window = self._hits[bucket]
+        while window and now - window[0] > 60:
+            window.popleft()
+        if len(window) >= effective:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": True,
+                    "code": "rate_limited",
+                    "message": f"请求过于频繁，每分钟最多 {effective} 次",
+                    "status_code": 429,
+                    "tenant_id": tenant_id,
                 },
             )
         window.append(now)
         if len(self._hits) > _MAX_CLIENT_KEYS // 2 and len(window) == 1:
             self._prune(now)
         return await call_next(request)
+
+    def _redis_check(self, bucket: str, effective: int) -> bool | None:
+        """Return True if limited, False if allowed via Redis, None to use memory."""
+        url = (settings.redis_url or "").strip()
+        if not url:
+            return None
+        try:
+            import redis  # type: ignore
+
+            r = redis.from_url(url, socket_connect_timeout=0.4, socket_timeout=0.4)
+            key = f"mdbridge:rl:{bucket}"
+            n = int(r.incr(key))
+            if n == 1:
+                r.expire(key, 60)
+            return n > effective
+        except Exception:
+            return None
 
 
 def reset_rate_limits() -> None:

@@ -1,7 +1,8 @@
-"""PPTX importer using docling (optional [office] extra)."""
+"""PPTX importer: docling when available, else slide XML text extract."""
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import zipfile
@@ -10,7 +11,9 @@ from pathlib import Path
 
 from app.core.document_model import DocumentModel
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
-from app.importers._docling_utils import docling_document_to_model
+from app.importers.pptx_text import try_extract_pptx_model
+
+_log = logging.getLogger("mdbridge.pptx")
 
 
 def _require_docling():
@@ -36,19 +39,36 @@ def import_pptx(source_bytes: bytes, filename: str = "input.pptx") -> DocumentMo
     except InvalidDocumentError:
         raise
 
-    get_converter = _require_docling()
+    title = Path(filename).stem
+    light = try_extract_pptx_model(source_bytes, title=title)
+    try:
+        get_converter = _require_docling()
+    except InvalidDocumentError:
+        if light is not None and light.nodes:
+            return light
+        raise
+
+    try:
+        return _docling_import(source_bytes, filename, get_converter)
+    except Exception as exc:
+        if light is not None and light.nodes:
+            _log.info("docling PPTX failed, using slide XML fallback: %s", exc)
+            return light
+        if isinstance(exc, (InvalidDocumentError, CorruptedFileError)):
+            raise
+        raise CorruptedFileError(
+            f"PPTX 解析失败（文件可能已损坏）: {filename} — {exc}"
+        ) from exc
+
+
+def _docling_import(source_bytes: bytes, filename: str, get_converter) -> DocumentModel:
+    from app.importers._docling_utils import docling_document_to_model
+
     suffix = Path(filename).suffix or ".pptx"
     with tempfile.TemporaryDirectory(prefix="mdbridge-pptx-") as tmpdir:
         tmp_path = Path(tmpdir) / f"input{suffix}"
         tmp_path.write_bytes(source_bytes)
         os.chmod(tmp_path, 0o600)
-        try:
-            converter = get_converter()
-            result = converter.convert(str(tmp_path))
-            return docling_document_to_model(result.document, title=Path(filename).stem)
-        except (InvalidDocumentError, CorruptedFileError):
-            raise
-        except Exception as exc:
-            raise CorruptedFileError(
-                f"PPTX 解析失败（文件可能已损坏）: {filename} — {exc}"
-            ) from exc
+        converter = get_converter()
+        result = converter.convert(str(tmp_path))
+        return docling_document_to_model(result.document, title=Path(filename).stem)

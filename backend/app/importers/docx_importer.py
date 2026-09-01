@@ -1,4 +1,4 @@
-"""DOCX importer using docling (optional heavy dependency) + OOXML enrich."""
+"""DOCX importer using docling (optional heavy dependency)."""
 
 from __future__ import annotations
 
@@ -11,13 +11,11 @@ from pathlib import Path
 from app.core.document_model import DocumentModel
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
 from app.importers._docling_utils import docling_document_to_model
-from app.importers.docx_ooxml import enrich_docx_model
 
 
 def _require_docling():
     try:
         import docling.document_converter  # noqa: F401
-
         from app.importers._docling_converter import get_office_converter
     except ImportError as exc:
         raise InvalidDocumentError(
@@ -39,7 +37,6 @@ def import_docx(source_bytes: bytes, filename: str = "input.docx") -> DocumentMo
 
     get_converter = _require_docling()
     suffix = Path(filename).suffix or ".docx"
-    model: DocumentModel
     with tempfile.TemporaryDirectory(prefix="mdbridge-docx-") as tmpdir:
         tmp_path = Path(tmpdir) / f"input{suffix}"
         tmp_path.write_bytes(source_bytes)
@@ -47,12 +44,10 @@ def import_docx(source_bytes: bytes, filename: str = "input.docx") -> DocumentMo
         try:
             converter = get_converter()
             result = converter.convert(str(tmp_path))
-            model = docling_document_to_model(result.document, title=Path(filename).stem)
+            return docling_document_to_model(result.document, title=Path(filename).stem)
         except (InvalidDocumentError, CorruptedFileError):
             raise
         except Exception as exc:
             raise CorruptedFileError(
                 f"DOCX 解析失败（文件可能已损坏）: {filename} — {exc}"
             ) from exc
-
-    return enrich_docx_model(model, source_bytes)

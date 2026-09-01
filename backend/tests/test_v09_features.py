@@ -7,17 +7,11 @@ import gzip
 from app.config import settings
 from app.core.cache import ResultCache
 from app.core.converter import SUPPORTED_TARGET_FORMATS, convert
-from app.core.document_model import (
-    Blockquote,
-    DocumentModel,
-    Heading,
-    HorizontalRule,
-    ListItem,
-    Paragraph,
-)
+from app.core.document_model import Blockquote, Heading, HorizontalRule, ListItem
 from app.core.warmup import warmup_sync
 from app.exporters.mobi_exporter import export_mobi
 from app.importers.html_importer import import_html
+from app.core.document_model import DocumentModel, Paragraph
 
 
 def test_mobi_in_targets():

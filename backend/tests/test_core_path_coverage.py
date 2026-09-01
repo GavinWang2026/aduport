@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from app.core.converter import convert
-from app.core.css_sanitize import sanitize_custom_css as scss
-from app.core.css_sanitize import sanitize_font_family
+import base64
+
 from app.core.document_model import (
     CodeBlock,
     DocumentModel,
@@ -17,6 +16,8 @@ from app.core.document_model import (
     RichText,
     Table,
 )
+from app.core.converter import convert
+from app.core.css_sanitize import sanitize_custom_css as scss, sanitize_font_family
 from app.exporters.md_exporter import export_md
 from app.exporters.pdf_exporter import _render_html
 from app.importers.md_importer import import_md

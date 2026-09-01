@@ -76,6 +76,11 @@ class ResultCache:
                 _, (_, blob, _) = self._data.popitem(last=False)
                 self.bytes_stored = max(0, self.bytes_stored - len(blob))
 
+    def clear(self) -> None:
+        with self._lock:
+            self._data.clear()
+            self.bytes_stored = 0
+
     def stats(self) -> dict[str, int | float | bool]:
         with self._lock:
             return {

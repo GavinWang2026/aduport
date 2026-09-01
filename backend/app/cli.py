@@ -123,6 +123,59 @@ def formats_cmd() -> None:
     typer.echo("Supported formats: " + ", ".join(sorted(SUPPORTED_FORMATS)))
 
 
+@app.command("machine-id")
+def machine_id_cmd() -> None:
+    """打印本机 machine_id（企业一机一码绑定用）。"""
+    from app.core.license import machine_id
+
+    typer.echo(machine_id())
+
+
+@app.command("license-issue")
+def license_issue_cmd(
+    machine: str = typer.Option(..., "--machine", "-m", help="客户 machine_id"),
+    expires: str = typer.Option("", "--expires", "-e", help="到期日 YYYY-MM-DD，空=永久"),
+    seats: int = typer.Option(1, "--seats", "-s", help="席位数"),
+    customer: str = typer.Option("", "--customer", "-c", help="客户名称"),
+) -> None:
+    """签发企业 License Key（需与部署侧 MDBRIDGE_LICENSE_SECRET 一致）。"""
+    from app.core.exceptions import MdBridgeError
+    from app.core.license import issue_license
+
+    try:
+        token = issue_license(
+            machine_id_value=machine,
+            expires=expires,
+            seats=seats,
+            customer=customer,
+        )
+    except MdBridgeError as exc:
+        typer.secho(f"错误 [{exc.code}]: {exc.message}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(token)
+
+
+@app.command("license-check")
+def license_check_cmd(
+    key: Optional[str] = typer.Option(None, "--key", "-k", help="License token；默认读环境变量"),
+) -> None:
+    """校验 License（本机指纹 + 签名 + 到期）。"""
+    from app.config import settings
+    from app.core.license import machine_id, parse_and_verify
+
+    token = (key or settings.license_key or "").strip()
+    if not token and settings.license_file:
+        from pathlib import Path
+
+        token = Path(settings.license_file).read_text(encoding="utf-8").strip()
+    info = parse_and_verify(token)
+    typer.echo(f"host_machine_id={machine_id()}")
+    typer.echo(f"valid={info.valid} reason={info.reason}")
+    typer.echo(f"customer={info.customer} expires={info.expires or '-'} seats={info.seats}")
+    if not info.valid:
+        raise typer.Exit(code=1)
+
+
 def main() -> None:
     app()
 

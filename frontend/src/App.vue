@@ -1,76 +1,171 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import FormatSelect from './components/FormatSelect.vue'
 import FileUploader from './components/FileUploader.vue'
+import { message } from './toast'
 import {
+  convertBatchZip,
   convertDocument,
   downloadServerJob,
+  fetchFormats,
   fetchHealth,
   listServerJobs,
   type ServerJob,
 } from './api'
-import type { ConvertJob, HistoryItem, SourceFormat, TargetFormat } from './types'
+import type { ConvertJob, HistoryItem, SourceFormat, SourceFormatOption, TargetFormat } from './types'
 import { detectFormat, formatLabel } from './types'
 import { t, type Locale as UILocale } from './i18n'
 
-const sourceFormats: SourceFormat[] = ['docx', 'pdf', 'md', 'txt', 'html', 'pptx', 'epub', 'mobi']
+const sourceFormats: SourceFormat[] = [
+  'docx', 'pdf', 'md', 'txt', 'html', 'pptx', 'epub', 'mobi',
+  'odt', 'rtf', 'doc', 'json', 'xlsx', 'csv',
+]
 const targetFormats: TargetFormat[] = [
-  'docx',
-  'pdf',
-  'md',
-  'html',
-  'txt',
-  'epub',
-  'pptx',
-  'mobi',
-  'azw3',
-  'kf8',
+  'docx', 'pdf', 'md', 'html', 'txt', 'epub', 'pptx', 'mobi',
+  'azw3', 'kf8', 'latex', 'csv', 'odt', 'json', 'xlsx',
 ]
 
 const locale = ref<UILocale>((localStorage.getItem('mdbridge-locale') as UILocale) || 'zh')
-const sourceFormat = ref<SourceFormat>('docx')
+const theme = ref<'dark' | 'light'>((localStorage.getItem('mdbridge-theme') as 'dark' | 'light') || 'dark')
+const activeTab = ref<'convert' | 'tasks'>('convert')
+const sourceFormat = ref<SourceFormatOption>('auto')
 const targetFormat = ref<TargetFormat>('md')
 const jobs = ref<ConvertJob[]>([])
 const converting = ref(false)
+const zipping = ref(false)
 const apiOnline = ref(false)
 const previewText = ref('')
 const previewTitle = ref('')
+const previewMode = ref<'md' | 'render'>('md')
+const previewFullscreen = ref(false)
 const history = ref<HistoryItem[]>([])
 const serverJobs = ref<ServerJob[]>([])
 const dragIndex = ref<number | null>(null)
+const autoRefresh = ref(true)
+const jobFilter = ref<'all' | 'active' | 'done' | 'error'>('all')
+const uploader = ref<{ openDirectory: () => void } | null>(null)
+/** Target formats that cannot be used as source (from GET /api/formats). */
+const exportOnlyFormats = ref<Set<string>>(new Set())
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const HISTORY_KEY = 'mdbridge-history'
-
 const tt = (key: Parameters<typeof t>[1]) => t(locale.value, key)
 
+function applyTheme(next: 'dark' | 'light') {
+  theme.value = next
+  document.documentElement.setAttribute('data-theme', next)
+  localStorage.setItem('mdbridge-theme', next)
+}
+
 onMounted(async () => {
+  applyTheme(theme.value)
   try {
     history.value = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
   } catch {
     history.value = []
   }
   apiOnline.value = await fetchHealth()
-  if (!apiOnline.value) {
-    message.warning(tt('apiWarn'))
+  if (!apiOnline.value) message.warning(tt('apiWarn'))
+  const fmts = await fetchFormats()
+  if (fmts?.export_only) {
+    exportOnlyFormats.value = new Set(
+      fmts.export_only.map((x) => x.toLowerCase()),
+    )
   }
   await refreshServerJobs()
+  startPolling()
+  // keep online badge fresh (PDF/docling can make API look offline)
+  window.setInterval(() => {
+    void fetchHealth().then((ok) => {
+      apiOnline.value = ok
+    })
+  }, 5000)
 })
 
+onUnmounted(() => stopPolling())
+
+watch([activeTab, autoRefresh], () => {
+  stopPolling()
+  startPolling()
+})
+
+function startPolling() {
+  if (!autoRefresh.value || activeTab.value !== 'tasks') return
+  pollTimer = setInterval(() => {
+    void refreshServerJobs()
+  }, 2500)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
 const doneCount = computed(() => jobs.value.filter((j) => j.status === 'done').length)
+const queueCount = computed(() =>
+  jobs.value.filter((j) => j.status === 'pending' || j.status === 'converting').length,
+)
+const historyOkCount = computed(() => history.value.filter((h) => h.ok).length)
+const successRate = computed(() => {
+  if (!history.value.length) return '—'
+  return `${((historyOkCount.value / history.value.length) * 100).toFixed(1)}%`
+})
+
+const filteredServerJobs = computed(() => {
+  const list = serverJobs.value
+  if (jobFilter.value === 'all') return list
+  if (jobFilter.value === 'active') {
+    return list.filter((j) => j.status === 'queued' || j.status === 'running')
+  }
+  if (jobFilter.value === 'done') return list.filter((j) => j.status === 'done')
+  return list.filter((j) => j.status === 'error')
+})
+
+const sourceOptions = computed(() => [
+  { value: 'auto', label: formatLabel('auto', locale.value) },
+  ...sourceFormats.map((f) => ({ value: f, label: formatLabel(f, locale.value) })),
+])
+
+const targetOptions = computed(() =>
+  targetFormats.map((f) => {
+    const only = exportOnlyFormats.value.has(f)
+    return {
+      value: f,
+      label: only
+        ? `${formatLabel(f, locale.value)} · ${tt('exportOnlyTag')}`
+        : f === 'csv'
+          ? `${formatLabel(f, locale.value)} · ${tt('csvTableOnlyShort')}`
+          : formatLabel(f, locale.value),
+      hint: only ? tt('exportOnlyHint') : f === 'csv' ? tt('csvTableOnly') : undefined,
+    }
+  }),
+)
+
+const renderedPreview = computed(() => {
+  if (!previewText.value) return ''
+  return simpleMarkdown(previewText.value)
+})
 
 function setLocale(next: UILocale) {
   locale.value = next
   localStorage.setItem('mdbridge-locale', next)
 }
 
+function toggleTheme() {
+  applyTheme(theme.value === 'dark' ? 'light' : 'dark')
+}
+
 function swapFormats() {
   const src = sourceFormat.value
   const tgt = targetFormat.value
-  if ((sourceFormats as string[]).includes(tgt)) {
-    sourceFormat.value = tgt as SourceFormat
-  }
-  if ((targetFormats as string[]).includes(src)) {
+  if (src !== 'auto' && (targetFormats as string[]).includes(src)) {
     targetFormat.value = src as TargetFormat
+  }
+  // Do not promote export-only targets (azw3/kf8/latex) into source.
+  if ((sourceFormats as string[]).includes(tgt) && !exportOnlyFormats.value.has(tgt)) {
+    sourceFormat.value = tgt as SourceFormat
   }
 }
 
@@ -79,21 +174,35 @@ function pushHistory(item: HistoryItem) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value))
 }
 
-function onFilesSelected(files: File[]) {
+function enqueueFiles(files: File[], fromDir = false) {
   for (const file of files) {
     const detected = detectFormat(file.name)
-    const src = detected ?? sourceFormat.value
-    if (detected) {
+    const src: SourceFormatOption =
+      sourceFormat.value === 'auto' ? 'auto' : (detected ?? sourceFormat.value)
+    if (sourceFormat.value !== 'auto' && detected) {
       sourceFormat.value = detected
     }
+    const rel = (file as File & { webkitRelativePath?: string }).webkitRelativePath || undefined
     jobs.value.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
       sourceFormat: src,
       targetFormat: targetFormat.value,
       status: 'pending',
+      relativePath: rel || undefined,
     })
   }
+  if (fromDir && files.length) {
+    message.success(`${tt('dirAdded')}（${files.length}）`)
+  }
+}
+
+function onFilesSelected(files: File[]) {
+  enqueueFiles(files, false)
+}
+
+function onDirectorySelected(files: File[]) {
+  enqueueFiles(files, true)
 }
 
 function onDragStart(index: number) {
@@ -129,14 +238,16 @@ async function convertAll() {
       const job = pending[idx]
       job.status = 'converting'
       job.targetFormat = targetFormat.value
+      if (sourceFormat.value === 'auto') job.sourceFormat = 'auto'
       job.progress = 0
       try {
         const result = await convertDocument(
           job.file,
           job.sourceFormat,
           job.targetFormat,
-          (p) => {
-            job.progress = p
+          (p, status) => {
+            // server often stays at 0.1 during long PDF/docling work
+            job.progress = Math.max(p, status === 'running' ? 0.15 : p)
           },
         )
         job.result = result
@@ -147,7 +258,7 @@ async function convertAll() {
         }
         pushHistory({
           id: job.id,
-          name: job.file.name,
+          name: job.relativePath || job.file.name,
           sourceFormat: job.sourceFormat,
           targetFormat: job.targetFormat,
           at: new Date().toLocaleString(),
@@ -158,7 +269,7 @@ async function convertAll() {
         job.error = err instanceof Error ? err.message : tt('failed')
         pushHistory({
           id: job.id,
-          name: job.file.name,
+          name: job.relativePath || job.file.name,
           sourceFormat: job.sourceFormat,
           targetFormat: job.targetFormat,
           at: new Date().toLocaleString(),
@@ -175,12 +286,33 @@ async function convertAll() {
 
   const failed = jobs.value.filter((j) => j.status === 'error').length
   const ok = jobs.value.filter((j) => j.status === 'done').length
-  if (failed && !ok) {
-    message.error(`${tt('allFailed')}（${failed}）`)
-  } else if (failed) {
-    message.warning(`${tt('partialDone')} ${ok} / ${failed}`)
-  } else {
-    message.success(`${tt('batchDone')}（${ok}）`)
+  if (failed && !ok) message.error(`${tt('allFailed')}（${failed}）`)
+  else if (failed) message.warning(`${tt('partialDone')} ${ok} / ${failed}`)
+  else message.success(`${tt('batchDone')}（${ok}）`)
+}
+
+async function downloadZipBatch() {
+  const pending = jobs.value.filter((j) => j.status === 'pending' || j.status === 'error')
+  const files = (pending.length ? pending : jobs.value).map((j) => j.file)
+  if (!files.length) {
+    message.info(tt('needFiles'))
+    return
+  }
+  zipping.value = true
+  try {
+    const { filename, blob } = await convertBatchZip(files, sourceFormat.value, targetFormat.value)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+    message.success(tt('zipDone'))
+    await refreshServerJobs()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : tt('failed'))
+  } finally {
+    zipping.value = false
   }
 }
 
@@ -237,279 +369,412 @@ async function onDownloadServerJob(job: ServerJob) {
   }
 }
 
-function label(fmt: SourceFormat | TargetFormat) {
-  return formatLabel(fmt, locale.value)
+function formatTime(ts: number) {
+  try {
+    return new Date(ts * 1000).toLocaleString()
+  } catch {
+    return String(ts)
+  }
+}
+
+function formatBytes(n: number) {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function extOf(name: string) {
+  return (name.split('.').pop() || '').toLowerCase()
+}
+
+function extClass(name: string) {
+  const e = extOf(name)
+  if (['pdf', 'docx', 'doc', 'md', 'html', 'xlsx', 'csv'].includes(e)) return `is-${e}`
+  return ''
+}
+
+function statusClass(status: ConvertJob['status']) {
+  if (status === 'pending') return 'wait'
+  if (status === 'converting') return 'run'
+  if (status === 'done') return 'ready'
+  return 'bad'
+}
+
+function statusText(job: ConvertJob) {
+  if (job.status === 'pending') return tt('waiting')
+  if (job.status === 'converting') {
+    const pct = job.progress != null ? ` ${Math.round(job.progress * 100)}%` : ''
+    const bigPdf =
+      /\.pdf$/i.test(job.file?.name || '') && (job.file?.size || 0) > 1_500_000
+    const hint = bigPdf && (job.progress ?? 0) < 0.95 ? ` · ${tt('ocrSlowHint')}` : ''
+    return `${tt('converting')}${pct}${hint}`
+  }
+  if (job.status === 'done') return tt('done')
+  return job.error || tt('failed')
+}
+
+function histBadgeClass(name: string) {
+  const e = extOf(name)
+  if (e === 'pdf') return 'md-hb-pdf'
+  if (e === 'docx' || e === 'doc') return 'md-hb-doc'
+  if (e === 'md' || e === 'txt') return 'md-hb-md'
+  if (e === 'html') return 'md-hb-html'
+  return 'md-hb-def'
+}
+
+function histBadgeText(name: string) {
+  const e = extOf(name)
+  if (!e) return 'FILE'
+  return e.slice(0, 4).toUpperCase()
+}
+
+async function copyPreview() {
+  if (!previewText.value) return
+  try {
+    await navigator.clipboard.writeText(previewText.value)
+    message.success(tt('copied'))
+  } catch {
+    message.error(tt('failed'))
+  }
+}
+
+function downloadPreview() {
+  if (!previewText.value) return
+  const blob = new Blob([previewText.value], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = previewTitle.value || 'preview.md'
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
+
+function simpleMarkdown(src: string): string {
+  const esc = src
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  return esc
+    .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>')
 }
 </script>
 
 <template>
-  <a-layout class="layout">
-    <a-layout-header class="header">
-      <div class="brand">
-        <span class="logo">md-bridge</span>
-        <span class="subtitle">{{ tt('subtitle') }}</span>
+  <div class="md-app">
+    <div class="md-stage" aria-hidden="true" />
+
+    <header class="md-header">
+      <div class="md-brand">
+        <div class="md-logo" aria-hidden="true">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 5h9a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6V5Z" opacity=".9" />
+            <path d="M6 5h9a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6" opacity=".35" />
+            <path d="M9.5 9.5v5M12 9.5l2.5 2.5-2.5 2.5" />
+          </svg>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:2px">
+          <span class="md-brand-name">md<em>-bridge</em></span>
+          <span class="md-brand-tag">{{ tt('localTag') }}</span>
+        </div>
       </div>
-      <a-space>
-        <a-radio-group
-          size="small"
-          :value="locale"
-          button-style="solid"
-          @update:value="(v: string) => setLocale(v as UILocale)"
-        >
-          <a-radio-button value="zh">中文</a-radio-button>
-          <a-radio-button value="en">EN</a-radio-button>
-        </a-radio-group>
-        <a-tag :color="apiOnline ? 'success' : 'error'">
+
+      <div class="md-hdr-right">
+        <div class="md-seg" role="group">
+          <button type="button" :class="{ active: locale === 'zh' }" @click="setLocale('zh')">中文</button>
+          <button type="button" :class="{ active: locale === 'en' }" @click="setLocale('en')">EN</button>
+        </div>
+        <div class="md-online" :class="{ 'is-on': apiOnline }">
+          <span class="md-dot" />
           {{ apiOnline ? tt('apiOnline') : tt('apiOffline') }}
-        </a-tag>
-      </a-space>
-    </a-layout-header>
+          <span class="md-tip">{{ tt('apiTip') }}</span>
+        </div>
+        <button
+          type="button"
+          class="md-icon-rd"
+          :title="theme === 'dark' ? tt('themeLight') : tt('themeDark')"
+          @click="toggleTheme"
+        >
+          <svg v-if="theme === 'dark'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+          </svg>
+          <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
+          </svg>
+        </button>
+      </div>
+    </header>
 
-    <a-layout-content class="content">
-      <a-row :gutter="[24, 24]">
-        <a-col :xs="24" :lg="14">
-          <a-card :title="tt('uploadCard')" :bordered="false">
-            <a-space direction="vertical" size="large" style="width: 100%">
-              <a-row :gutter="16" align="middle">
-                <a-col :span="10">
-                  <label class="field-label">{{ tt('sourceFormat') }}</label>
-                  <a-select v-model:value="sourceFormat" style="width: 100%">
-                    <a-select-option v-for="f in sourceFormats" :key="f" :value="f">
-                      {{ label(f) }}
-                    </a-select-option>
-                  </a-select>
-                </a-col>
-                <a-col :span="4" style="text-align: center; padding-top: 22px">
-                  <a-button type="link" @click="swapFormats">{{ tt('swap') }}</a-button>
-                </a-col>
-                <a-col :span="10">
-                  <label class="field-label">{{ tt('targetFormat') }}</label>
-                  <a-select v-model:value="targetFormat" style="width: 100%">
-                    <a-select-option v-for="f in targetFormats" :key="f" :value="f">
-                      {{ label(f) }}
-                    </a-select-option>
-                  </a-select>
-                </a-col>
-              </a-row>
+    <div class="md-pagehead">
+      <div>
+        <h1>{{ tt('pageTitle') }}<span class="hl">.</span></h1>
+        <div class="sub">{{ tt('pageSub') }}</div>
+      </div>
+      <div class="md-stat-row">
+        <div class="md-stat"><b class="blue">{{ historyOkCount }}</b><span>{{ tt('statConverted') }}</span></div>
+        <div class="md-stat"><b class="green">{{ successRate }}</b><span>{{ tt('statRate') }}</span></div>
+        <div class="md-stat"><b class="gray">{{ queueCount }}</b><span>{{ tt('statQueue') }}</span></div>
+      </div>
+    </div>
 
-              <FileUploader :disabled="converting" @files-selected="onFilesSelected" />
+    <nav class="md-tabs" aria-label="tabs">
+      <button type="button" :class="{ on: activeTab === 'convert' }" @click="activeTab = 'convert'">{{ tt('tabConvert') }}</button>
+      <button type="button" :class="{ on: activeTab === 'tasks' }" @click="activeTab = 'tasks'">{{ tt('tabTasks') }}</button>
+    </nav>
 
-              <a-space wrap>
-                <a-button type="primary" :loading="converting" @click="convertAll">
+    <main class="md-main">
+      <template v-if="activeTab === 'convert'">
+        <div class="md-grid">
+          <!-- left: upload -->
+          <section class="md-panel">
+            <div class="md-p-head">
+              <div class="md-p-title"><span class="k" />{{ tt('uploadCard') }}</div>
+              <span class="md-p-sub">{{ tt('dragDrop') }}</span>
+            </div>
+            <div class="md-workspace">
+              <div class="md-fmt-grid">
+                <FormatSelect v-model="sourceFormat" :label="tt('sourceFormat')" :options="sourceOptions" />
+                <button type="button" class="md-swap" :title="tt('swap')" @click="swapFormats">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 4v14m0 0-3.5-3.5M7 18l3.5-3.5" />
+                    <path d="M17 20V6m0 0-3.5 3.5M17 6l3.5 3.5" />
+                  </svg>
+                </button>
+                <FormatSelect v-model="targetFormat" :label="tt('targetFormat')" :options="targetOptions" />
+              </div>
+
+              <FileUploader
+                ref="uploader"
+                :disabled="converting || zipping"
+                :text="tt('uploadText')"
+                :hint="tt('uploadHint')"
+                @files-selected="onFilesSelected"
+                @directory-selected="onDirectorySelected"
+              />
+
+              <div v-if="jobs.length" class="md-files">
+                <div v-for="item in jobs" :key="item.id" class="md-frow">
+                  <span class="md-ext" :class="extClass(item.file.name)">{{ extOf(item.file.name).slice(0, 4) || 'FILE' }}</span>
+                  <span class="md-fname" :title="item.relativePath || item.file.name">{{ item.relativePath || item.file.name }}</span>
+                  <span class="md-fsize">{{ formatBytes(item.file.size) }}</span>
+                  <span class="md-st" :class="statusClass(item.status)">
+                    <span v-if="item.status === 'converting'" class="dot2" />
+                    {{ statusText(item) }}
+                  </span>
+                  <div v-if="item.status === 'converting'" class="md-bar" :class="{ 'is-indet': !item.progress }">
+                    <i :style="item.progress ? { width: `${Math.round(item.progress * 100)}%` } : undefined" />
+                  </div>
+                  <button v-if="item.status === 'done'" type="button" class="md-link" @click="downloadJob(item)">{{ tt('download') }}</button>
+                  <button type="button" class="md-x" :title="tt('remove')" @click="removeJob(item.id)">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="md-ops">
+                <button type="button" class="md-btn md-btn--g" :disabled="converting || zipping" @click="uploader?.openDirectory()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M8 16V8m8 8V4M12 12V6" /></svg>
+                  {{ tt('pickDir') }}
+                </button>
+                <button type="button" class="md-btn md-btn--p" :disabled="converting" @click="convertAll">
+                  <span v-if="converting" class="md-spin" />
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" /></svg>
                   {{ tt('start') }}
-                </a-button>
-                <a-button :disabled="converting || !doneCount" @click="downloadAll">
+                </button>
+                <button type="button" class="md-btn md-btn--g" :disabled="!jobs.length || zipping" @click="downloadZipBatch">
+                  <span v-if="zipping" class="md-spin" />
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
+                  {{ tt('downloadZip') }}
+                </button>
+                <button type="button" class="md-btn md-btn--g" :disabled="converting || !doneCount" @click="downloadAll">
                   {{ tt('downloadAll') }} ({{ doneCount }})
-                </a-button>
-                <a-button :disabled="converting || !jobs.length" @click="clearJobs">
-                  {{ tt('clearList') }}
-                </a-button>
-              </a-space>
-            </a-space>
-          </a-card>
+                </button>
+                <button type="button" class="md-btn md-btn--g" :disabled="converting || !jobs.length" @click="clearJobs">
+                  {{ tt('clear') }}
+                </button>
+              </div>
+            </div>
+          </section>
 
-          <a-card :title="tt('queue')" :bordered="false" style="margin-top: 24px">
-            <template #extra>
-              <span class="preview-name">{{ tt('dragHint') }}</span>
-            </template>
-            <a-empty v-if="!jobs.length" :description="tt('queueEmpty')" />
-            <a-list v-else :data-source="jobs" item-layout="horizontal">
-              <template #renderItem="{ item, index }">
-                <a-list-item
-                  class="queue-item"
-                  draggable="true"
-                  @dragstart="onDragStart(index)"
-                  @dragover="onDragOver"
-                  @drop="onDrop(index)"
-                >
-                  <template #actions>
-                    <a-tag v-if="item.status === 'pending'" color="default">{{ tt('waiting') }}</a-tag>
-                    <a-tag v-else-if="item.status === 'converting'" color="processing">
-                      {{ tt('converting') }}{{ item.progress != null ? ` ${Math.round(item.progress * 100)}%` : '' }}
-                    </a-tag>
-                    <a-tag v-else-if="item.status === 'done'" color="success">{{ tt('done') }}</a-tag>
-                    <a-tag v-else color="error">{{ item.error || tt('failed') }}</a-tag>
-                    <a-button
-                      v-if="item.status === 'done'"
-                      type="link"
-                      size="small"
-                      @click="downloadJob(item)"
-                    >
-                      {{ tt('download') }}
-                    </a-button>
-                    <a-button type="link" size="small" danger @click="removeJob(item.id)">
-                      {{ tt('remove') }}
-                    </a-button>
-                  </template>
-                  <a-list-item-meta
-                    :title="item.file.name"
-                    :description="`${label(item.sourceFormat)} → ${label(item.targetFormat)}`"
-                  >
-                    <template #avatar>
-                      <span class="drag-handle" title="drag">⠿</span>
-                    </template>
-                  </a-list-item-meta>
-                </a-list-item>
-              </template>
-            </a-list>
-          </a-card>
-        </a-col>
+          <!-- right: preview -->
+          <section
+            class="md-panel md-preview"
+            :class="{ 'is-fullscreen': previewFullscreen }"
+            :style="previewFullscreen ? { position: 'fixed', inset: '16px', zIndex: 80, maxHeight: 'none' } : undefined"
+          >
+            <div class="md-p-head">
+              <div class="md-p-title"><span class="k" />{{ tt('preview') }}</div>
+              <div style="display:flex;gap:3px;align-items:center">
+                <span v-if="previewTitle" class="md-p-sub" style="margin-right:6px">{{ previewTitle }}</span>
+                <button type="button" class="md-icon-rd" :title="tt('copy')" :disabled="!previewText" @click="copyPreview">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+                </button>
+                <button type="button" class="md-icon-rd" :title="tt('download')" :disabled="!previewText" @click="downloadPreview">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v3a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-3" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg>
+                </button>
+                <button type="button" class="md-icon-rd" :title="tt('fullscreen')" @click="previewFullscreen = !previewFullscreen">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" /></svg>
+                </button>
+              </div>
+            </div>
+            <div class="md-pv-tabs">
+              <button type="button" :class="{ on: previewMode === 'md' }" @click="previewMode = 'md'">{{ tt('previewMd') }}</button>
+              <button type="button" :class="{ on: previewMode === 'render' }" @click="previewMode = 'render'">{{ tt('previewRender') }}</button>
+            </div>
+            <div class="md-pv-body">
+              <div v-if="!previewText" class="md-pv-empty">
+                <div class="frame">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h16v18H4z" /><path d="M8 9h3M8 13h3M13 9h3M8 17h8" /></svg>
+                </div>
+                <p>{{ tt('previewEmpty') }}</p>
+              </div>
+              <pre v-else-if="previewMode === 'md'" class="md-pv-doc">{{ previewText }}</pre>
+              <div v-else class="md-pv-render" v-html="renderedPreview" />
+            </div>
+          </section>
+        </div>
 
-        <a-col :xs="24" :lg="10">
-          <a-card :title="tt('preview')" :bordered="false">
-            <template #extra>
-              <span v-if="previewTitle" class="preview-name">{{ previewTitle }}</span>
-            </template>
-            <a-empty v-if="!previewText" :description="tt('previewEmpty')" />
-            <pre v-else class="preview-box">{{ previewText }}</pre>
-          </a-card>
+        <!-- queue ‖ history -->
+        <div class="md-bottom-row">
+          <section class="md-panel md-queue">
+            <div class="md-q-head">
+              <div class="md-q-title"><span class="k" />{{ tt('queue') }}</div>
+              <span class="md-q-hint">{{ tt('dragHint') }}</span>
+            </div>
+            <div class="md-q-inner">
+              <div v-if="!jobs.length" class="md-q-empty">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h6" /></svg>
+                {{ tt('queueEmpty') }}
+              </div>
+              <div
+                v-for="(item, index) in jobs"
+                :key="`q-${item.id}`"
+                class="md-qitem"
+                draggable="true"
+                @dragstart="onDragStart(index)"
+                @dragover="onDragOver"
+                @drop="onDrop(index)"
+              >
+                <span class="grip" aria-hidden="true">
+                  <svg width="7" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
+                </span>
+                <span class="idx">{{ String(index + 1).padStart(2, '0') }}</span>
+                <span class="s" :class="`is-${item.status}`" />
+                <span class="n" :title="item.relativePath || item.file.name">{{ item.relativePath || item.file.name }}</span>
+                <button v-if="item.status === 'done'" type="button" class="md-link" @click="downloadJob(item)">{{ tt('download') }}</button>
+              </div>
+            </div>
+          </section>
 
-          <a-card :title="tt('serverJobs')" :bordered="false" style="margin-top: 24px">
-            <template #extra>
-              <a-button type="link" size="small" @click="refreshServerJobs">{{ tt('refreshJobs') }}</a-button>
-            </template>
-            <a-empty v-if="!serverJobs.length" :description="tt('serverJobsEmpty')" />
-            <a-list v-else size="small" :data-source="serverJobs">
-              <template #renderItem="{ item }">
-                <a-list-item>
-                  <a-list-item-meta
-                    :title="item.filename"
-                    :description="`${item.source_format} → ${item.target_format} · ${item.status}`"
-                  />
-                  <template #actions>
-                    <a-button
-                      v-if="item.status === 'done'"
-                      type="link"
-                      size="small"
-                      @click="onDownloadServerJob(item)"
-                    >
-                      {{ tt('download') }}
-                    </a-button>
-                    <a-tag v-else :color="item.status === 'error' ? 'error' : 'processing'">
-                      {{ item.status }}
-                    </a-tag>
-                  </template>
-                </a-list-item>
-              </template>
-            </a-list>
-          </a-card>
-
-          <a-card :title="tt('history')" :bordered="false" style="margin-top: 24px">
-            <template #extra>
-              <a-button type="link" size="small" :disabled="!history.length" @click="clearHistory">
+          <section class="md-panel md-history">
+            <div class="md-p-head">
+              <div class="md-p-title"><span class="k" />{{ tt('history') }}</div>
+              <button type="button" class="md-btn md-btn--g" style="padding:5px 12px;font-size:11px" :disabled="!history.length" @click="clearHistory">
                 {{ tt('clear') }}
-              </a-button>
-            </template>
-            <a-empty v-if="!history.length" description="—" />
-            <a-list v-else size="small" :data-source="history" :split="true">
-              <template #renderItem="{ item }">
-                <a-list-item>
-                  <a-list-item-meta
-                    :title="item.name"
-                    :description="`${item.sourceFormat} → ${item.targetFormat} · ${item.at}`"
-                  />
-                  <template #actions>
-                    <a-tag :color="item.ok ? 'success' : 'error'">
-                      {{ item.ok ? tt('success') : tt('failed') }}
-                    </a-tag>
-                  </template>
-                </a-list-item>
-              </template>
-            </a-list>
-          </a-card>
-        </a-col>
-      </a-row>
-    </a-layout-content>
+              </button>
+            </div>
+            <div v-if="!history.length" class="md-empty-pad">—</div>
+            <div v-else class="md-hlist">
+              <div v-for="item in history" :key="item.id" class="md-hitem" :class="item.ok ? 'ok' : 'bad'" :title="item.error || item.name">
+                <div class="md-h-badge" :class="histBadgeClass(item.name)">{{ histBadgeText(item.name) }}</div>
+                <div class="md-h-body">
+                  <div class="md-h-name" :title="item.name">{{ item.name }}</div>
+                  <div class="md-h-meta">
+                    <span class="a">{{ item.sourceFormat }} → {{ item.targetFormat }}</span>
+                    <span>· {{ item.at }}</span>
+                  </div>
+                  <div v-if="!item.ok && item.error" class="md-h-err" :title="item.error">{{ item.error }}</div>
+                </div>
+                <span class="md-st" :class="item.ok ? 'ok' : 'bad'">{{ item.ok ? tt('success') : tt('failed') }}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </template>
 
-    <a-layout-footer class="footer">
-      {{ tt('footer') }}
-    </a-layout-footer>
-  </a-layout>
+      <section v-else class="md-panel">
+        <div class="md-p-head">
+          <div class="md-p-title"><span class="k" />{{ tt('serverJobs') }}</div>
+        </div>
+        <div class="md-tasks-toolbar">
+          <label class="md-check">
+            <input v-model="autoRefresh" type="checkbox" />
+            {{ tt('autoRefresh') }}
+          </label>
+          <div class="md-seg">
+            <button type="button" :class="{ active: jobFilter === 'all' }" @click="jobFilter = 'all'">{{ tt('filterAll') }}</button>
+            <button type="button" :class="{ active: jobFilter === 'active' }" @click="jobFilter = 'active'">{{ tt('filterActive') }}</button>
+            <button type="button" :class="{ active: jobFilter === 'done' }" @click="jobFilter = 'done'">{{ tt('filterDone') }}</button>
+            <button type="button" :class="{ active: jobFilter === 'error' }" @click="jobFilter = 'error'">{{ tt('filterError') }}</button>
+          </div>
+          <button type="button" class="md-btn md-btn--g" @click="refreshServerJobs">{{ tt('refreshJobs') }}</button>
+        </div>
+        <div v-if="!filteredServerJobs.length" class="md-empty-pad">{{ tt('serverJobsEmpty') }}</div>
+        <div v-else class="md-table-wrap">
+          <table class="md-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>File</th>
+                <th>Route</th>
+                <th>Status</th>
+                <th>{{ tt('progress') }}</th>
+                <th>{{ tt('createdAt') }}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in filteredServerJobs" :key="row.id">
+                <td class="mono">{{ row.id.slice(0, 8) }}</td>
+                <td class="mono">{{ row.filename }}</td>
+                <td>{{ row.source_format }} → {{ row.target_format }}</td>
+                <td>
+                  <span
+                    class="md-st"
+                    :class="{
+                      wait: row.status === 'queued',
+                      run: row.status === 'running',
+                      ready: row.status === 'done',
+                      bad: row.status === 'error',
+                    }"
+                  >{{ row.status }}</span>
+                </td>
+                <td>
+                  <div class="md-bar" style="flex:none;width:90px">
+                    <i :style="{ width: `${Math.round((row.progress || 0) * 100)}%` }" />
+                  </div>
+                </td>
+                <td>{{ formatTime(row.created_at) }}</td>
+                <td>
+                  <button v-if="row.status === 'done'" type="button" class="md-link" @click="onDownloadServerJob(row)">
+                    {{ tt('download') }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="md-foot">
+      <div class="md-foot-l"><b>md-bridge</b> · MIT License · {{ tt('footerPrivacy') }}</div>
+      <div class="md-trust">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3Z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+        {{ tt('footerPrivacy') }}
+      </div>
+    </footer>
+  </div>
 </template>
-
-<style scoped>
-.layout {
-  min-height: 100vh;
-  background: #f0f2f5;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #001529;
-  padding: 0 32px;
-}
-
-.brand {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.logo {
-  color: #fff;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.subtitle {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 14px;
-}
-
-.content {
-  padding: 24px 32px;
-  max-width: 1400px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.field-label {
-  display: block;
-  margin-bottom: 6px;
-  color: rgba(0, 0, 0, 0.65);
-  font-size: 13px;
-}
-
-.preview-box {
-  max-height: 360px;
-  overflow: auto;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 6px;
-  padding: 16px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.preview-name {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.footer {
-  text-align: center;
-  color: rgba(0, 0, 0, 0.45);
-}
-
-.drag-handle {
-  cursor: grab;
-  color: #94a3b8;
-  font-size: 18px;
-  user-select: none;
-  line-height: 1;
-}
-
-.queue-item {
-  cursor: grab;
-}
-
-.queue-item:active {
-  cursor: grabbing;
-}
-</style>

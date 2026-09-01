@@ -70,6 +70,6 @@ def test_html_heading_to_ast():
 
 def test_detect_source_format_ext_and_magic():
     assert detect_source_format("a.markdown") == "md"
-    assert detect_source_format("x.azw3") == "mobi"
+    assert detect_source_format("x.azw3") == "azw3"
     assert detect_source_format("n.bin", b"%PDF-1.4\n") == "pdf"
     assert detect_source_format("n.bin", b"<!DOCTYPE html><html></html>") == "html"

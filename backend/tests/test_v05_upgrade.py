@@ -75,6 +75,6 @@ def test_virus_scan_missing_binary_open(monkeypatch):
 
 def test_health_ocr_and_version(client):
     h = client.get("/api/health").json()
-    assert h["version"] == "0.11.0"
+    assert h["version"] == "0.16.0"
     assert h["ocr"]["feature"] == "scanned_pdf_to_structured_markdown"
     assert "virus_scan" in h

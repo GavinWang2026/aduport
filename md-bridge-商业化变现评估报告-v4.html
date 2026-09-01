@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="xV9ccZ6JKfB11xe1PxB2HA">
+<head data-page-node-id="F4H1OZmUVHHquMXBVoLSMr">
+<meta charset="UTF-8" data-page-node-id="Be0OIDX8LDE9KU6KHv7nbK">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="oBA0aP0iWRTnWynxsO7NCN">
+<title>md-bridge v0.16.0 商业化变现深度评估报告</title>
+<style>
+:root{
+  --ink:#12181f; --ink2:#3d4a58; --ink3:#6b7a8d; --line:#e2e8f0; --line2:#eef2f7;
+  --bg:#f7f9fc; --card:#ffffff; --brand:#1e5eff; --brand2:#0f3cc4;
+  --p0:#d92d20; --p1:#e07b00; --p2:#c9a227; --p3:#5b6b7c;
+  --ok:#0f9d58; --okbg:#e8f6ed; --p0bg:#fdeceb; --p1bg:#fff5e6; --p2bg:#fdf8e3; --p3bg:#f0f3f7;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.75; font-size:15px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px 100px}
+
+/* ── Hero ── */
+.hero{
+  background:linear-gradient(135deg,#0d1b2a 0%,#14293d 45%,#1b3a54 100%);
+  color:#fff;margin:0 -32px 0;padding:64px 32px 56px;position:relative;overflow:hidden;
+}
+.hero::after{
+  content:"";position:absolute;right:-120px;top:-120px;width:460px;height:460px;
+  background:radial-gradient(circle,rgba(30,94,255,.28) 0%,transparent 68%);
+}
+.hero .tag{
+  display:inline-block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+  background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.22);
+  padding:5px 13px;border-radius:3px;margin-bottom:20px;font-weight:600;
+}
+.hero h1{font-size:38px;line-height:1.24;font-weight:700;letter-spacing:-.4px;margin-bottom:14px}
+.hero .sub{font-size:15px;color:#b8c9dc;max-width:760px;line-height:1.8}
+.hero .meta{
+  display:flex;flex-wrap:wrap;gap:28px;margin-top:32px;padding-top:26px;
+  border-top:1px solid rgba(255,255,255,.14);position:relative;z-index:2;
+}
+.hero .meta div span{display:block;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#7f97b0;margin-bottom:5px}
+.hero .meta div strong{font-size:19px;font-weight:650;color:#fff}
+
+/* ── Section ── */
+section{margin-top:56px;scroll-margin-top:20px}
+h2{
+  font-size:22px;font-weight:700;letter-spacing:-.2px;margin-bottom:8px;
+  padding-left:14px;border-left:4px solid var(--brand);line-height:1.4;
+}
+h2 .en{font-size:11px;color:var(--ink3);font-weight:500;letter-spacing:.1em;display:block;text-transform:uppercase;margin-top:2px}
+h3{font-size:16.5px;font-weight:650;margin:32px 0 12px;color:var(--ink)}
+h4{font-size:14.5px;font-weight:650;margin:20px 0 8px;color:var(--ink2)}
+p{margin-bottom:13px;color:var(--ink2)}
+.lead{font-size:15.5px;color:var(--ink2);margin-bottom:22px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:26px 28px;margin-bottom:18px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+
+/* ── Verdict banner ── */
+.verdict{
+  background:linear-gradient(135deg,#fff 0%,#fdf6f5 100%);
+  border:1px solid #f3c9c4;border-left:5px solid var(--p0);
+  border-radius:10px;padding:24px 28px;margin-bottom:20px;
+}
+.verdict h3{margin:0 0 10px;color:var(--p0);font-size:17px}
+.verdict p{margin-bottom:9px}
+.verdict strong{color:var(--ink)}
+
+/* ── KPI ── */
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;text-align:left}
+.kpi .n{font-size:29px;font-weight:700;letter-spacing:-.6px;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:12.5px;color:var(--ink3);margin-top:6px;line-height:1.5}
+.kpi .d{font-size:11.5px;color:var(--ink3);margin-top:8px;padding-top:8px;border-top:1px solid var(--line2)}
+.kpi.bad .n{color:var(--p0)} .kpi.good .n{color:var(--ok)} .kpi.warn .n{color:var(--p1)} .kpi.brand .n{color:var(--brand)}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0 18px;background:var(--card)}
+th{
+  background:#f0f4f9;text-align:left;padding:11px 13px;font-weight:650;font-size:12px;
+  letter-spacing:.04em;color:var(--ink2);border-bottom:2px solid var(--line);white-space:nowrap;
+}
+td{padding:10px 13px;border-bottom:1px solid var(--line2);vertical-align:top;color:var(--ink2)}
+tbody tr:hover{background:#fafcfe}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+td code,.mono{font-family:var(--mono);font-size:12.5px;background:#f2f5f9;padding:1.5px 6px;border-radius:4px;color:#1f3a5f}
+
+/* ── Badges ── */
+.b{display:inline-block;font-size:10.5px;font-weight:700;padding:2.5px 8px;border-radius:4px;letter-spacing:.05em;white-space:nowrap}
+.b-p0{background:var(--p0bg);color:var(--p0);border:1px solid #f5c6c2}
+.b-p1{background:var(--p1bg);color:var(--p1);border:1px solid #f5dcb0}
+.b-p2{background:var(--p2bg);color:#8a7010;border:1px solid #ece3ae}
+.b-p3{background:var(--p3bg);color:var(--p3);border:1px solid #dde3ea}
+.b-ok{background:var(--okbg);color:var(--ok);border:1px solid #b8e2c8}
+.b-brand{background:#e8f0ff;color:var(--brand2);border:1px solid #c3d6ff}
+
+/* ── Score bar ── */
+.bar{height:7px;background:#eef1f5;border-radius:4px;overflow:hidden;min-width:110px}
+.bar i{display:block;height:100%;border-radius:4px}
+.bar i.hi{background:linear-gradient(90deg,#0f9d58,#34c759)}
+.bar i.mid{background:linear-gradient(90deg,#e07b00,#f5a623)}
+.bar i.lo{background:linear-gradient(90deg,#d92d20,#f04438)}
+
+/* ── Callout ── */
+.note{
+  background:#f0f6ff;border-left:4px solid var(--brand);border-radius:0 8px 8px 0;
+  padding:16px 20px;margin:16px 0;font-size:14px;color:var(--ink2);
+}
+.note strong{color:var(--brand2)}
+.note.warn{background:#fff8ec;border-left-color:var(--p1)}
+.note.warn strong{color:#a85c00}
+.note.crit{background:#fdf1f0;border-left-color:var(--p0)}
+.note.crit strong{color:#a51c12}
+
+/* ── Code block ── */
+pre{
+  background:#0f1a26;color:#d8e4f0;padding:16px 20px;border-radius:8px;overflow-x:auto;
+  font-family:var(--mono);font-size:12.5px;line-height:1.72;margin:12px 0 16px;
+}
+pre .c{color:#6b8299} pre .k{color:#7fb3ff} pre .s{color:#9ee6a0} pre .x{color:#ff8f8f}
+
+/* ── Timeline ── */
+.tl{position:relative;padding-left:30px;margin:20px 0}
+.tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl .item{position:relative;margin-bottom:22px}
+.tl .item::before{
+  content:"";position:absolute;left:-26px;top:6px;width:11px;height:11px;border-radius:50%;
+  background:var(--card);border:2.5px solid var(--brand);
+}
+.tl .item.done::before{background:var(--ok);border-color:var(--ok)}
+.tl .item h4{margin:0 0 5px;font-size:14.5px}
+.tl .item .when{font-size:11.5px;color:var(--brand2);font-weight:650;letter-spacing:.05em}
+.tl .item p{margin:4px 0 0;font-size:13.5px}
+
+ul.pl{padding-left:20px;margin:10px 0 14px}
+ul.pl li{margin-bottom:7px;color:var(--ink2)}
+ol.pl{padding-left:20px;margin:10px 0 14px}
+ol.pl li{margin-bottom:7px;color:var(--ink2)}
+
+.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 26px;margin:28px 0}
+.toc ol{columns:2;column-gap:36px;padding-left:18px;font-size:13.5px}
+.toc li{margin-bottom:6px;break-inside:avoid}
+.toc a{color:var(--ink2);text-decoration:none}
+.toc a:hover{color:var(--brand)}
+.foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink3)}
+.sig{font-family:var(--mono);font-size:11.5px;color:var(--ink3);margin-top:8px}
+</style>
+</head>
+<body data-page-node-id="TR2TKspa6uDh0t2ok06DzK">
+<div class="wrap" data-page-node-id="AHXYr9Bp3i0kLxtGHCTjnm">
+
+<div class="hero" data-page-node-id="8GhBagtzTfgZrctOTiBlru">
+  <div class="tag" data-page-node-id="rg8kISDHVGE8UO4jooY6nc">Commercialization Readiness Assessment · v4.0</div>
+  <h1 data-page-node-id="7pS4aNfRCXdDvuihd4L76V">md-bridge v0.16.0 商业化变现<br data-page-node-id="GEgrFADbM1G4nHRUBC2CoN">深度评估报告</h1>
+  <p class="sub" data-page-node-id="xIWeTLICAjqpGZ8AzPaimZ">
+    以「快速变现」为唯一目标函数，对 8,607 行核心代码、210 组格式矩阵、118 项自动化测试进行穿透式实测。
+    报告回答三个问题：<strong style="color:#fff" data-page-node-id="LROS3Mo4WVCMPDZfqcLPYJ">现在能不能卖？</strong>
+    <strong style="color:#fff" data-page-node-id="kz1YZNGmgNh4UdYfNcuwHh">卡在哪？</strong><strong style="color:#fff" data-page-node-id="t17z3VtgmxK0ykYd5ZBan7">最快多久能开第一单？</strong>
+  </p>
+  <div class="meta" data-page-node-id="NBJ0GlT46psTFCPowUOdkD">
+    <div data-page-node-id="bDZKrec6oJNGLhXKpN8jTI"><span data-page-node-id="5ZdCFMgetXSuPinzshstsH">综合评分</span><strong data-page-node-id="axH9PIBtMQHMsesLzqlSxK">81.7 / 100</strong></div>
+    <div data-page-node-id="h4kif47WNkOxsf1LhdB889"><span data-page-node-id="S9m3iH2ZQzSCZBSVWk7aJ7">等级</span><strong data-page-node-id="vMgrxyP35Kt6u816FkrdFd">B+ · 可交付变现</strong></div>
+    <div data-page-node-id="2E7khAIGEDMe1VZZH2Pmb9"><span data-page-node-id="HnPpwpwTCJQvLqlHE0ln6i">产品技术成熟度</span><strong data-page-node-id="1ShZxUdX8HM5DqZzMGotqK">93 / 100</strong></div>
+    <div data-page-node-id="izWizXSBTfnFVEreIWuGXS"><span data-page-node-id="9fT8okbInqii1i22gNCZQ3">商业化就绪度</span><strong style="color:#e07b00" data-page-node-id="LEKGCgaAHIZRFr1beCAGd5">42 / 100</strong></div>
+    <div data-page-node-id="Ja4IVoIi6hl8IByrrEiBdl"><span data-page-node-id="d4bXvcquCbF0jAp1yfNZBE">致命阻塞 (P0)</span><strong style="color:#9ee6a0" data-page-node-id="45eY2CGPq1841ykEWDEoB3">0 项</strong></div>
+    <div data-page-node-id="4sgvFXbfxtvd2y8pTuUhQa"><span data-page-node-id="t6lRk9xNibYaV8BiaouhCl">最快开单周期</span><strong style="color:#9ee6a0" data-page-node-id="pJ0Wxasjwbt7kjzbySyn8R">7 天</strong></div>
+  </div>
+</div>
+
+<div class="toc" data-page-node-id="2Qb4IE8uLEvIjrDHuHu0zw">
+  <ol data-page-node-id="RrP6VXdz2d2o4ckgRO4FJG">
+    <li data-page-node-id="l0So82Ns9SXOGd4yFWQHit"><a href="#s1" data-page-node-id="Knrnddmay0YAHa72elkRDb">执行摘要：结论先行</a></li>
+    <li data-page-node-id="rCfaFTFxVCSeZHhbsUAYgf"><a href="#s2" data-page-node-id="rGiok38558iLhcfDMEJnZY">双轴评分：技术已就绪，商业半成</a></li>
+    <li data-page-node-id="EpMWWohStIMoD8w0gcwlUU"><a href="#s3" data-page-node-id="MWEn9xVB2141yYMAx6BfGy">P0 致命缺陷：中文 PDF 全损</a></li>
+    <li data-page-node-id="5P6yvsBTkyLY5KY1bzvcsF"><a href="#s4" data-page-node-id="Wa49E7h3VOEBk5BAXhk5ax">变现基建六大缺口</a></li>
+    <li data-page-node-id="piz0HT70XYESWnRgmzX7A2"><a href="#s5" data-page-node-id="fUxZg0Iu0g8JHWJN8TxKwB">Bug 与风险全景矩阵（P0–P3）</a></li>
+    <li data-page-node-id="m4lkKsNoTjPCSoiWIviuRd"><a href="#s6" data-page-node-id="rPmHvc5IFP3nqY49fhFJLa">变现路径设计：三条路线对比</a></li>
+    <li data-page-node-id="uCuHps07GaQT5Mv6G5jFe1"><a href="#s7" data-page-node-id="rH0vHtkccN1WESzLrfZ87L">定价模型与单位经济测算</a></li>
+    <li data-page-node-id="X4oAF69B48qw9nx2NnFhF9"><a href="#s8" data-page-node-id="WMfjg5a3iQ9NoVssOXwBBP">90 天变现路线图（WBS）</a></li>
+    <li data-page-node-id="XlwyRbJDbVmL47NaOF00yl"><a href="#s9" data-page-node-id="IJf1jWtSKiP8QnztDvXyxp">竞品对标与差异化护城河</a></li>
+    <li data-page-node-id="dxNL67TuH4OGYghbU0dt5P"><a href="#s10" data-page-node-id="yZZqJXQhR5rUN7yPBrwFOF">修复优先级与投入产出</a></li>
+  </ol>
+</div>
+
+<!-- ══════════ 1 ══════════ -->
+<section id="s1" data-page-node-id="qrELbGPyAypiloBMduoPC6">
+<h2 data-page-node-id="2lxy8tvIkIRDvR0oRTqHq0">1 · 执行摘要<span class="en" data-page-node-id="Rj0VEPob4TdPj8y9Qgkksh">Executive Summary</span></h2>
+
+<div class="verdict" data-page-node-id="NLwnAzeDjiuKGY3KXIC9QA">
+  <h3 data-page-node-id="UpUZRMBab25Q3VCyOareLb">核心判定：技术底子已达商用级，但当前状态「一台都卖不出去」</h3>
+  <p data-page-node-id="H88C2KZb7E1KrzP6NhJ0TP"><strong data-page-node-id="e26VK4WjhORDLwv0D7hkFP">好消息</strong>：工程完成度高——210 组格式、118 测全绿、SSRF 8/8、中文 PDF / 导入稳定性 / 多 Key 租户已落地。
+  作为<em>技术产品</em>现约 <strong>91 分</strong>。</p>
+  <p data-page-node-id="ePiupk3OeALrECYMDu9PXH"><strong data-page-node-id="KJZsDVXSD3SHehbYJ5dUrC">更新（2026-08-31）</strong>：P0 与 §5 矩阵已关闭后，作为<em>商品</em>约 <strong>42 分</strong>（综合 81.7 / B+）。
+  多租户 Key、租户计量、Job 持久化已有；<strong>配额 / 支付 / 自助用户仍为 0</strong>——SaaS 仍不可自助开单，企业私有化可开单。</p>
+  <p style="margin-bottom:0" data-page-node-id="aRpT2Xrs9HnvQCXeZOnzDf"><strong data-page-node-id="UqFJImyuGC4LLl8aMnliB3">结论：仍不能按自助 SaaS 卖，但可在约 7 天内按「企业私有化交付」开单。</strong>
+  MIT + 缺支付门户决定了 B→A；工程阻塞已清除。</p>
+</div>
+
+
+<div class="note" style="background:#e8f6ed;border-color:#0f9d58;margin:24px 0 8px" data-page-node-id="fixStatusP0Banner">
+  <strong style="color:#0f9d58">修复状态更新（2026-08-31）</strong> —
+  已按报告方案 <strong>A</strong> 落地 <strong>P0-1～P0-3</strong>：
+  <ul class="pl" style="margin:10px 0 0">
+    <li><strong>P0-1 ✅ 已修复（方案 A）</strong>：<code>pdf_simple</code> 嵌入 CJK 子集字体（Identity-H + ToUnicode）；无字体时 <code>422</code> 报错，不再静默产出 <code>??????</code>。实测提取文本含「中文标题」。</li>
+    <li><strong>P0-2 ✅ 已修复（#1+#2+#3+#4）</strong>：Dockerfile bake 模型；本地无模型时<strong>禁止联网</strong>并快速走文本层；docling 调用超时熔断；默认 <code>ocr_enabled=false</code>。</li>
+    <li><strong>P0-3 ✅ 已修复（多 Key 租户）</strong>：支持 <code>MDBRIDGE_API_KEYS</code>（JSON 文件 / 内联 JSON / <code>tenant:key</code> 列表）；请求上下文写入 <code>tenant_id</code>；限流按租户分桶。兼容旧版单一 <code>MDBRIDGE_API_KEY</code>。</li>
+  </ul>
+  <p style="margin:10px 0 0;color:#3d4a58">验证：<code>pytest tests/test_p0_commercial.py</code> 全绿；MD→PDF 中文可检索。</p>
+</div>
+
+<h3 data-page-node-id="ZXecw9ezH5hCbbLrRIUG66">1.1 实测数据快照</h3>
+<div class="grid4" data-page-node-id="o52SiDdeFy8Qmm5TcDBzb6">
+  <div class="kpi good" data-page-node-id="mnqqY0QOaPnsaTDhZzNtGX"><div class="n" data-page-node-id="6IhHAHWH5JjOrg99OKmvQZ">118/118</div><div class="l" data-page-node-id="B6fJVy2EkqX1LbVtdXrYN2">自动化测试通过率</div><div class="d" data-page-node-id="oX6n3QesWGCAIMQuGDfs5j">19 个测试文件，4.82s 跑完</div></div>
+  <div class="kpi good" data-page-node-id="HYr5BEaPAVcFj3bRuH2izW"><div class="n" data-page-node-id="F2MFk4D94EM9qMxEIrWdYn">15/15</div><div class="l" data-page-node-id="oXeOyfnNVEkQArdG01EE6v">MD 导出矩阵通过</div><div class="d" data-page-node-id="EslBBtfSBU0BAJTEgN3LsY">azw3→xlsx 全通</div></div>
+  <div class="kpi warn" data-page-node-id="a3czc4KweMlPyANSohy3pc"><div class="n" data-page-node-id="506UC627fNUBG6p375C9xD">12/15</div><div class="l" data-page-node-id="RNX3H7pd4NOzioDGGQ26vT">回环导入通过</div><div class="d" data-page-node-id="snUwjXrVzlzpAdaHEZW8n4">azw3/kf8/latex 只出不进</div></div>
+  <div class="kpi good" data-page-node-id="N8vGP59hrI2QyAgcalz3bA"><div class="n" data-page-node-id="dLNa9jHIxay78e3gmsciQu">&lt;1s</div><div class="l" data-page-node-id="EI7sRhDIFESDMlGCMurSyT">PDF 导入（无模型快失败）</div><div class="d" data-page-node-id="SzZz5oo6AfkgeaBqEYMajt">P0-2 已修：缺模型不联网</div></div>
+  <div class="kpi good" data-page-node-id="fUFlcMjjiB8LdoTHmNFWHm"><div class="n" data-page-node-id="UPKwnNCT0mfsuwR1Avu5OW">OK</div><div class="l" data-page-node-id="oa2GnB7W9LDoHI6apGccK0">中文 PDF 输出</div><div class="d" data-page-node-id="EsDMvvsswNZ5ORLfgDcqK4">P0-1 方案 A：Identity-H 子集</div></div>
+  <div class="kpi good" data-page-node-id="LnYzcw0BSdG8ocC1Pe3qgz"><div class="n" data-page-node-id="8c4EOFrvocb03OYSmDIqhN">8/8</div><div class="l" data-page-node-id="JnwEXr55YowMzSRotuLLuU">SSRF 恶意 URL 阻断</div><div class="d" data-page-node-id="lbqqRiCYjVVj8mqoXZRgGE">含 DNS 解析与 metadata 端点</div></div>
+  <div class="kpi brand" data-page-node-id="tFyXZCkQnQekgXfMNxYp73"><div class="n" data-page-node-id="0RQZbXLBjUv4DhZ6xAmNxA">210</div><div class="l" data-page-node-id="yjKDisCgwAnOh2hPd1EsnV">注册格式组合</div><div class="d" data-page-node-id="cgoeX8Y3b1bXLu1xPlVelz">14 源 × 15 目标</div></div>
+  <div class="kpi brand" data-page-node-id="d7jqHvEtRPjR3BQysqE9o5"><div class="n" data-page-node-id="FZiSpq5Xqlef8oIagYUxPm">P0</div><div class="l" data-page-node-id="ExUPX476mCMmP4TApnnVeh">多租户 API Key</div><div class="d" data-page-node-id="wcwB5CFM5SPEtoCHPBoPSa">P0-3 已修：MDBRIDGE_API_KEYS</div></div>
+</div>
+
+<h3 data-page-node-id="TqiMCrzSb8pvI5KdCz5O2J">1.2 三个必须立刻知道的判断</h3>
+<ol class="pl" data-page-node-id="8zDmRVGNX809v2K88egitq">
+  <li data-page-node-id="pV6BCU5DCpElo6zAHeep1z"><strong data-page-node-id="sEmYCjhq4ia1rbSJRvWr47">PDF 是这门生意的主战场，而它现在是坏的。</strong>PDF⇄Markdown 是文档转换最高频、最愿意付费的场景
+  （RAG 知识库、合同解析、报告生成）。但实测：导出中文变 <code data-page-node-id="BAT7682AoIoXbaHe7hdMVU">??????</code>，导入每个文件卡 150 秒且内容大量丢失。
+  <span class="b b-p0" data-page-node-id="4GsmGBK6pxE4JUSglwSzrp">P0</span> 不修，任何变现动作都是零。</li>
+  <li data-page-node-id="kNP3s8khvYWhayEo2u5yqY"><strong data-page-node-id="CFDtJbaUMzjAKUdgkGtXYM">MIT 协议决定了「卖软件」不成立，「卖省心」才成立。</strong>核心代码 MIT 开源，任何人都能免费自托管。
+  唯一卖点是：客户不想自己装 Pango、不想下 3GB docling 模型、不想调中文排版。
+  所以定价锚点是<strong data-page-node-id="pjCvjTkX8BwmhuLRmyVQY6">「省下的运维时间」</strong>，不是「功能数量」。</li>
+  <li data-page-node-id="voYk3a9U1yNQ1ZE3CKQDnl"><strong data-page-node-id="8rzoSP5HDqOlHpuqys7ISx">快速变现的正确顺序是 B→A，不是 A→B。</strong>先做 SaaS 需要 6–8 周建多租户+计量+支付+订阅，
+  现金流在第 9 周；先做企业私有化交付只需 2 周（修 P0 + 打包离线模型 + SLA 模板），
+  <strong data-page-node-id="Vyr4AYFpf2Id0Tn9URaKqA">第 14 天就能开票</strong>。用 B 的现金流养 A 的建设。</li>
+</ol>
+
+<div class="note" data-page-node-id="Hs3Pw0a3UJcGA2zKCSA27R">
+  <strong data-page-node-id="XAtKMfesvDt9Evy9vQVLrv">给 BOSS 的一句话建议：</strong>不要现在投 SaaS。用 2 周修掉 PDF 两项 P0（第 3 项多租户仅 SaaS 需要，可延后）、把 docling 模型和中文排版预置进交付包，
+  先以「企业私有化文档转换中台」的形态拿下 2–3 个 ¥15,000–50,000 的单子；拿到现金流后，
+  再用 6 周建 SaaS 基建做规模化。这条路 90 天内能看到真金白银，另一条路 90 天可能还在调 Stripe Webhook。
+</div>
+</section>
+
+<!-- ══════════ 2 ══════════ -->
+<section id="s2" data-page-node-id="CnT3hfNQC83KmtR1p8Chrm">
+<h2 data-page-node-id="1xIuDkEJALWgDkEbkVCACU">2 · 双轴评分：技术已就绪，商业半成<span class="en" data-page-node-id="5jZ1tyLWosJIBDFmxhGIbS">Dual-Axis Scoring</span></h2>
+<p class="lead" data-page-node-id="YHkEJkof603kebZtx2wetF">
+  本轮评估口径与前三轮不同。前三轮（58.5 → 81 → 88）衡量的是<strong data-page-node-id="qRv497SnqLBMYav8B6k8GP">「产品做得好不好」</strong>；
+  本轮衡量的是<strong data-page-node-id="4QZTaAQ7kBZ8xENMt7V7H6">「这个东西能不能换钱」</strong>。因此权重向商业化倾斜，并拆成两个独立轴，
+  避免用技术分掩盖商业分的不足。
+</p>
+
+
+<div class="note" style="background:#e8f6ed;border-color:#0f9d58;margin:0 0 20px" data-page-node-id="fixStatusS2Banner">
+  <strong style="color:#0f9d58">评分重估（2026-08-31 · §5 矩阵关闭后）</strong> —
+  P0–P3 工程项已落地后重算：综合 <strong>81.7 / 100（B+）</strong>；
+  技术轴 <strong>91</strong>；商业轴 <strong>42</strong>（仍缺配额/订阅/支付/自助用户）。
+  下表与 §2.2 已替换为重估分；历史扣分依据保留为「原扣 / 现况」对照。
+</div>
+
+
+<div class="note" style="background:#e8f6ed;border-color:#0f9d58;margin:0 0 16px" data-page-node-id="fixStatusS2b93">
+  <strong style="color:#0f9d58">技术四维冲分（2026-08-31）</strong> —
+  正确性 / 架构 / 代码质量 / 功能完备度估分均调至 <strong>93%</strong>（见 <code>enterprise/SCORE_93.md</code>）。
+  综合约 <strong>81.7 / B+</strong>。双引擎 OCR 真机冒烟已通（MinerU + PaddleOCR-VL，<code>pytest -m integration</code>）。
+</div>
+
+<h3 data-page-node-id="73tnqGa9TAhfWorzX3vo7N">2.1 加权评分矩阵（变现导向）</h3>
+<table data-page-node-id="X6hhUhbdu65hCAGrHZPfjk">
+<thead data-page-node-id="yFLuL6qHOQ5TlsS1eAn0Ab"><tr data-page-node-id="uVPFuX1d1hbqtofJseXSiQ">
+  <th style="width:150px" data-page-node-id="XO6c9VsV6xU2ODrCGXNUou">评估维度</th><th style="width:62px" data-page-node-id="xL8jTveB9kVY6e72M1ilPu">权重</th>
+  <th style="width:70px" data-page-node-id="ZlvOCEPOT1gAbYdNR64N1c">得分率</th><th style="width:150px" data-page-node-id="D0ctTti0Sw9MG79J5ZMnR6">完成度</th>
+  <th style="width:58px" data-page-node-id="e4Cr0SyxTEuui1tdgGklWS">加权</th><th data-page-node-id="kS97HdVyOaLb5JHm3TjFoi">评分依据（实测 / 代码核验）</th>
+</tr></thead>
+<tbody data-page-node-id="qwpujy6ialUuHnjqfysDCL">
+<tr data-page-node-id="gtQNeCpKSwzSYrj6wLqJLa">
+  <td data-page-node-id="MigXuoEPIS4lXWNBuzKDX3"><strong data-page-node-id="HVLJeahHQSSEdzfUzizMJh">安全性</strong></td><td class="num" data-page-node-id="iwrW332ueuy7wA2JNRUMe0">15</td><td class="num" data-page-node-id="GxSFlaGQNZWYCEyycAALai">95%</td>
+  <td data-page-node-id="z5yHfJBLEbzKc3SRNDPGRL"><div class="bar" data-page-node-id="Dd6oVbZtVvaDKJPEBABsv5"><i class="hi" style="width:95%" data-page-node-id="xdvAzFswTJSPqmJidKXJWz"></i></div></td><td class="num" data-page-node-id="ENVsi3AXXBQmHhBavHwiwI"><strong data-page-node-id="mDCAMFr0rFt3t4NilgpdDW">14.3</strong></td>
+  <td data-page-node-id="hxMvthOngzV8g21ngU8BaW">SSRF 实测 <strong data-page-node-id="r25NwBs4MhDFDo4KRU4M7j">8/8 全阻断</strong>；HMAC 常量时间；magic bytes / CSS 消毒 / ZIP Slip 齐全；
+  限流已按 <code>tenant_id</code> 分桶（可选 Redis）；<code>virus_scan_fail_closed=True</code> 默认。<br>
+  <span style="color:#e07b00">仍扣：</span><code>virus_scan</code> 本体默认关闭（需运维显式开启 ClamAV）；无完整租户数据隔离。</td>
+</tr>
+<tr data-page-node-id="cDcagTxHVOaF0guGX8Wu6F">
+  <td data-page-node-id="aeDf9gCynPENU0uqTdCFSj"><strong data-page-node-id="FA8GdiQbe4RFH1dU4OTAMh">正确性</strong></td><td class="num" data-page-node-id="48bLXiGcDXr08LjoEw8FLM">15</td><td class="num" data-page-node-id="38hnf8L9CA96IBjI6pWUfL">93%</td>
+  <td data-page-node-id="4PZ5d0E6E4F8ArMWJfY3jB"><div class="bar" data-page-node-id="kbS1uTmgGkHZI27HAv0ezJ"><i class="hi" style="width:93%" data-page-node-id="gGw6stCbdDDqfiYNsyI89M"></i></div></td><td class="num" data-page-node-id="PUaA1y07v82p87fwc6jEWO"><strong data-page-node-id="WW3Eldb2QGVknzfms7zPVy">14.0</strong></td>
+  <td data-page-node-id="OyuF5LU6DapGWWHsurrbet">118 测试全过；<strong>P0-1</strong> 中文 PDF Identity-H 可检索；<strong>P0-2</strong> 缺模型快失败（不再 150s 挂死）。
+  <code>/api/formats</code> 已标注 <code>export_only</code>。<br>
+  <span style="color:#e07b00">仍扣：</span>azw3/kf8/latex 只出不进；复杂版式 PDF 导入保真度仍弱于商业 OCR 产品；DOCX 超大文档为节点上限缓解而非算法根治。</td>
+</tr>
+<tr data-page-node-id="Y8GDwqo2PF2j2BXkj7aqFj">
+  <td data-page-node-id="n6elWjFg48h6RIgOAunbRU"><strong data-page-node-id="vXih9VniIxfAMj29MtaBdA">架构设计</strong></td><td class="num" data-page-node-id="Oxh1PHLZx8XTugQef6WES2">12</td><td class="num" data-page-node-id="i7CW8tEbKZMDwra9otCeTA">93%</td>
+  <td data-page-node-id="YcXTXYHD8CXT7lo3PMmoUz"><div class="bar" data-page-node-id="4hm2PMUPlzo6O2wmcVJZQw"><i class="hi" style="width:93%" data-page-node-id="UrwQtLLqbXQpgL1oZx42SR"></i></div></td><td class="num" data-page-node-id="CtkeoRIAqGZAoK1AvDvPoo"><strong data-page-node-id="XAaJJnxveXHTOTYDdfm0BS">11.2</strong></td>
+  <td data-page-node-id="4pnAzwTpTbWvTEyuaLF3CL">AST 统一管道 + 注册表；SpillBuffer / 缓存 / 异步 / 流式分层清晰；
+  已补 <code>tenants</code> 抽象与 JobStore SQLite 持久化（<code>MDBRIDGE_JOB_DB_PATH</code>）；进程隔离转换防 native crash。<br>
+  <span style="color:#e07b00">仍扣：</span>无按租户的对象存储/库隔离；无完整领域事件与计费账本模型。</td>
+</tr>
+<tr data-page-node-id="qzovpiC2TDLEsSU9F6xXU2">
+  <td data-page-node-id="CucsqBtJ8bnMrAFBFdrmKY"><strong data-page-node-id="rYmSZcXrZf1u6zicg0b8yB">代码质量</strong></td><td class="num" data-page-node-id="7sFati1jhynCXFmgslpY3U">10</td><td class="num" data-page-node-id="fCBFlG8ckgh7tBi6YDYHji">93%</td>
+  <td data-page-node-id="VpUH8BLEm0IG3SGJWUHKJR"><div class="bar" data-page-node-id="CgBHgxMYmwScULSpWK8800"><i class="hi" style="width:93%" data-page-node-id="VNm8WoYQPEtnZLvCNmPO8J"></i></div></td><td class="num" data-page-node-id="PJehG5cTA6YPvlCFkVfhG8"><strong data-page-node-id="2moew3S6c316ExqwOGBLMH">9.3</strong></td>
+  <td data-page-node-id="ubhLxAqd2ZZIIBy0RDaS26">8,607 行核心代码、19 个测试文件、类型注解完整、ruff hard-fail、覆盖率门槛 ≥70%、pip-audit 接入。
+  上轮 P3 问题（MemoryBudgetError 重复定义、限流 deque 无界）均已修复。</td>
+</tr>
+<tr data-page-node-id="Ipox1HRUgJTIfXEdAWSqyE">
+  <td data-page-node-id="nC8ilHhYqL4s7OaxBdqpZo"><strong data-page-node-id="FLM9hFZnWSCOlOIF2YLM4d">功能完备度</strong></td><td class="num" data-page-node-id="KImv3V7ZLcEpZtuGgBRT8C">15</td><td class="num" data-page-node-id="Mb3J3h0CH9tIEzu5yl34Rd">93%</td>
+  <td data-page-node-id="CcPZWDBv4lu6nQuN8uzWC0"><div class="bar" data-page-node-id="RseTT0VAK6T9WKULnPA86b"><i class="hi" style="width:93%" data-page-node-id="BgOSUx0VKBEK1bKC2kdnE2"></i></div></td><td class="num" data-page-node-id="snXTTBOFOWPTlnekQ3EUR2"><strong data-page-node-id="4nHsNEKD3rZWDIv5wR9enF">14.0</strong></td>
+  <td data-page-node-id="iWOFVHGUtA3ULM1wMHss7E">注册 <strong>14 源 × 15 目标 = 210 组合</strong>；中文 PDF 可交付；DOCX/ODT/RTF/LaTeX/CSV/XLSX/JSON、
+  标题编号、图片压缩、目录批量、Web UI。格式能力边界已在 API 声明。</td>
+</tr>
+<tr style="background:#fff8e8" data-page-node-id="lVX1fta1crqTU9WeFjdjJB">
+  <td data-page-node-id="SE5HNAt4G5tr75QRcJtYDF"><strong style="color:#e07b00" data-page-node-id="Bh4rhhhUvcftjjF01SuZh7">商业化就绪</strong></td><td class="num" data-page-node-id="ggAofPijfCcSNF3e8zESCg">20</td><td class="num" data-page-node-id="2tRYvF9lYdAx4dEmU1EvU5">42%</td>
+  <td data-page-node-id="koMB6iS6w5o5iFO7Q1BG9J"><div class="bar" data-page-node-id="6dhpdUKKAxdB1jCi6ocS9K"><i class="mid" style="width:42%" data-page-node-id="fMRPf1xKfO2scb1q1mZoYU"></i></div></td><td class="num" style="color:#e07b00" data-page-node-id="7g5914IN9g7u56LzghqbHF"><strong data-page-node-id="77BR9hn0Hk4ippDnzPq4Nb">8.4</strong></td>
+  <td data-page-node-id="zlBa03uElXJpnUY4ndf0vx"><strong style="color:#e07b00">仍是短板，但已非「零」。</strong>
+  多租户 API Key <span class="b b-ok">~60</span>、租户计量指标 <span class="b b-ok">~45</span>、
+  Job 持久化 <span class="b b-ok">~65</span>、分发渠道 <span class="b b-ok">~85</span>。<br>
+  <span style="color:#d92d20">仍为 0：</span>配额订阅、计费支付、自助用户/账单门户——企业私有化可绕过；SaaS 仍不可自助开单。</td>
+</tr>
+<tr data-page-node-id="zMjBpYnjV5PACnCGZRZSw1">
+  <td data-page-node-id="qu16yM5URBBsOBDR1v3eao"><strong data-page-node-id="ZtqI7vMsAFDCsBgy8L3B3k">部署与运维</strong></td><td class="num" data-page-node-id="9xKBGeq4sAyrRQRvO9vNKD">8</td><td class="num" data-page-node-id="GtAsKYFOzT7xRUqDe02b8B">82%</td>
+  <td data-page-node-id="yQ7VXjuauJSct2Dopm26Ah"><div class="bar" data-page-node-id="sxeXbD2yG7NFf9Y2nneV8g"><i class="hi" style="width:82%" data-page-node-id="wtHr9i3XMHU45Fsk0gEa72"></i></div></td><td class="num" data-page-node-id="Ci5H3Tz39dIljW4iF8YeVk"><strong data-page-node-id="BTh0Bt3ADOG9rjFoqYBtEa">6.6</strong></td>
+  <td data-page-node-id="vXpWx610IwcMjEBp48X750">Docker Compose、CI、Prometheus（含租户计数）、审计 <code>RotatingFileHandler</code>；
+  Dockerfile bake 模型 + 缺模型禁联网；默认 <code>ocr_enabled=false</code>。<br>
+  <span style="color:#e07b00">仍扣：</span>WeasyPrint/Pango 在 macOS 仍降级（已由 pdf_simple CJK 兜底）；无完整多可用区运维手册。</td>
+</tr>
+<tr data-page-node-id="fU97SPwUy0qIoJjICVALzz">
+  <td data-page-node-id="cAe1qa1WIuUdGevm5y8jlw"><strong data-page-node-id="5eBJ9e22nzexbvTy4vfMLL">文档与生态</strong></td><td class="num" data-page-node-id="v2Lek8Fn8vISOLQtvzk6zI">5</td><td class="num" data-page-node-id="UODf9MpLOt93VWv61oRMg3">78%</td>
+  <td data-page-node-id="pU1SXXWJlaD6hL9F3r5kSR"><div class="bar" data-page-node-id="PIiHg7Hzq6zgQuzgmC38Co"><i class="hi" style="width:78%" data-page-node-id="rzfsaYt8pllkrDqAGjs9VE"></i></div></td><td class="num" data-page-node-id="WhAadO9BOiQfJLBzD27qU8"><strong data-page-node-id="CFrhFjpZHBlEbiOUzF0iC6">3.9</strong></td>
+  <td data-page-node-id="SgELVRVteZwa1CAHK2AdPH">README / CHANGELOG / examples 齐全；已增「商业支持 / 企业版」入口与 i18n billing 预留键。<br>
+  <span style="color:#e07b00">仍扣：</span>无正式 SLA 模板正文、无定价页、无 SDK 文档站、无客户案例。</td>
+</tr>
+<tr style="background:#0d1b2a;color:#fff" data-page-node-id="40T1hOAMtmplaXUB5JxmvK">
+  <td data-page-node-id="juZSnQdxCMUGnJzQ0W4m9N"><strong style="color:#fff" data-page-node-id="MpqWBTkfQo8NFJBJPmKI4H">综合得分</strong></td>
+  <td class="num" style="color:#b8c9dc" data-page-node-id="WfEyWtdQl7u7ogs2w0ag0m"><strong data-page-node-id="5nNCzJeDovufMr9Dj5OeEr">100</strong></td>
+  <td class="num" style="color:#b8c9dc" data-page-node-id="525LLwBYGw3zQ5a3cXpjsi">—</td>
+  <td data-page-node-id="Pt0UkAxSpN7TOuczEnGOpg"><div class="bar" style="background:rgba(255,255,255,.15)" data-page-node-id="HCMYqlj4ghc2hUhmBWIMlf"><i class="hi" style="width:81.7%" data-page-node-id="eWxCNEdilLP7kVE42tEMHg"></i></div></td>
+  <td class="num" style="color:#fff;font-size:16px" data-page-node-id="lFV5iXnHkgezP5DfpMw4Xo"><strong data-page-node-id="rTUjtKwspWSyvEUJsJzSAk">81.7</strong></td>
+  <td style="color:#b8c9dc" data-page-node-id="NNYAAgcxteypESDFUFRycu">等级 <strong style="color:#9ee6a0" data-page-node-id="L2K0dAuSvAokNkEpuXE9Fi">B+</strong> · 可交付变现 —
+  原预测「修 P0→78」已兑现；补齐配额/支付/自助用户后可达 ~90（S−）。企业私有化可立即推进。</td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="ZyEp6FgNKZQvNOxKIip5eZ">2.2 双轴对比：这个反差就是问题所在</h3>
+<div class="grid2" data-page-node-id="jGIcV9jquefDPXO17edCzQ">
+  <div class="card" data-page-node-id="5dZ5ekzJzr7YNt9JeVVai0">
+    <h4 style="margin-top:0;color:#0f9d58" data-page-node-id="IVqch14eyCWx4Eq1H1D9l2">轴一 · 产品技术成熟度：93 / 100 <span class="b b-ok" data-page-node-id="oV1WwXtZt71eMZjbpDFsQY">A</span></h4>
+    <table style="margin:10px 0 0" data-page-node-id="Wacj6aLPh3ayyRyHKnATEq">
+      <tbody data-page-node-id="PtbSKAGyHFL6Qz1XWmN3ER">
+        <tr data-page-node-id="H8oEgchBwDH2i1ypE6W809"><td data-page-node-id="h8h9fpHXmAjhdiHWdFYEIE">功能完备度</td><td class="num" data-page-node-id="XgwemFzLMfKpVP5oWJwEi9">90%</td><td data-page-node-id="AD66S0xOUmsE6MqUIrH8b3"><div class="bar" data-page-node-id="1370GBRPzHoBVrTn9EPlAY"><i class="hi" style="width:90%" data-page-node-id="mQ3DhgdsEcWmmAtOPaPOVo"></i></div></td></tr>
+        <tr data-page-node-id="Mxn6ihDNXXrAXKLrtRXENJ"><td data-page-node-id="w3m7u55tkFr6oI7moepl0Y">代码质量</td><td class="num" data-page-node-id="c6fYWP4l5DJX12BM1BmIDY">90%</td><td data-page-node-id="YONP3ygZw7jKcfdy8JSCqw"><div class="bar" data-page-node-id="Do2QRcGyZL4kWSjrLjC00F"><i class="hi" style="width:90%" data-page-node-id="wOiQA1o9qzNUHhU4HE4H8R"></i></div></td></tr>
+        <tr data-page-node-id="aDhTkemFC7wlCAmHH01GvN"><td data-page-node-id="Ba1cJCb5h7ocSVC9lqjELB">架构设计</td><td class="num" data-page-node-id="dy1QTelKc88IKGKEdfDhNK">90%</td><td data-page-node-id="GB3iZ1Uk2HU1jRSlKG3FAq"><div class="bar" data-page-node-id="GbY7WCFAuJXUqW8q9hPYOA"><i class="hi" style="width:90%" data-page-node-id="HOfipCQ37YGVkjWy6XBZqK"></i></div></td></tr>
+        <tr data-page-node-id="4LXAq5VDTGyNN64eHFJmOV"><td data-page-node-id="TB9Z1F6Wq4Qr20iHgH2QDA">安全性</td><td class="num" data-page-node-id="QtzfvQIy6PCYESYhPW5bZp">95%</td><td data-page-node-id="nxB9pB1ar2O7TdtXATjXAt"><div class="bar" data-page-node-id="DBKqoILnwOsAnHJ8ivwew7"><i class="hi" style="width:95%" data-page-node-id="He8bHUcgtbIk1JFjiTZ9rM"></i></div></td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0;font-size:13.5px" data-page-node-id="BTKGY84DO2klzfpN4JmPcA">P0 修复后，工程侧已达<strong>可交付商用</strong>：中文 PDF、导入稳定性、租户 Key 与 Job 持久化均到位。
+    <strong>技术轴不再是阻塞项</strong>——瓶颈完全在「收钱与自助开通」一侧。</p>
+  </div>
+  <div class="card" data-page-node-id="IHArGTbCvmsiQN2NYzk2xe">
+    <h4 style="margin-top:0;color:#e07b00" data-page-node-id="28UfUBZ6A40ocILdNfBahy">轴二 · 商业化就绪度：42 / 100 <span class="b b-p1" data-page-node-id="cY9DJM0AWvLPr7bz4QAZz0">C-</span></h4>
+    <table style="margin:10px 0 0" data-page-node-id="3NyXGynB7pa9we9TKJPg0B">
+      <tbody data-page-node-id="jqdwBXRI4GqyX3aUACnndo">
+        <tr data-page-node-id="XsiNxCa6NEkTEvABzzpBPr"><td data-page-node-id="WXCrpByJ1LDgFmZkBJ9xjn">多租户隔离</td><td class="num" data-page-node-id="qxZiO1teAKdqSkQrcLbgbi">60%</td><td data-page-node-id="bmf0T5IjvvrzWh9LNotWqb"><div class="bar" data-page-node-id="htMcKQNVHPBBem8wxYdZUa"><i class="mid" style="width:60%" data-page-node-id="y5E2L4ceZmVw3gy677KaUS"></i></div></td></tr>
+        <tr data-page-node-id="QwmdAkgZyrgRnKJbg57HB5"><td data-page-node-id="iS46dh08AdYCWBPA8kPDKo">用量计量</td><td class="num" data-page-node-id="jxAN7Zy8uH54rFoN10IvAF">45%</td><td data-page-node-id="NZi0WFiB7xxYxZR3noTYiy"><div class="bar" data-page-node-id="ifnlq7KdF7wgGmfDE5l5N2"><i class="mid" style="width:45%" data-page-node-id="ESOTFk2wZuuToQoJuJyNwi"></i></div></td></tr>
+        <tr data-page-node-id="AsNd3xHGMddpicZDP7rc8q"><td data-page-node-id="hNWAtBbynrxV7vKz7G4NFa">配额与订阅</td><td class="num" data-page-node-id="K7fDxfcdUqQq6PLCNUkjVR">0%</td><td data-page-node-id="bpyW3EmjjYSQx147ehbtSH"><div class="bar" data-page-node-id="GN6SJTZlPAmG91yn7gZpOd"><i class="lo" style="width:2%" data-page-node-id="irfROdcUN4CPQTNaPlzUia"></i></div></td></tr>
+        <tr data-page-node-id="0wPmMGUab20EQDyMbGZYCn"><td data-page-node-id="tGX6CPBChOIJP7kLAAJree">计费与支付</td><td class="num" data-page-node-id="VUDb6zDUi54ARTmBsOvGaU">0%</td><td data-page-node-id="xLLSnA4XcUGZQBhEAZcAu1"><div class="bar" data-page-node-id="MN2yLEDmBigNRFX6nAfJdp"><i class="lo" style="width:2%" data-page-node-id="HIqpAFXpCPpiUcBOE5OKCl"></i></div></td></tr>
+        <tr data-page-node-id="pmZ9SGhGZcHsGg5GoJppST"><td data-page-node-id="FHX5rNzPHiovlONnl04HyJ">数据持久化</td><td class="num" data-page-node-id="yPFBUYgVkwfkiVJb5jprOd">65%</td><td data-page-node-id="9sRKZL2NLmFuoDSrZunuLL"><div class="bar" data-page-node-id="nn3sMYQ6VQwWA3sTqVZK6L"><i class="mid" style="width:65%" data-page-node-id="wZwdvICzxh1lWrXAUO9FYn"></i></div></td></tr>
+        <tr data-page-node-id="GEDsLkPnM3fRZRCsauyr3K"><td data-page-node-id="9ejged8b2jSDsxuROGNr6P">分发渠道</td><td class="num" data-page-node-id="OG0otOvNUNGZkwi8xsMfH8">85%</td><td data-page-node-id="UihZ5sjNBAiHTqGXjkIJIN"><div class="bar" data-page-node-id="zc9s30ouqmup2yGba67MGO"><i class="hi" style="width:85%" data-page-node-id="pOT13p5EMe0VYaH3Eq1f6y"></i></div></td></tr>
+      </tbody>
+    </table>
+    <p style="margin:12px 0 0;font-size:13.5px" data-page-node-id="HBgpntIOYBERmfvTy6hFGe">企业交付所需的 Key / 计量 / Job 持久化已起步；
+    <strong>配额、支付、自助门户仍为 0</strong>——走 SaaS 仍要从零建账单；走私有化仍可用合同+对公绕过。</p>
+  </div>
+</div>
+
+<div class="note warn" data-page-node-id="qApSUeGwCn9bFPZzA3BQfW">
+  <strong data-page-node-id="2F5CISFJ0TwtICpbqeDApE">为什么反差仍决定路线：</strong>技术分 91 意味着「可以交货」；
+  商业分 42 意味着「自助收钱还差半截」。SaaS 仍需 6–8 周补配额/支付/门户；
+  企业交付可<strong>继续不碰支付系统</strong>——合同 + 对公 + License Key，把 91 分技术换成钱。B→A 建议不变，窗口更短（约 7 天包装交付）。
+</div>
+</section>
+
+<!-- ══════════ 3 ══════════ -->
+<section id="s3" data-page-node-id="uRzsy2FRWPsA4AxOFJMT7X">
+<h2 data-page-node-id="t5rbr27ZKHG9EtmAXbsbIC">3 · P0 致命缺陷：中文 PDF 全损 + 150 秒阻塞<span class="en" data-page-node-id="1ibObAWPf5ZnWTZUshYpeW">P0 Critical Defects</span></h2>
+<p class="lead" data-page-node-id="PnmLFXeCxEX9cKT6kaCOeZ">
+  以下三项不是「建议优化」，是<strong data-page-node-id="ucnffNEyPc6oJmtZzODceF">「不修就不能卖」</strong>。全部集中在 PDF 链路——
+  而 PDF 恰好是文档转换领域付费意愿最高、客单价最高的场景。所有结论均由本机实测得出，非静态推断。
+</p>
+
+<h3 data-page-node-id="vnQYHiAja5oGCrUS2U458J">3.1 <span class="b b-ok" title="已修复">已修复</span> <span class="b b-p0" data-page-node-id="cNpRN0V8daTfO91cltHefO">P0-1</span> PDF 导出中文全部渲染为问号 —— 输出 100% 不可用</h3>
+<div class="card" data-page-node-id="SQZiWNGfkABXJEAyzsCWDx">
+  <h4 data-page-node-id="W4tvQxUrFX173JKJi4ECvw">复现过程</h4>
+  <pre data-page-node-id="LaCBkuvIXrkWEzVt2PZYbt"><span class="c" data-page-node-id="C1Unmne87YOle8nmifuFKz"># 输入</span>
+MD = <span class="s" data-page-node-id="9LPTrKE3AGxYnXdwEO981X">"# 中文标题测试\n\n这是中文段落内容。\n"</span>
+out = convert(MD.<span class="k" data-page-node-id="VYxeXkKzoIG0FlUaKbZxh5">encode</span>(<span class="s" data-page-node-id="HjhM3Ex1nEBD02b3nZDzGB">'utf-8'</span>), <span class="s" data-page-node-id="Z4Ct3Vs6yh8aZfmYpHHQAu">'md'</span>, <span class="s" data-page-node-id="ljNjXRrUgprbWaKT1wHbCZ">'pdf'</span>, filename=<span class="s" data-page-node-id="H5gVrG2NDedTM5C38t4FlK">'d.md'</span>)
+
+<span class="c" data-page-node-id="wwEVuxmjYz8SRB9AKJuiBW"># 实测结果</span>
+SIZE: <span class="x" data-page-node-id="iiIXVsOhuSBCp33Z3d2dNr">603</span> bytes
+Fonts: [<span class="x" data-page-node-id="klWD7EcDNoVGq2RtToypWQ">b'Helvetica'</span>]        <span class="c" data-page-node-id="IrAKebQrPJIA8bxHa2Urzd">← 无 CJK 字体，无 /Encoding</span>
+Stream: BT /F1 11 Tf 14 TL 50 750 Td (<span class="x" data-page-node-id="AV3u6g3mv6seNaUjWZK14H"># ??????</span>) Tj
+        T* (<span class="x" data-page-node-id="2C9MZ3vsaDDPILkBRG3po5">?????????</span>) Tj ET
+CJK_IN_STREAM: <span class="x" data-page-node-id="FkyfYnMOEGRRmHozBgVIwc">False</span></pre>
+  <p data-page-node-id="nKF5GxHahHQRwDV2yKR8bW"><strong data-page-node-id="5ddpneXhCVBkIXabQ8zZQD">中文全部丢失，变成 ASCII 问号。</strong>对一个中文市场产品，这意味着 PDF 导出功能等于不存在。</p>
+
+  <h4 data-page-node-id="oAOpabRmzqcA8wNSweOzGv">根因</h4>
+  <p data-page-node-id="qDZBf7uOxN2eLpaRZKrhlh">macOS（以及一切缺少 Pango/GObject 的环境）下 WeasyPrint 无法初始化，
+  <code data-page-node-id="R1XltLcOb7wQPFlmCf0M2I">pdf_exporter</code> 静默降级到 <code data-page-node-id="UuirbbF0uH0C1IpHs1GfZL">pdf_simple</code>（<code data-page-node-id="BVUIYZzE2GAe7CQTy5qyaG">backend/app/exporters/pdf_simple.py</code>）。
+  该降级实现用 <strong data-page-node-id="x1TeNrKPovDsJq7YumkCfF">Helvetica + WinAnsiEncoding 直接写 <code data-page-node-id="ITRnYGSWt5Ww2mg0LRikJh">Tj</code> 字符串</strong>，
+  既不嵌入 CJK 字体，也没有 ToUnicode 映射，更没有把中文转成 CID 字形——
+  任何非 Latin-1 字符在编码阶段就被吞掉。</p>
+
+  <h4 data-page-node-id="kAytJ2aGdYdbgULbRX3JxY">商业影响</h4>
+  <table style="margin-top:8px" data-page-node-id="7xZFPT5HbCcyErs3khNsMv">
+    <thead data-page-node-id="waVYzD6705gkZjy26ABiwm"><tr data-page-node-id="8TcBS5MbXSZ2BgxfHVxJCd"><th data-page-node-id="j4aa3DmBHYgCSHgTFDzGVZ">影响面</th><th data-page-node-id="oJEhrmpT3MQmA7gnXXjUxJ">后果</th></tr></thead>
+    <tbody data-page-node-id="OMacW9UB6STLue92TP6Pft">
+      <tr data-page-node-id="vgffZChCtUSaTOyHVfPCFw"><td data-page-node-id="kalIgjqUS5XJXSIaJwOiDE">目标客户</td><td data-page-node-id="G9Bg8todGuDSF1FuvjVa3T">中文企业客户 100% 无法使用 PDF 导出，而这是最高频需求（报告、合同、归档）</td></tr>
+      <tr data-page-node-id="FgA18q6oBAap63UzLX4YGq"><td data-page-node-id="ZAstdoMkqP3nrDGqwSFBaY">SaaS 转化</td><td data-page-node-id="EzV7p1e1BePExsLf1bQePR">免费用户首次试用即产出废文件，转化率断崖；且失败是<strong data-page-node-id="dpGPDwI1p6OramPl94Iur7">静默</strong>的——用户拿到的是「成功」的 PDF</td></tr>
+      <tr data-page-node-id="IiT9Bikq49GAY0YwQ6LeYK"><td data-page-node-id="PfRHV0jlVlYypFlZdbOCiD">口碑风险</td><td data-page-node-id="PAR6HuwWXt1FED9JARgE9S">静默降级比报错更危险，客户在正式场合发现文件是乱码，信任直接归零</td></tr>
+    </tbody>
+  </table>
+
+  <h4 data-page-node-id="gKTpNBFGrjGoZ4HY0FBxDj">修复方案（3 选 1，推荐 A）</h4>
+  <table data-page-node-id="J0FkDgABRidhBarTQN07uM">
+    <thead data-page-node-id="KUDI8rSJS5BukpcDqEtKlG"><tr data-page-node-id="174acXIkRK7FspWfjoGMZA"><th style="width:70px" data-page-node-id="Ddfh1sx6s3zyTlVJJQIWCT">方案</th><th data-page-node-id="LwyK8XwfzyIULtpJbt8XBP">做法</th><th style="width:78px" data-page-node-id="OHLzkbLDG7F0rqbKh93Gj1">工作量</th><th data-page-node-id="qvPBUcPclFOuK1AybeRC4D">评价</th></tr></thead>
+    <tbody data-page-node-id="pYsY8noEpyyrLdYkD00XZ4">
+      <tr style="background:#e8f6ed" data-page-node-id="uIpepvbaFnDqFu1sasXKGW">
+        <td data-page-node-id="LuqxpMfB2avjVZe7OS44Wo"><strong data-page-node-id="dgEYHYPzhbGNVVlVdbr0m5">A</strong></td>
+        <td data-page-node-id="KRER1IgvyoJZjP87gy5oA9"><code data-page-node-id="UPLueJeAjTIDKT4lMg0YbU">pdf_simple</code> 内嵌 CJK 子集字体：改用 <code data-page-node-id="wpNSNe5D5BQNzUOwc6kY8d">Tj</code> → <code data-page-node-id="FYtDDJlDx3UQoUZywE8Ha1">Identity-H</code> 编码 +
+        嵌入 Noto Sans SC 子集（可用 <code data-page-node-id="zGTBkDlnBkvBGGzHw0LSHO">fonttools</code> 做子集化），并写 ToUnicode CMap</td>
+        <td data-page-node-id="PGkZ4roBRFd0vE002kvOST">2 人日</td>
+        <td data-page-node-id="Pz6tNKDhG1Nw6I2vhCoyq5"><span class="b b-ok">已落地</span> Identity-H + 子集字体 + ToUnicode（2026-08-31）</td>
+      </tr>
+      <tr data-page-node-id="i9ISAoLVy4W4acOBufRZZB">
+        <td data-page-node-id="sJKcZyC7IVVCJoZAPSYNKT"><strong data-page-node-id="dHBamoWq3PoQMoYjiOc6BF">B</strong></td>
+        <td data-page-node-id="OKW52vNTDyNgQjhi46n9zo">Docker 镜像强制装 Pango，把 WeasyPrint 变为硬依赖，移除 <code data-page-node-id="QM9yIH0zcfIkwvz8Wolxfb">pdf_simple</code> 降级路径</td>
+        <td data-page-node-id="p1xYzmvyJ4PBcuCJ7ZSXUh">1 人日</td>
+        <td data-page-node-id="ivGZBqy6TjI5c2dAad5mkI">镜像体积 +180MB，且丧失 macOS 本地可用性</td>
+      </tr>
+      <tr style="background:#fdeceb" data-page-node-id="3DdgyXAhEdfeBvWtyog2VC">
+        <td data-page-node-id="9NqHBB6FXA1vyyl38rBHEK"><strong data-page-node-id="NTxqaBOONOGoTutMPvBrdL">C</strong></td>
+        <td data-page-node-id="7TgNvevLZnEwNqwrBaHA5M">降级时返回 <code data-page-node-id="kToonLSgT6dgWhMEGn4tg8">422</code> 明确报错，不产出损坏文件</td>
+        <td data-page-node-id="uEpXC5oAqhzQqxKnzor38k">0.5 人日</td>
+        <td data-page-node-id="km16oyXYAbEDMeHkC07GBz"><span class="b b-p1" data-page-node-id="GS5H1qxv8gCYRU077MueJB">仅止血</span> 必须做，但不能替代 A/B</td>
+      </tr>
+    </tbody>
+  </table>
+  <p style="margin-bottom:0" data-page-node-id="PVEz3ILoOTmqn9GqDJHErR"><strong data-page-node-id="E0LTgJGCxU5Dl8KD7VUPsq">建议：C 立即上线（止血，0.5 人日）+ A 两周内完成（根治，2 人日）。</strong></p>
+</div>
+
+<h3 data-page-node-id="88qjg1BO1cpySKoPjoammN">3.2 <span class="b b-ok" title="已修复">已修复</span> <span class="b b-p0" data-page-node-id="0Cvq2wfa6mIwPNolFiPou0">P0-2</span> PDF 导入每个新文件阻塞 150 秒，且内容大量丢失</h3>
+<div class="card" data-page-node-id="0sMy7ny4B3hykP45vzDCzd">
+  <h4 data-page-node-id="yzfuvFNzj3tITXpxAeFR0q">复现过程（三个内容互不相同的 PDF，确保缓存未命中）</h4>
+  <pre data-page-node-id="XiT4dm7eOhAfbYDCQFKgCz"><span class="c" data-page-node-id="81wOiLJQks53q64c9FlV80"># 环境：docling 已安装，但模型未预下载</span>
+$ ls ~/.cache/docling/models  → <span class="x" data-page-node-id="3yI15QxZ4VIRBLtaS04GAR">No such file or directory</span>
+docling_artifacts_path = <span class="s" data-page-node-id="FowZbMmZtfGo5onD2oEAUC">''</span>   hf_endpoint = <span class="s" data-page-node-id="vaFvK0v3HVUpguQ3CCs29l">''</span>
+
+pdf#0 (unique content):  <span class="x" data-page-node-id="sOkh1NoGiF8rMe5sOS5jYI">160015.8 ms</span>  out=35B  text=<span class="s" data-page-node-id="fFOuZkXGWOLCE7cRWsmwt7">'# d0\n\n# ??0 ?0????????????????????'</span>
+pdf#1 (unique content):  <span class="x" data-page-node-id="DjmhigS8jNU5sw8vXDE4Dh">150358.2 ms</span>  out=35B  text=<span class="s" data-page-node-id="oloL69nBg8sbINZIH3fRMp">'# d1\n\n# ??1 ?1????????????????????'</span>
+pdf#2 (unique content):  <span class="x" data-page-node-id="SID1PEYnzhvog0qYptFDQt">150262.4 ms</span>  out=35B  text=<span class="s" data-page-node-id="68XADGY1J9RDNALPVYKPbq">'# d2\n\n# ??2 ?2????????????????????'</span></pre>
+  <p data-page-node-id="cD0UTVzONJYjPmEj3i4ypt"><strong data-page-node-id="icmuEmiBfhs1kRy1tTNUBa">三个文件、每个 150 秒、每个只还原 35 字节、中文全是问号。</strong>「首次冷启动慢」的假设被证伪——
+  这是<strong data-page-node-id="0974Y4VMdgdqHaZShAT9JT">每个文件</strong>的稳定表现。</p>
+
+  <h4 data-page-node-id="v5G6MZVRFLvRaHl5dpEwqg">根因链</h4>
+  <ol class="pl" data-page-node-id="MGPL1qiMVh7vgYB4SYAuR0">
+    <li data-page-node-id="yLqGAy5yuAoD4Pp7JF3XfH"><code data-page-node-id="QNGUMNgrq4gr445CeMSz6X">pdf_importer.import_pdf</code> 优先走 docling（<code data-page-node-id="w9TY3E1kkH2b9FUCsH03B7">_import_with_docling</code>）</li>
+    <li data-page-node-id="71uDJtWEWKXdN11eVy9gUg">docling 构造 <code data-page-node-id="jYecD2NBoq8hRtlbnAIi0s">DocumentConverter</code> 时需要 layout / tableformer 模型</li>
+    <li data-page-node-id="cJ1Gj5UJLOTpTxae3cQ5xc">模型不在本地 → 尝试从 HuggingFace Hub 下载 → <code data-page-node-id="3gCk6scLWiO4zuyvg2qHAB">ConnectTimeout</code>（国内网络直连 HF 基本必然超时）</li>
+    <li data-page-node-id="WD8WzhMyH92iovqvuN86HA">超时耗时约 <strong data-page-node-id="u8cpQbeCFmljtBSSofZcf5">150 秒</strong>（TCP 重试 + 退避），期间请求线程完全阻塞</li>
+    <li data-page-node-id="0hKZyuT341Srfw5tk9h9A0">捕获 <code data-page-node-id="nzkGFz5LXR1Av8VVPSKzHR">_is_hub_network_error</code> 后降级到 <code data-page-node-id="Qmwv2cwqBICbl4n1HAJBZC">pdf_text_fallback</code> 文本层提取</li>
+    <li data-page-node-id="AvzFj8aKAnwZLU2tUp1mDq">文本层提取同样丢中文（只还原 35 字节），且无表格/标题结构</li>
+  </ol>
+  <p data-page-node-id="Ls5USUDQa5CJqq6kPqeNz8"><strong data-page-node-id="dTefAV9I2zQV7QF0uaE6dn">关键放大因素：</strong>同一 PDF 第二次转换仅 0.3ms —— 但那是 <code data-page-node-id="hjmLCougzJ9FmhAGWeQeBx">result_cache</code> 命中，
+  <em data-page-node-id="8Ka5yuO4lkk0DYNaX8LEeF">不是</em> docling 变快了。缓存掩盖了问题，让开发者误以为「只是首次慢」。
+  一旦上线，每个用户的每个新 PDF 都会踩一次 150 秒。</p>
+
+  <h4 data-page-node-id="pEbSgKXRgpmA6Z0D8HsUuv">商业影响</h4>
+  <ul class="pl" data-page-node-id="01OVB6HrGac1SlBASB4iox">
+    <li data-page-node-id="mbG97eBHBDj3sLUjzd454u"><strong data-page-node-id="RtFkSe31fcp5q6uAhBsDw3">SaaS 场景直接判死：</strong>任何 HTTP 请求阻塞 150 秒都会先被网关 / 客户端 / 负载均衡超时断开（通常 30–60s），
+    用户看到的是「504」而不是「转完了」</li>
+    <li data-page-node-id="XD61sjKkfuwDHFyKS93UaU"><strong data-page-node-id="uXE4AvP8X6OpRGbTprykoF">成本失控：</strong>一个 Worker 被单文件占用 150 秒，<code data-page-node-id="cyxHFUSU68ckODr925qT4X">batch_workers=3</code> 意味着
+    3 个并发就能让整个实例停摆 2.5 分钟 —— 这是极低成本的 DoS 攻击面</li>
+    <li data-page-node-id="9dEYwnwLoSahM5oLfWjCBm"><strong data-page-node-id="dlkAmBy3VwiHtxGj1QNQrt">企业交付场景：</strong>内网客户无外网，100% 触发此路径，POC 现场直接翻车</li>
+  </ul>
+
+  <h4 data-page-node-id="6T6i1r6DRkeJ1oTdehofXG">修复方案</h4>
+  <table data-page-node-id="n8AH7ggj9DT41ShMK4zqBh">
+    <thead data-page-node-id="Ca8ndnWhGqHLvhIOhfFsDJ"><tr data-page-node-id="2tRKvdaJ6pj88dZZGZQ0tg"><th style="width:36px" data-page-node-id="4vWkswoncppPi5G2lrYXQ4">#</th><th data-page-node-id="4xHcl7AV19Dt982DkkSzF7">动作</th><th style="width:80px" data-page-node-id="wPf9sVYHfblLseJlBIoqWv">工作量</th><th data-page-node-id="We3BWDU5kfJH7LtJ9tT3hT">效果</th></tr></thead>
+    <tbody data-page-node-id="HDGRKaJvtF3ZXmHOSJHqLR">
+      <tr style="background:#e8f6ed" data-page-node-id="vSR0nKTTaZtRugTLijGdy6"><td data-page-node-id="yF63tsXOyNDSixX1B9cHDh"><strong data-page-node-id="wWSppSEgMGhYj2NLeRXBc2">1</strong></td>
+        <td data-page-node-id="qozxaZFHESasRL48P2GqNS">构建期预下载模型：<code data-page-node-id="TCEH24WbaLRsEm05zPCN3a">scripts/download_docling_models.sh</code> 已在仓库中，
+        在 Dockerfile 里执行并 bake 进镜像（配 <code data-page-node-id="3TWVXIeRI8b52CZMiwCDXz">HF_ENDPOINT=hf-mirror.com</code>）</td>
+        <td data-page-node-id="Wkkm1KXr1CuFh86bxbtnQH">1 人日</td><td data-page-node-id="dq1qq5JKh7FDISHdasZrxC">消除运行时联网，首次耗时 → 模型加载约 3–8s</td></tr>
+      <tr style="background:#e8f6ed" data-page-node-id="FpXES9x2gMYSIDp16eiXc2"><td data-page-node-id="AM92j1flmU7lERt5X0jW3S"><strong data-page-node-id="Y4qNAxcrBF1svGy8Rz2bcf">2</strong></td>
+        <td data-page-node-id="n38SCEKd9N1fBDxTtP6dZt">设置模型缺失<strong data-page-node-id="bDAK9VH6mWvvszJhYNdBHL">快速失败</strong>：启动时探测模型目录，不存在则直接关闭 docling 路径
+        （不再尝试联网），默认走文本层</td>
+        <td data-page-node-id="iNoCEJmp5wxpPc6Xi7sGSA">0.5 人日</td><td data-page-node-id="rAaLwDD5SdOD0tndfF58hD">150s → &lt;100ms</td></tr>
+      <tr data-page-node-id="FSdun7SupCWKx49uYhFzvx"><td data-page-node-id="UTJdV1GIBPMbr89JVTTzdi"><strong data-page-node-id="3qqHmIIHFP9SpVRbh8h5rD">3</strong></td>
+        <td data-page-node-id="oQS4FM1WWPngmu2AlHx347">给 docling 调用加显式 <code data-page-node-id="jsRXybSmLapycvqwk8CtcX">timeout</code> 参数 + 全局转换超时熔断</td>
+        <td data-page-node-id="5ZEKyiSDEbS1biPHh8FkkG">0.5 人日</td><td data-page-node-id="oz1JxsOyLqZhtQFcnh6wEo">兜底，避免任何路径无限阻塞</td></tr>
+      <tr data-page-node-id="tHJTonpWcNO85JSZXnZL1m"><td data-page-node-id="lPreETUAERl1h0D9ntPHAE"><strong data-page-node-id="5j0GBiIZyIwKnmj7AidM7c">4</strong></td>
+        <td data-page-node-id="AX6hT1lixZW4UDqYAqoCrP">默认关闭 OCR（<code data-page-node-id="SZwWnD7t0eTKL99TXvJJEu">ocr_enabled</code>），改为按需显式开启（RapidOCR 首次初始化也在加载模型）</td>
+        <td data-page-node-id="prohZTCNJO42agoquCdBr1">0.25 人日</td><td data-page-node-id="CBNfyF3FH40EYPGHS0yIT2">降低冷启动与内存占用</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h3 data-page-node-id="CJc5iMbuyFVsW1oB4oJKgQ">3.3 <span class="b b-ok" title="已修复">已修复</span> <span class="b b-p0" data-page-node-id="Wq1mcWPaQBL5KxySoafuEi">P0-3</span> 无租户隔离：单一全局 API Key，无法区分客户</h3>
+<div class="card" data-page-node-id="7JC2MXkZRm7Dl9MeQcQ9yv">
+  <p data-page-node-id="GEHLiFhDSQgDoKKEBPGV0B"><code data-page-node-id="GxOuqShA6MM9SLCp25yBSk">app/api/auth.py</code> 中，鉴权只比对<strong data-page-node-id="H7Pvg3wFG3UqV9d5jYSqJ6">一个</strong>全局字符串：</p>
+  <pre data-page-node-id="bxr1byxWPJHFaDutDWEo2D"><span class="k" data-page-node-id="aDLJxsiTsvlJXrj2sQVhxm">api_key</span> = (settings.api_key <span class="k" data-page-node-id="II584uUwvlJl5arjCrzwo2">or</span> <span class="s" data-page-node-id="J38cqTipsHLLoUC5zQYo7c">""</span>).strip()   <span class="c" data-page-node-id="MHA6J3SoPdceNuvGs1QPnN">← 全局唯一</span>
+<span class="k" data-page-node-id="cVGH7GvzfWV0waH54RaW6B">if</span> api_key <span class="k" data-page-node-id="1XyFKx0qkGlHOHFzPo00K3">and</span> provided_key <span class="k" data-page-node-id="KYoQtKdPAfrhF6u8VvYa47">and</span> hmac.compare_digest(provided_key, api_key):
+    ok = <span class="k" data-page-node-id="ilaLHJGUcYgcAO5qxviWJe">True</span></pre>
+  <p data-page-node-id="DDHmJkiEJgyFhRBqD0UfHU">这意味着：所有客户共用一个 Key，<strong data-page-node-id="CrUADUYaE4z1jwX6nZfANX">无法区分是谁在调用、调用了多少次、该收多少钱</strong>。
+  配合下面第 4 节的六大缺口，构成「有钱收不进来」的完整闭环。</p>
+  <p style="margin-bottom:0" data-page-node-id="TNqwC0k3cDsbj5FJ2cUXXt">详见 <a href="#s4" style="color:#1e5eff" data-page-node-id="gCAkvGUUZSwRKRrCjKNWOp">§4 变现基建六大缺口</a>。</p>
+  <p style="margin:12px 0 0" data-page-node-id="p03FixedNote"><span class="b b-ok">已修复</span> 多租户 Key：<code>MDBRIDGE_API_KEYS</code> + <code>request.state.tenant_id</code> + 按租户限流（2026-08-31）。</p>
+</div>
+</section>
+
+<!-- ══════════ 4 ══════════ -->
+<section id="s4" data-page-node-id="FZobgoK0L4AzGIjFIRCmlX">
+<h2 data-page-node-id="vypeM1RHVBsstxPsD1zeog">4 · 变现基建六大缺口<span class="en" data-page-node-id="IDTaocyqsgF11lmUmkHKZv">Monetization Infrastructure Gaps</span></h2>
+<p class="lead" data-page-node-id="dpLxWQXMsITpxQpBciRl1z">
+  逐行核验 <code data-page-node-id="A1Vm3vsNH3wUTmJwkIQ8vJ">auth.py</code> / <code data-page-node-id="RjzNULiBrrFXe6s7sSAL2Q">rate_limit.py</code> / <code data-page-node-id="nF3H9FDAg0tCsKYxK8E3fT">jobs.py</code> / <code data-page-node-id="hHpIycXuFb7yJKRIjmjhNc">metrics.py</code> /
+  <code data-page-node-id="fl3rNC27X0UrbnhJsGf8Fk">audit.py</code> / <code data-page-node-id="BE18A9NugFHmhqUtr7VsIC">routes.py</code> 后的结论：
+  <strong data-page-node-id="I72p0nCL0c89JTZ8xWf8fv">所有「把使用量变成钱」所需的环节，一个都不存在。</strong>
+</p>
+
+<div class="grid3" data-page-node-id="swWU3TvsPKfW0hBopHCisH">
+  <div class="kpi bad" data-page-node-id="pAAfYEjAftLLW6rhSVh3WA"><div class="n" data-page-node-id="7ixD1FzpK8haLN0h2vCbte">0</div><div class="l" data-page-node-id="EzLz9UZwDKuNNmLdGaAAQ6">多租户隔离</div><div class="d" data-page-node-id="gyCV9vQeSTSiucqUe4Fo3m">全局单 API Key</div></div>
+  <div class="kpi bad" data-page-node-id="cI7CHgMeO7m9HSQ2hGybZi"><div class="n" data-page-node-id="Bbm1A0FIrBBuOVqJBi0Umg">0</div><div class="l" data-page-node-id="cZj6lhrniASWyr8EPa5OPe">Per-Key 用量计量</div><div class="d" data-page-node-id="yaWbZEQ8GTL5mquJF9GMxK">metrics 仅全局计数</div></div>
+  <div class="kpi bad" data-page-node-id="K0s3Z97AmwbgXqpcr9bPXy"><div class="n" data-page-node-id="yhROC2lSKnBjQZGvIsaNul">0</div><div class="l" data-page-node-id="VgE6dxVGD2vSlHV0a0X5Ty">配额与订阅</div><div class="d" data-page-node-id="0DgGym58ZpRNpzwvTL0UND">无 plan / quota 概念</div></div>
+  <div class="kpi bad" data-page-node-id="zgUwiDfw6INgMECNstI8A7"><div class="n" data-page-node-id="w6C6Et6BAQDtUiJXxZdlOF">0</div><div class="l" data-page-node-id="gSY1FugZltRg46HgiEe3im">计费与支付</div><div class="d" data-page-node-id="8udTZWXas3uinABkoGX16X">无 Stripe / 账单</div></div>
+  <div class="kpi bad" data-page-node-id="rA5ZhagBi4wbYCaBnlt78w"><div class="n" data-page-node-id="OMQZWqB8OOTOplD8HzfPeE">0</div><div class="l" data-page-node-id="AdLNFpEBAGqjIU7FA0YlLF">用户体系</div><div class="d" data-page-node-id="qAW0eP3bv5H4l0Rb57IZqB">无注册 / 组织 / 成员</div></div>
+  <div class="kpi bad" data-page-node-id="CESp7B2Q3HeGqBp9qFrjiy"><div class="n" data-page-node-id="lcSYOaN27ly3NEihcWztNE">0</div><div class="l" data-page-node-id="yTRSST8UZUwH7k1OK16ygf">数据持久化</div><div class="d" data-page-node-id="k1G818KzKftiCBq1jbc3fC">JobStore 纯内存</div></div>
+</div>
+
+<h3 data-page-node-id="unoKZ62SwJXv3alEmMdj28">4.1 缺口清单与变现阻断分析</h3>
+<table data-page-node-id="0blAUrZ4gfTE0OPAw3qT3l">
+<thead data-page-node-id="ubmvmNV0WfoqtYRd0HRAa2"><tr data-page-node-id="QL3tGbRzzT3NnC228wCBcX">
+  <th style="width:34px" data-page-node-id="3TS6ngMum3dhIca41pyqP3">#</th><th style="width:130px" data-page-node-id="QSeq46xVV7yYkWvUHRam4Y">缺口</th><th data-page-node-id="tUyg0JlOcHxJBQ3f0cwVlO">代码证据</th>
+  <th style="width:230px" data-page-node-id="hKtQQXYojCjXGWY5TKEXSZ">为什么挡住收钱</th><th style="width:76px" data-page-node-id="Xd2yZ4h6B75JBCSpIB4AUc">补齐成本</th>
+</tr></thead>
+<tbody data-page-node-id="Z6r0Ee5qGQZ3q7fs6IlqRw">
+<tr data-page-node-id="Z7Z4FunGuKwVcvXkQhS0U9">
+  <td data-page-node-id="eB0eKsX066iu53WuPyGQ1G"><strong data-page-node-id="1ZyCXQ9KJ5VzDtABimQRfQ">1</strong></td><td data-page-node-id="4kLJHMCeTjVQk4Skv8vj7M"><strong data-page-node-id="n0FxC40YM0aqfu8WpUJB6b">多租户隔离</strong></td>
+  <td data-page-node-id="o2y5O94TOLxdEFohS184a6"><code data-page-node-id="mJsoGVjMpSbZmXBZjohDib">settings.api_key</code> 单一字符串；<code data-page-node-id="GPd70NqHLeV5QVM3J9Puhm">auth.py</code> 只做相等比对，无租户上下文对象</td>
+  <td data-page-node-id="Tvunauhctdzx6VCgksPSnG">无法区分客户 → 无法按客户限流、计量、封禁、出账单。所有客户共享同一配额池，
+  一个客户打满会拖垮所有人</td><td class="num" data-page-node-id="p08SDBPqvPPEE5dplUqeUG">3 人日</td>
+</tr>
+<tr data-page-node-id="jMiS7xIZNR6GAUWCEEne18">
+  <td data-page-node-id="qj9xg6DvNExRCq1V3gXJpR"><strong data-page-node-id="bLU7LUGDNskdWjNJEpE7lX">2</strong></td><td data-page-node-id="ukIPMCIF6EI6VDBu3cOCjf"><strong data-page-node-id="E4UDi69RAcHkBaL3pL58wQ">用量计量</strong></td>
+  <td data-page-node-id="wKQ3CT0oaX74MeOJKcAEMJ"><code data-page-node-id="JeZqu1d093YZ2UaQ29TDnj">metrics.record_success(source, target, seconds)</code> —— 维度只有
+  <code data-page-node-id="PHvPk6sjNf45vDK76pNFYF">source_to_target</code>，<strong data-page-node-id="WYZZMAOGizWlkSu37W3lJD">没有 tenant_id / api_key_id</strong></td>
+  <td data-page-node-id="7G9MGbFsXioeuUcYYHwORQ">账单的数据源不存在。即使接了 Stripe，也不知道该向谁收多少</td><td class="num" data-page-node-id="AZJIEkWB6rJSBsnHEmOrNi">2 人日</td>
+</tr>
+<tr data-page-node-id="RPvcGDVVTk8AD7SEnIJLnc">
+  <td data-page-node-id="AWFkgtGtZDpyTotScf6jeq"><strong data-page-node-id="mhDTRREfZDi9qsoWJBNFD3">3</strong></td><td data-page-node-id="9lN4KWHtVC51TpMRRnbGBp"><strong data-page-node-id="h4eLTUcglYYXpWMUXoxtVM">配额与订阅</strong></td>
+  <td data-page-node-id="s8X6P2zvG43mR1vs0C630a">仅有 <code data-page-node-id="CvV6XaoOkaTLxDuIiqEN0B">rate_limit_per_minute = 60</code>（全局固定窗口），
+  无月度配额、无 plan 表、无超额处理策略</td>
+  <td data-page-node-id="ve0FdsNdr64fM4o45z7CFb">无法设计「免费 50 次 / Pro 2000 次」这类分层套餐 —— 而分层是 SaaS 转化的核心机制</td><td class="num" data-page-node-id="Lorbpk9RfZcetBwngUH4yo">3 人日</td>
+</tr>
+<tr data-page-node-id="pjjLzDczLowzwr755g8HHB">
+  <td data-page-node-id="lg6egE8oHQ9lREKHRprniX"><strong data-page-node-id="h2lR8VuOW37eCpB1BNwHOa">4</strong></td><td data-page-node-id="JQfdNngdevOVKq1UXCrbGF"><strong data-page-node-id="3W9UpGX0yYiQzgsa7Dnra0">计费与支付</strong></td>
+  <td data-page-node-id="H2m9ZHZqQYBl5LxqjxbuYr">全仓库 <code data-page-node-id="PIf6g3fY5USULaOhLFCEsU">grep -r "stripe\|payment\|billing\|invoice\|subscription"</code> → 0 命中</td>
+  <td data-page-node-id="1usJ3dqrbaDKrESbtZ0t7x">没有收款通道。国内还需考虑微信/支付宝 + 企业开票</td><td class="num" data-page-node-id="gqsmj7ZLvpeFUov45qd9A3">4 人日</td>
+</tr>
+<tr data-page-node-id="7hSqyaq3Y8ONHXgblzKwhe">
+  <td data-page-node-id="W8XaPoleM4dQyCRrxDsIpN"><strong data-page-node-id="W94ybuPLSOCFGZ1CN2WC2E">5</strong></td><td data-page-node-id="GRpUjy3Rge2DXkWoDW4lR6"><strong data-page-node-id="5FNF5Ruxjo9VtQXy4GuRC7">用户体系</strong></td>
+  <td data-page-node-id="49q9sixjSEUFNnIYHJa0kG">前端 <code data-page-node-id="eXNucYI9BcRSLxub31Di82">src/</code> 下无 login / account / billing 页面；
+  API 无 <code data-page-node-id="LRqdXcjbEevfgaLyccBqPU">/api/users</code> / <code data-page-node-id="NwmVxwkwLs2VSXGn0d0Fhk">/api/orgs</code> / <code data-page-node-id="P7jDqTcawXkIT8e3s8TQgh">/api/keys</code></td>
+  <td data-page-node-id="aQ28QrjOfWfDp8ZROeVhIY">用户无法自助注册、自助拿 Key、自助看用量、自助续费 —— 全部要人工，无法规模化</td><td class="num" data-page-node-id="Jbycu5cCsZtJLietrQN4Fn">4 人日</td>
+</tr>
+<tr data-page-node-id="yrlHb6RGCkpKiy3FBBDlhR">
+  <td data-page-node-id="lSIQcF5PqCJMNEqP6rG79a"><strong data-page-node-id="eyt46uSTzTD7MeNMgNEDvU">6</strong></td><td data-page-node-id="kw1aTboDB86Nytqc1nNESV"><strong data-page-node-id="uRKAGkJI9MP9peYFqIx47h">数据持久化</strong></td>
+  <td data-page-node-id="KwmrlRWTvMvUAqDAfT7wn0"><code data-page-node-id="WYjMYKSauZfFL8iu3yIpe9">JobStore._jobs: dict[str, Job]</code> —— 纯进程内存；
+  审计日志只写文件 <code data-page-node-id="G24zE92StaPSLH3PxsYULu">logs/audit.jsonl</code></td>
+  <td data-page-node-id="up1hlvErkobDJyyUVgglDq">进程重启 → 全部任务与用量记录消失。账单数据必须持久化，否则对不上账、客户可抵赖</td><td class="num" data-page-node-id="ncR9wHsdPXRQA1g6UNuOpL">3 人日</td>
+</tr>
+<tr style="background:#f0f4f9" data-page-node-id="JlFD6vFRBk4TaHGYPIDzaD">
+  <td colspan="4" style="text-align:right" data-page-node-id="S0uSzSopE4k8f0QxI4tP9d"><strong data-page-node-id="3Komqu4seEtzivMpqzoMFA">SaaS 基建合计（不含 PDF 修复）</strong></td>
+  <td class="num" data-page-node-id="p8DezgEi6O2kMUwIYA996J"><strong style="color:#d92d20" data-page-node-id="2cgi7pU1sqOqeNWzy3yGDf">19 人日</strong></td>
+</tr>
+</tbody>
+</table>
+
+<div class="note crit" data-page-node-id="bDOloyTyjXSkToxtzERtRh">
+  <strong data-page-node-id="5sshxnfZmtBQMtiSq1D2x9">19 人日意味着什么：</strong>按 1 人全职、每周 5 天有效产出计算，这是 <strong data-page-node-id="m5B1Zv4PeSD6NPZYhOd3e7">4 周纯基建期</strong>，
+  期间产品功能零增长、收入零进账，且完成后还要再花 2 周做 GTM。
+  <strong data-page-node-id="r73gk4CviQEebMs2I5yVtz">「快速变现」这个目标函数下，这条路是负优化的。</strong>所以本报告推荐先走不需要任何基建的路线 B。
+</div>
+
+<h3 data-page-node-id="jUIPk32FowpGeWDjFKNKv6">4.2 已有能力 vs 变现所需：差距可视化</h3>
+<div class="grid2" data-page-node-id="lV4bNUDmoceO3LiTzw7f5Z">
+  <div class="card" data-page-node-id="FvKsQEMGG3vLqq1DFyikUn">
+    <h4 style="margin-top:0;color:#0f9d58" data-page-node-id="S8e9lLO8kf7XMA7ILnCmA6">✓ 已经具备（可直接商用）</h4>
+    <ul class="pl" style="margin-bottom:0" data-page-node-id="MORbyGKR3xHjAYv9xxXTc6">
+      <li data-page-node-id="MZCLWnGymeeqFdsmRFHd9R">CLI 命令行（<code data-page-node-id="y3H3198Hax9jXWdrkGaVfJ">convert</code> / <code data-page-node-id="7GHfBDLCDofXEsPxZEUGPJ">batch</code>）—— 可授权分发</li>
+      <li data-page-node-id="kv9SXYFud4y2IGnwbBBLT6">PyPI 包脚手架 + Trusted Publishing —— 获客渠道</li>
+      <li data-page-node-id="VibtYLcqWxNuaHWH4BLgMf">Docker Compose 一键部署 —— 交付载体</li>
+      <li data-page-node-id="7vv6FVLcTTWXujNCnV4osH">Prometheus 指标端点 —— 运维可观测</li>
+      <li data-page-node-id="6Dhy9oFnBUY0b92Z48tcx0">审计日志（JSONL，含脱敏）—— 合规留痕雏形</li>
+      <li data-page-node-id="VCUGdcFHEUedVuFWE2bqUJ">API Key / Basic Auth —— 最简单的访问控制</li>
+      <li data-page-node-id="z3gXyHp1ZUXjWIhrCTl5Ip">限流（有界内存）—— 基础防护</li>
+      <li data-page-node-id="BpI2pu5gCvciGSsBMq7ASA">结果缓存 + 异步任务 + 批量 ZIP —— 体感性能</li>
+    </ul>
+  </div>
+  <div class="card" style="border-color:#f3c9c4" data-page-node-id="FQmzu72xLnT3AZ5GaA99rC">
+    <h4 style="margin-top:0;color:#d92d20" data-page-node-id="z7vCdYDjBHZMlbHaMjShGy">✗ 完全缺失（收钱必需）</h4>
+    <ul class="pl" style="margin-bottom:0" data-page-node-id="oWJRrz5Rhpq66EFMYnwAYu">
+      <li data-page-node-id="7o5lJmkZIleXo7DETxgFDM">多租户 / 租户上下文传递</li>
+      <li data-page-node-id="d2TMluxOePYP2mPTLJiFsB">Per-Key 用量计量与聚合</li>
+      <li data-page-node-id="u06MeTkiLfEFhMB0OWbnmv">月度配额、套餐分层、超额策略</li>
+      <li data-page-node-id="HyQWJCnIxFTvoraED50hS2">支付网关、账单、发票</li>
+      <li data-page-node-id="q1qUIJAxqtQwkgkG3ooNBr">用户注册 / 登录 / 组织 / 成员 / 自助改密</li>
+      <li data-page-node-id="BtQ7DviurJueWjDHWbVP5N">自助 Key 管理（生成 / 轮换 / 吊销）</li>
+      <li data-page-node-id="JOOpDxXNkNzzQWCdObfxuJ">用量看板（用户侧）+ 管理后台（运营侧）</li>
+      <li data-page-node-id="EhRhURYdWBe8EHsrGQUHDC">持久化存储（DB / Redis）</li>
+    </ul>
+  </div>
+</div>
+
+<h3 data-page-node-id="Czf1uuAVHlEtUxZ8gbNqmN">4.3 限流按 IP：一个看似小、实际会炸的设计</h3>
+<div class="card" data-page-node-id="bLfc6EtZeDPlFChPId8W75">
+  <pre data-page-node-id="HE4t7UdiJHkHR2OCUFwdO1"><span class="c" data-page-node-id="icwLweCPtLwgolVse6yHVD"># app/api/rate_limit.py</span>
+client = request.client.host <span class="k" data-page-node-id="p3IK9HHg2BEIDGACZ4icjK">if</span> request.client <span class="k" data-page-node-id="K87tiK8j63AQYvn3RwsJnZ">else</span> <span class="s" data-page-node-id="HAmyiLSo93DqJGB0hWDAS5">"unknown"</span>   <span class="c" data-page-node-id="UqGwBTEFkBGfIpvtNZN5eT">← 按 IP 计数</span>
+<span class="k" data-page-node-id="8AAhSds2wDJUI9zwFeyCSH">self</span>._hits: dict[str, deque[float]]                          <span class="c" data-page-node-id="FQwlhntePiYEhhrEhIbM1B">← 进程内内存</span></pre>
+  <p data-page-node-id="5klenEsfZMPvAFqPXWQiiW">三个问题，在生产环境会依次引爆：</p>
+  <table style="margin-top:8px" data-page-node-id="KfnDpyCiID3AimPGFWeuSG">
+    <thead data-page-node-id="PZHvAZ6BPRgo7ecMv4H9Tu"><tr data-page-node-id="2hqTsRAsL86wPxHmJ7G9am"><th style="width:150px" data-page-node-id="ImGiEdLE12b8VxaUvBe6MP">问题</th><th data-page-node-id="wwM9XgjIySXG9MqaavWr8j">后果</th><th style="width:180px" data-page-node-id="qvrdWE839BdBnF2xajz5Yl">触发条件</th></tr></thead>
+    <tbody data-page-node-id="22AWymkCZYOAXoCNLy6fg8">
+      <tr data-page-node-id="7futR2R7dCqzy3WveRqiBS"><td data-page-node-id="P0zvaBA2aKkMRxJiYFLE09"><strong data-page-node-id="GnfZGziKLhDGjZ0EgzgWXs">NAT 误伤</strong></td>
+        <td data-page-node-id="mPJeryxWVFWAjybCCOxVwi">同一公司出口 IP 下 100 个员工共享 60 次/分钟配额 → 全员 429。
+        企业客户会直接判定「产品不可用」</td>
+        <td data-page-node-id="C6zEgghSC7egTUTH0msaIF">任何企业客户接入</td></tr>
+      <tr data-page-node-id="YvZzi7i5rIfkE7wJtLvdhC"><td data-page-node-id="vKBXWYvlTIGthq0nA6uqdX"><strong data-page-node-id="EHGOXkuKUAQSQPNCQ0c1bA">多副本失效</strong></td>
+        <td data-page-node-id="CzJvK8iebww8P0VLGpe1AE">各副本独立计数，实际限额 = <code data-page-node-id="3eLGs0tsE1gBQYZEfESWqA">N × 60</code>。扩到 5 副本后限流形同虚设，
+        被刷量时成本失控</td>
+        <td data-page-node-id="oz8Fj9IUh2aoXxScNO1hZp">水平扩容（必然发生）</td></tr>
+      <tr data-page-node-id="tao4ODn8PJJWBc3DHIgm6Q"><td data-page-node-id="i4LmPQr5KKQAqbFSLaUKCD"><strong data-page-node-id="Mk9n1W1N1lu3fmOFGhMG7W">无法按套餐区分</strong></td>
+        <td data-page-node-id="lPvKCv9J4mCEKHsQP0Ssy8">免费用户和付费企业用户拿同样配额 —— 付费没有获得感，转化动机归零</td>
+        <td data-page-node-id="4dxnx4jBc5cxlFCkQ3BUDD">推出分层套餐时</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-bottom:0" data-page-node-id="dGuvqfXqznz5DFLxN5D3Bs"><strong data-page-node-id="Zr4VesKIWOIYPZyPC8prDI">修复：</strong>限流 Key 改为 <code data-page-node-id="dMp1fF3YkqdJ8aH5tUKJYA">tenant_id</code>（来自鉴权后的租户上下文），
+  计数迁至 Redis 原子操作（<code data-page-node-id="u2vI7PgjcXNq2E4IGQ9Cng">INCR + EXPIRE</code>）。<span class="b b-p1" data-page-node-id="6SmQLetl53XRWSVUqRU2UJ">P1</span> · 2 人日</p>
+</div>
+</section>
+
+<!-- ══════════ 5 ══════════ -->
+<section id="s5" data-page-node-id="DVFKgCDw6IB4piDnws2LFD">
+<h2 data-page-node-id="D1v1D5Cdj4TPY48giMHPoB">5 · Bug 与风险全景矩阵（P0–P3）<span class="en" data-page-node-id="4mBhuc0QtO3SVqVy5f8Ykx">Defect & Risk Matrix</span></h2>
+<p class="lead" data-page-node-id="qVsFtNMdkJBBcISbEOGBj1">
+  按「对变现的阻断程度」排序，而非单纯按技术严重度。
+  <strong data-page-node-id="H1rmHIXMYesIBGFAT1STEW">P0 = 不修不能卖；P1 = 影响体验与规模化；P2 = 应修；P3 = 技术债。</strong>
+</p>
+
+<div class="note" style="background:#e8f6ed;border-color:#0f9d58;margin:0 0 18px" data-page-node-id="fixStatusS5Banner">
+  <strong style="color:#0f9d58">§5 矩阵修复状态（2026-08-31）</strong>
+  <ul class="pl" style="margin:10px 0 0">
+    <li><strong>P0 #1–#3 ✅</strong>：CJK PDF 方案 A、docling 快失败/bake/超时、多租户 <code>MDBRIDGE_API_KEYS</code></li>
+    <li><strong>P1 #4–#8 ✅</strong>：限流按 <code>tenant_id</code>（可选 Redis）、Job 元数据 SQLite 持久化、metrics 租户维度、审计日志轮转、<code>/api/formats</code> 标注 <code>export_only</code></li>
+    <li><strong>P2 #9–#12 ✅</strong>：病毒扫描默认 fail_closed、CSV table-first 语义说明、DOCX 节点上限、batch <code>client=</code> 透传</li>
+    <li><strong>P3 #13–#15 ✅</strong>：CI 接入 <code>check_version.py</code>、i18n 预留 billing key、README「商业支持」章节</li>
+  </ul>
+</div>
+
+
+<table data-page-node-id="YRkjbCBP9XSxPwPjUGdhTJ">
+<thead data-page-node-id="ttpIF8QQeX0H9mk55qQQCG"><tr data-page-node-id="raHHTA5O66N3OZGcfcKiHI">
+  <th style="width:34px" data-page-node-id="ph3sxGSgXxlNmtcq6B2Ztw">#</th><th style="width:52px" data-page-node-id="GxgDQ3Wh0ap9aSbZaFttgi">级别</th><th style="width:190px" data-page-node-id="YMIf0nAcaOrnc0SQoFZl7i">问题</th>
+  <th data-page-node-id="yUojmrvD5CjKioECLo5SeI">证据 / 位置</th><th style="width:250px" data-page-node-id="XMpkoKBcGbeGuBPqT50wJb">变现影响与建议</th><th style="width:62px" data-page-node-id="AYsYWHxZljW2OQhb1KhOva">工作量</th><th style="width:72px">状态</th>
+</tr></thead>
+<tbody data-page-node-id="dPMz7QhtCDdG1IRF2yPjom">
+<tr style="background:#e8f6ed" data-page-node-id="mxHQax5A8dAFvhxHENOtqK">
+  <td data-page-node-id="5CsHbg1rh40tbyLmWXNE2g"><strong data-page-node-id="L2xYAXmuM3UvmJD0NGHShV">1</strong></td><td data-page-node-id="NQ4iqC4uItU5mY2GGGrMiS"><span class="b b-p0" data-page-node-id="Wj3g9NvrrqWD4ZJFICiG5b">P0</span></td>
+  <td data-page-node-id="R2xm4mng7XjJ56UFc3jzJB"><strong data-page-node-id="lDCjAtZGxfYAB6vo95YOnI">PDF 导出中文全变 <code data-page-node-id="o8G7AzS3CKF3w9y30nGnOt">?</code></strong></td>
+  <td data-page-node-id="zjRbeKLXwon7U80fGFlk0c">实测：<code data-page-node-id="E3Gn3WvLZOdWt69VAJTSjO">pdf_simple</code> 输出 603B，<code data-page-node-id="eXIqLKdjKNMqLY0CdHsFzM">/BaseFont Helvetica</code>，
+  流内 <code data-page-node-id="dABGZdAgLC8BVlj9Q6BA2e">(# ??????)</code>，CJK 检出 False</td>
+  <td data-page-node-id="YOtPoAr84uEC9xKDwbFFPp"><strong data-page-node-id="levag4tEoqQVxqkaFniwZz">中文市场 PDF 功能等于不存在</strong>。方案 C 止血（报错不产出）+ 方案 A 根治（嵌入 CJK 子集字体）</td>
+  <td class="num" data-page-node-id="gkGL8lCngYFBtSAfzLikZy">2.5 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="51V1YQDieHz08PlqualsY0">
+  <td data-page-node-id="EUQmBFCkKUdBim2cxrjlNc"><strong data-page-node-id="PWhDfnmjaTK1tzqtLxt5t6">2</strong></td><td data-page-node-id="H2atvrJMhi0SXOxoITInda"><span class="b b-p0" data-page-node-id="uxKLYZH1zo1EBubtXGUXx8">P0</span></td>
+  <td data-page-node-id="ELntIFxLnwbkvgmpBalAVx"><strong data-page-node-id="x1ZLyzIgFOdWsZfCWuJ0fs">PDF 导入 150s 阻塞 + 内容丢失</strong></td>
+  <td data-page-node-id="G9GE1uEwlC82b4CLE8515e">实测：3 个独立 PDF 分别 160.0s / 150.4s / 150.3s，各输出 35B；
+  <code data-page-node-id="RajvSsLribpRQTUJByXgTe">~/.cache/docling/models</code> 不存在</td>
+  <td data-page-node-id="lNzn0w3PqFyIABZ35GdXvB"><strong data-page-node-id="CuEXlEORi7uy8Gkqktm3Ya">HTTP 必被网关超时；3 并发即可瘫痪实例</strong>。构建期 bake 模型 + 启动时探测快失败 + 显式 timeout</td>
+  <td class="num" data-page-node-id="H1wM88HdCAuclvGILHbXlU">2.25 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="oO4jR5zym3bE7zTNufvK6t">
+  <td data-page-node-id="IFR1m4Y0a3dzTZLxtgWpI6"><strong data-page-node-id="sXXyNS8Wic0rjxuFoly8Bf">3</strong></td><td data-page-node-id="IODpAdoQ5uGf71FDY9MylV"><span class="b b-p0" data-page-node-id="qGDnj9xFDhmZFpDjBYiZ4c">P0</span></td>
+  <td data-page-node-id="5gDi5HdZ3ClfDjFR5i6BF3"><strong data-page-node-id="lyvAUx1AOsfFFxXoZguIfD">无租户隔离（单一全局 Key）</strong></td>
+  <td data-page-node-id="tGSHBVg3WaFb0E4WXmMhgl"><code data-page-node-id="uiAL4FgW3FLAp2zOxngBec">auth.py</code>：<code data-page-node-id="Y1NAupK6KIladvG1WnuRpJ">settings.api_key</code> 单值比对</td>
+  <td data-page-node-id="UrS9fNEfqjmYb8YUSgqcF6"><strong data-page-node-id="B9v9ErajfGHofZiGBd5sTc">无法区分客户 = 无法收钱</strong>。SaaS 必建；企业交付可用 License Key 绕过</td>
+  <td class="num" data-page-node-id="WNMwonJf3gWncFO4GVaAEu">3 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="5A08ti9eV4e0IDq7CPSEng">
+  <td data-page-node-id="gaaTHPcDwzQvqHpiLwZ74E"><strong data-page-node-id="toGb9tide7nxaVNQicA5BA">4</strong></td><td data-page-node-id="Grwsb29sLVvDD4tY4o0eIt"><span class="b b-p1" data-page-node-id="L3xQyQGX02HqNJwn9nnGTG">P1</span></td>
+  <td data-page-node-id="v0GkM9GP6xk3GhhInZHIPq"><strong data-page-node-id="OfU7fOfAHpEp4C0iAEXXNy">限流按 IP、非按租户、多副本失效</strong></td>
+  <td data-page-node-id="pIL3D2VdDqw1Fy9VmA39gt"><code data-page-node-id="E3d1YmuuS2nzxdcGpnmO0f">rate_limit.py</code>：<code data-page-node-id="PFTNuiFpvwnhn7CvrVYMa7">request.client.host</code> + 进程内 dict</td>
+  <td data-page-node-id="7sw3i8ycWOCFrnh31ISdI2">NAT 误伤企业客户；扩容后限流失效导致成本失控。改 tenant_id + Redis</td>
+  <td class="num" data-page-node-id="xjDUba0QwcYSZP2oNI3f3Y">2 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="Qfk4Z6EWXqIwf9ExxIXPLM">
+  <td data-page-node-id="5ZQYElMTW0P0Cz4YLsVNAO"><strong data-page-node-id="NE8eYdhBpBA2cjCux7fZEs">5</strong></td><td data-page-node-id="2oo6gd8mRq2PkIVYDsSzxO"><span class="b b-p1" data-page-node-id="89JPYGxTJ0bw4MSam3F5UZ">P1</span></td>
+  <td data-page-node-id="x1vsjxjsXsH6xEMQPPuDFx"><strong data-page-node-id="wyGaW9m3TQz3sPlaGKeysh">JobStore 无持久化</strong></td>
+  <td data-page-node-id="MdY06Q437quWcD01rFyt31"><code data-page-node-id="482MquSerBhOnkldmDfUMZ">jobs.py</code>：<code data-page-node-id="rq9rI1dYjf77uMyqNieRqq">self._jobs: dict[str, Job]</code>；
+  <code data-page-node-id="zWGHaHAuwVDFb0u7tqXbJg">job_ttl_seconds=3600</code> 后自动清理</td>
+  <td data-page-node-id="P4sTusIoyJez0RWODBAeFh">重启即失、无法对账、客户可抵赖。企业交付需 SQLite 起步，SaaS 需 Postgres</td>
+  <td class="num" data-page-node-id="wRwMTdBgZKhGXtnooHYDsb">3 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="8aHtHTSHEnMynsgjkGv2bz">
+  <td data-page-node-id="If3DQQQpPr8QT1ejSKSQXg"><strong data-page-node-id="WR185vZf0OS3Fz2r63N6P6">6</strong></td><td data-page-node-id="beAJvdUcMldaX9OBa8pU7S"><span class="b b-p1" data-page-node-id="VqP2O7gm3sEbmFqxez2fB7">P1</span></td>
+  <td data-page-node-id="iZ0V2nP4USnRmXyeiqkH39"><strong data-page-node-id="xIcxnJXBBaLQAXp36pdKH3">无用量计量维度</strong></td>
+  <td data-page-node-id="GRMJFaIl3JnzibAtH8zNHu"><code data-page-node-id="gT5i8WJHydRoh5eQ3pfOAk">metrics.py</code>：仅 <code data-page-node-id="Om9hmfUu8sW8hNVb2tjgx8">{source}_to_{target}</code> 计数</td>
+  <td data-page-node-id="KTm6A6588gxd4ghaDYSAp6">账单无数据源。增加 <code data-page-node-id="w2ra2QwcXxiKINAA4doOIr">tenant_id</code> 维度 + 落库聚合</td>
+  <td class="num" data-page-node-id="JvSaFAcrv48tBRI7C5bpPC">2 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="yjeFMgSwfwDvsa76AvIdBV">
+  <td data-page-node-id="7CUzOhwAjQNUQ8QJkGzpTf"><strong data-page-node-id="ap7bYpy8ytpEsVup8kUyTU">7</strong></td><td data-page-node-id="5yQOsaQLH1xEqSFvZWU9Iw"><span class="b b-p1" data-page-node-id="n5HUzngJWoidoiygeNG3Fm">P1</span></td>
+  <td data-page-node-id="peLTD5QGULJsoajCWnRZ9T"><strong data-page-node-id="zpPzluq6U5tobiqcjPHTr7">审计日志无轮转</strong></td>
+  <td data-page-node-id="Ub6rqipP5uFbIlPmnK28qh"><code data-page-node-id="0thSchgYwkTA2TVrgsgDQw">audit.py</code> 使用 <code data-page-node-id="S98J7SF1XZN0DMdlBHj6SX">logging.FileHandler</code>；
+  全仓库无 <code data-page-node-id="b4VNPFJv38zS6LvkqV3xYh">RotatingFileHandler</code> / logrotate 配置</td>
+  <td data-page-node-id="3PAxRuvqebe9BnraigIpPu">磁盘无限增长直至撑爆容器。企业客户长期运行必然触发。改
+  <code data-page-node-id="dQXUT075qKA4YttoUZnr4D">RotatingFileHandler(maxBytes=50MB, backupCount=10)</code></td>
+  <td class="num" data-page-node-id="AvUuJquHYiA3H6VBBbPfoy">0.5 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="m7c6TF1Auypzo8F0HtRVHd">
+  <td data-page-node-id="mhkstYbF1NpFp1jm3QgUxC"><strong data-page-node-id="DwjwhFBXSipzlHKUqiSEO0">8</strong></td><td data-page-node-id="5IzmzE1u36dJBjXI5U1KHI"><span class="b b-p1" data-page-node-id="1tuao2OwBznCVBOz7ROE9C">P1</span></td>
+  <td data-page-node-id="cVjMBYP7OcE99ZnWnYBxME"><strong data-page-node-id="3pe03nzxJktBDrZ8vZKAVM">azw3 / kf8 / latex 只出不进</strong></td>
+  <td data-page-node-id="cbSXM4sFVcDtSl322MTN9d">实测：<code data-page-node-id="XhJSXGFT0sGgioVndMgdBi">UnsupportedFormatError: 不支持的源格式: azw3/kf8/latex</code></td>
+  <td data-page-node-id="ksJV98ReGYG7TSH1IfszXU">宣传 15 目标但 3 个无法回导，属<strong data-page-node-id="hGxXBjyBgDo5uwV7wELEHN">宣传与实现不符</strong>的合规风险。
+  要么补导入器，要么在 <code data-page-node-id="w1AToojhDsxFPhk5M6JcX9">/api/formats</code> 明确标注单向</td>
+  <td class="num" data-page-node-id="pqW1FXEBHEWMLrpSg8sQaU">3 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="U4Okh4WumTFnQrjhlct7JA">
+  <td data-page-node-id="xaZj3LnRf1NJzfdCUIjCRD"><strong data-page-node-id="7QH4XKFWN9PKmlmSKlYIVU">9</strong></td><td data-page-node-id="lgQwqSQkjEiLKuNquRGXUV"><span class="b b-p2" data-page-node-id="lqmii4NpQA97Im4686Y9HC">P2</span></td>
+  <td data-page-node-id="mMoVtmTZ6SypcEt1XKm5J9"><strong data-page-node-id="n8DE06ZzGLNqz0dhNulEmp">virus_scan 默认放行</strong></td>
+  <td data-page-node-id="edj0i9UjUuElgolbnIO9um"><code data-page-node-id="bAjC8SHczKcNhpqjZI9y6P">virus_scan=False</code> 且 <code data-page-node-id="hHqAMnjDz5hMMaoC0J2CEy">virus_scan_fail_closed=False</code></td>
+  <td data-page-node-id="BKZUUVHit0LkcKTePoN8j4">SaaS 场景下上传文件未经扫描即处理，企业客户安全评审会被卡。建议 SaaS 默认开启 + fail_closed</td>
+  <td class="num" data-page-node-id="eJCeHA0X1PEop1ohS4ezjp">0.5 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="3FUhNGYQsj9aBQ3Pr9pckN">
+  <td data-page-node-id="u0FSMOJsu8Ac6vmpOa5WAq"><strong data-page-node-id="hIsYf2VzJAL7dlaiuZqNBq">10</strong></td><td data-page-node-id="f1pZjmjVa49OXtCdQE2OpA"><span class="b b-p2" data-page-node-id="lsb9DXqJgErXY5dkzB8eG1">P2</span></td>
+  <td data-page-node-id="dJKOlu8UsqfjDTFV29wnCo"><strong data-page-node-id="maaG0JAVVdPABvWvgpXzOZ">CSV 导出丢失非表格内容</strong></td>
+  <td data-page-node-id="SRMrwcjyaSDSChBgUOOE0E">实测：含标题+段落+表格的 MD → CSV 仅 <code data-page-node-id="8g2qzw89sjZbB4GCWpB3cq">"A,B\r\n1,2\r\n"</code>（10 字节）</td>
+  <td data-page-node-id="Vdp25hpeTVw84Ryy6pwQyd">用户预期「导出表格」而非「只导出表格」。需在文档与 UI 明确「table-first」语义，或提供全量模式</td>
+  <td class="num" data-page-node-id="YwJB171YoPfrDISy5hlzLJ">1 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="rseuTnjnbukXlKwVXKoO9G">
+  <td data-page-node-id="ZFVqO5kY09ppuU9eNfNXDV"><strong data-page-node-id="P54va7dLdFUOlqmVOOwFc1">11</strong></td><td data-page-node-id="gXzeCgCGa0qXk5q5WtSZAy"><span class="b b-p2" data-page-node-id="Gmu8xWlWOumwvOGyeAY5qm">P2</span></td>
+  <td data-page-node-id="v8CtiM0eA3YDYH37hiDYaM"><strong data-page-node-id="ymLrGi1tFLolpolLXGFDJv">DOCX 大文件仍超线性</strong></td>
+  <td data-page-node-id="SNNbMH9JNxcwVttzotIXnD">实测：500→2000 节点 ×3.04；2000→5000 ×2.42；5000→20000 <strong data-page-node-id="yj6QkECa47Myy7vDiBFdaW">×6.76</strong>（2517ms / 572KB）</td>
+  <td data-page-node-id="7u4j5fJhjASjiXpaBe4k4L">v0.13 FastBody 已改善 41%（v0.11 为 4305ms），但超大文档仍慢。企业批量场景需限制或分片</td>
+  <td class="num" data-page-node-id="7QVktVRuJvkOPfDleWBtor">2 人日</td>
+<td class="num"><span class="b b-ok">已缓解</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="Zc2dyPLBiRh9bNEdJNEZHf">
+  <td data-page-node-id="btBsJjWYmQrXLNRj2G4bBB"><strong data-page-node-id="fhpQ1IhymVWSmEACz23Nd7">12</strong></td><td data-page-node-id="uQHjENATJbLfSQr0gSrKwC"><span class="b b-p2" data-page-node-id="oolZrupQFsjN0ExexTHxuF">P2</span></td>
+  <td data-page-node-id="XCHBSExRDz9rNmlpknWsOQ"><strong data-page-node-id="fT1HkicDf8DUIYUthkgpnD">batch 接口缺失 client 透传</strong></td>
+  <td data-page-node-id="htQAEp4XZsSiG0mNnyUDEF"><code data-page-node-id="yB7TOdBgQEo8Jx3fKmex6E">routes.py</code>：<code data-page-node-id="upfuCMnfHqbIlo0vtyHief">/api/convert</code> 传 <code data-page-node-id="V49ja0bjPgT7anKXKuo6Ly">client=</code>，
+  <code data-page-node-id="WXT4kRjHCnapE4KsmjE68g">/api/convert/batch</code> 的 <code data-page-node-id="b3YxXQArmZgpsJkVBL3Qa6">_one()</code> 未传</td>
+  <td data-page-node-id="NTCPKeNUNprjHM6eEefCxa">批量转换不计入审计的客户端字段，用量归属不完整 → 账单漏记</td>
+  <td class="num" data-page-node-id="efHZFFEWPHARJncg2cAeGM">0.25 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="U4DPaFpHax0ZEAXsehAXAV">
+  <td data-page-node-id="ZeifFIjD5my7ILBiujHkhx"><strong data-page-node-id="WiZvfCLQhJ5lBfEYBEaJin">13</strong></td><td data-page-node-id="3H7Fgr8iEGSSTqQtEM0SNr"><span class="b b-p3" data-page-node-id="zO9AacZdTZlTSBgCCpMoB0">P3</span></td>
+  <td data-page-node-id="e7RFjlQud3nRhQPKLxmgkf">无 CI 发布门禁中的商业化检查</td>
+  <td data-page-node-id="AfoYvyURCWbH6vwrnGIXeN"><code data-page-node-id="6WxaEFEU9r1voA0oIDISZj">.github/workflows/</code> 仅 ci.yml + publish.yml</td>
+  <td data-page-node-id="e7YTeD27Bj5IcCGfH9zaLh">建议增加版本号一致性检查（已有 <code data-page-node-id="oml6ooQTk6CPHRMgJXjCVu">check_version.py</code>）+ 契约测试</td>
+  <td class="num" data-page-node-id="21wnspvUWT4BSSJhZIrwJa">0.5 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="bJOUzDbd00jHF6Engal6Vr">
+  <td data-page-node-id="TkeBpS6gppYBKbfkIDEFA5"><strong data-page-node-id="XQWQOvWoaKA4QuLlgdwNYM">14</strong></td><td data-page-node-id="EbvvFeAOHhuGhC2H1lfNLl"><span class="b b-p3" data-page-node-id="EACAnzQcy1R9PjVzkOnqhB">P3</span></td>
+  <td data-page-node-id="CdkRdFqhHzUj2kV7428MK4">前端无国际化收费文案位</td>
+  <td data-page-node-id="RPDzD15LDWipWITldEkHLO"><code data-page-node-id="KOPUuSSJ0m8HD5VKFlpjQP">frontend/src/i18n.ts</code> 存在但无 billing 相关 key</td>
+  <td data-page-node-id="MWuQoLrah9IoQPWCtVxBoF">接入订阅时需预留文案结构与升级引导位</td>
+  <td class="num" data-page-node-id="DvyAMqUProHB7rTTqqyoDA">0.5 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="BzehJtShrziwXxGFulVMDH">
+  <td data-page-node-id="mqssHtGphS2kfR9hmO8q0M"><strong data-page-node-id="k9MNQUO0BmtqXC8gvvROLP">15</strong></td><td data-page-node-id="J2HgA0mQoDJjSXI1pu8FRo"><span class="b b-p3" data-page-node-id="7K5twV8kH6jAwNrclOA84i">P3</span></td>
+  <td data-page-node-id="dkD4kZQZ4yk4EEpdYC3Jl9">README 未说明商业授权路径</td>
+  <td data-page-node-id="FJbyowghA97LuAGqp5Udih">README 有协议约束表但无「商业支持 / 企业版」入口</td>
+  <td data-page-node-id="27x7sPhbAqHuUtCfoxNJUo">企业客户找不到联系通道，商机流失。需加「商业支持」章节</td>
+  <td class="num" data-page-node-id="NCEq51EQlc5jhP3MrWSIad">0.25 人日</td>
+<td class="num"><span class="b b-ok">已修复</span></td></tr>
+</tbody>
+</table>
+
+<div class="grid4" style="margin-top:20px" data-page-node-id="lEF5M2HSFby5WfHFc9TYrG">
+  <div class="kpi good" data-page-node-id="u6OYc6ucp2VnEbLuUXFAJI"><div class="n" data-page-node-id="znT7cvGEsGBLMfEvBiLnaB">0</div><div class="l" data-page-node-id="gorXyAybcBK4ArhpQXZ6vm">P0 · 未关闭</div><div class="d" data-page-node-id="shYGS4tkg5wZC2N9vnO0X2">3/3 已修复</div></div>
+  <div class="kpi good" data-page-node-id="SXd4W26BxDNJZ2yyqZFSrL"><div class="n" data-page-node-id="laNTJ3ZEMN7vXaWNrpOUQG">0</div><div class="l" data-page-node-id="pSBIfPI5QvSZDnFGeAs5E8">P1 · 未关闭</div><div class="d" data-page-node-id="FEAxO2jPrwBlmGfUBrPQBb">5/5 已修复</div></div>
+  <div class="kpi good" data-page-node-id="1f2qTGJplm7oGjfwpv9nma"><div class="n" data-page-node-id="zTIhHZvqPkCYKvvlj8IRJa">0</div><div class="l" data-page-node-id="vvJZcwbYibU1ZXtZVlvIUy">P2 · 未关闭</div><div class="d" data-page-node-id="q3yazEVakbgCjbgILwnIlq">4/4 已修/缓解</div></div>
+  <div class="kpi good" data-page-node-id="H7gEtzqiaBLDKbAGJ35vS7"><div class="n" data-page-node-id="v0YCT7p9KaqDKiOdmYWs71">0</div><div class="l" data-page-node-id="UJwSFhz8w1uhsDWVPXl27O">P3 · 未关闭</div><div class="d" data-page-node-id="RhCKnoyJZSr7gD56QfnP64">3/3 已修复</div></div>
+</div>
+
+<div class="note" data-page-node-id="vXUfk2RAyolBSoOVBpVu7G" style="background:#e8f6ed;border-color:#0f9d58">
+  <strong style="color:#0f9d58">状态更新（2026-08-31）：</strong>§5 矩阵 <strong>P0–P3 共 15 项均已关闭或缓解</strong>。
+  P0/P1 已达「可卖 + 可规模化起步」门槛；SaaS 仍需阶段二完善支付/自助用户体系（见 §8.2）。
+  DOCX 超线性项以 <code>MDBRIDGE_DOCX_MAX_NODES</code> 硬上限缓解，未做算法根治。
+</div>
+</section>
+
+<!-- ══════════ 6 ══════════ -->
+<section id="s6" data-page-node-id="cFzTXoIhmWX3BaP3WH53Tt">
+<h2 data-page-node-id="obtHrFn1tijU69mPhyoTRg">6 · 变现路径设计：三条路线对比<span class="en" data-page-node-id="03diXiBtSbdOI88Wv1Bwub">Monetization Path Design</span></h2>
+<p class="lead" data-page-node-id="fBYGdHyMX53wMb2kdGWeLo">
+  MIT 协议下，"卖软件许可证"这条路已经被自己堵死了。剩下三条路，
+  按<strong data-page-node-id="MpvOrZsks26EEttbfHCK52">「现金流速度 × 天花板 × 投入」</strong>三维打分。
+</p>
+
+<h3 data-page-node-id="CLHsYijDjU5U2VZGe0Agbz">6.1 三条路线全景对比</h3>
+<table data-page-node-id="j15XRwGBKfBFotmQlLU06L">
+<thead data-page-node-id="MtKPxZmfWERO6YPtbk7fkh"><tr data-page-node-id="OYtXVtFOddHxQTiqH8m4zO">
+  <th style="width:150px" data-page-node-id="8MDjAYgqypVOIiDzDuOd0M">维度</th>
+  <th style="width:29%" data-page-node-id="cSwJGkp9jS4prFgDWjwuXO">路线 A · 托管 SaaS</th>
+  <th style="width:29%;background:#e8f6ed" data-page-node-id="xob4uTEmFO0zlba8SxG9If">路线 B · 企业私有化交付 <span class="b b-ok" data-page-node-id="7gHnMFoJSwKDMtiEZCIJWo">推荐</span></th>
+  <th style="width:29%" data-page-node-id="78cnUXVPby0FEjifTxmRcR">路线 C · 生态 / 流量</th>
+</tr></thead>
+<tbody data-page-node-id="s7ZNUUclLOo7qr9mQSA0An">
+<tr data-page-node-id="WCWViRxlzPiyq013zymnqy">
+  <td data-page-node-id="AeS8r99FrqrJ7pApE4ALDy"><strong data-page-node-id="Vl00l0t6wrhdnML2UYEmmw">核心卖点</strong></td>
+  <td data-page-node-id="QjiU0YVjNRCDJFTrgRumS4">开箱即用，不用装 Pango、不用下模型、不用运维</td>
+  <td data-page-node-id="eRG2JGB0M6RBb0tmlwlVFR"><strong data-page-node-id="0wBHhMVSwGEovZaWsos5MG">数据不出内网</strong> + 离线可用 + 中文排版保障 + 有人兜底</td>
+  <td data-page-node-id="xNh2sDH3czst09aS5yUE3V">免费 CLI/PyPI 获客，转化到付费增值</td>
+</tr>
+<tr data-page-node-id="HH3jpkI5xszQpn2lgyjENp">
+  <td data-page-node-id="zsRBJXWfApE55nyZgPGbRC"><strong data-page-node-id="aDDi58O5DBMar8OpPiJuRB">目标客户</strong></td>
+  <td data-page-node-id="2QgRDT0Hwpx0DRQDIjGZL8">开发者、小团队、个人创作者</td>
+  <td data-page-node-id="GzvOlCAh9PpjY3FzoBLYjH">律所、金融、医疗、政务、大型制造</td>
+  <td data-page-node-id="DEaPuteFeNWyWIzHthul4t">开发者社区</td>
+</tr>
+<tr data-page-node-id="1u835EEzrVOgCqqDxA6DgC">
+  <td data-page-node-id="J5woz3BsHOk91lj1wlt3gd"><strong data-page-node-id="Km87oBAmeXgrjTs7OOvwcq">前置基建</strong></td>
+  <td data-page-node-id="5Af2LAP1VHDalZ7YHHryrh"><span style="color:#d92d20" data-page-node-id="I0Hl78HUnWHt2DATYhKDOz"><strong data-page-node-id="8v42SbaHmDFtoARYnrBYm3">19 人日</strong></span>（多租户+计量+配额+支付+持久化）</td>
+  <td data-page-node-id="6eLEn530fbSYG9h3uKlhVs"><span style="color:#0f9d58" data-page-node-id="SEuTOlffUxdqUzyWFTeruS"><strong data-page-node-id="rBdruDvAnyOnk2bfy3S1I8">0 人日</strong></span>（合同+对公转账+License Key 即可）</td>
+  <td data-page-node-id="eW2IKLQfmTTkrkn4P8lZdH">3 人日（Landing Page + 文档站）</td>
+</tr>
+<tr data-page-node-id="kLjdysCLRvQxGY6LrZmMxj">
+  <td data-page-node-id="KIMXQy0UmPkvlqsTzhAwJk"><strong data-page-node-id="EmCy4fT4HlTcjCR6RYykOd">PDF 修复要求</strong></td>
+  <td data-page-node-id="x2sATTZBv2LPAXnGoTbcUI">必须（P0-1/P0-2）</td>
+  <td data-page-node-id="SxJD1I2SAFNRKJ1WmbAPBG">必须（P0-1/P0-2）</td>
+  <td data-page-node-id="MXT5eOtEr22wRoIu9KAnzS">建议</td>
+</tr>
+<tr data-page-node-id="f9hIrt3fFJCkY5IDLsjsio">
+  <td data-page-node-id="AgOpu2OFaE2ON7iBHqEMUD"><strong data-page-node-id="mM3fQc88J4hDcxzvIdiQsK">首单周期</strong></td>
+  <td data-page-node-id="sIzbCunchwidOhVKjy4844"><span style="color:#d92d20" data-page-node-id="HJC8OXeBsn7cpjtBoHrIQa">9–12 周</span></td>
+  <td data-page-node-id="wtgmNPFx5rwOChrp3cZCqV"><span style="color:#0f9d58" data-page-node-id="cGou0BQi7NPQ5VwiS4tEJo"><strong data-page-node-id="GFoTUriNfDw3GiObji9wmH">2 周</strong></span></td>
+  <td data-page-node-id="vQIl6zUOo5O1lOvGIwcAUj">6–8 周（需先积累流量）</td>
+</tr>
+<tr data-page-node-id="4qUkAc9PNJGBg9vU1Zq4EK">
+  <td data-page-node-id="wYwlMnH9Haq3gBFlnlr02d"><strong data-page-node-id="wjn9Q9s9g1Gfj2pJkNGuAt">客单价</strong></td>
+  <td data-page-node-id="w6XOQ5GpOCMH1BEKlLc7C8">¥39–199 / 月</td>
+  <td data-page-node-id="4AGyEQ3py7jGU4NPXE2iTQ"><strong data-page-node-id="Y2ZXOvGFGvzyGneS72khaS">¥15,000–50,000 / 次</strong> + ¥8,000/年维护</td>
+  <td data-page-node-id="1Gb5ihxrvbtmu3SUBATW0k">¥0（间接）</td>
+</tr>
+<tr data-page-node-id="5ZvVoiryVidkpLtMNSrkV9">
+  <td data-page-node-id="0zIk31AxDHmzB4JsADZxKi"><strong data-page-node-id="54XKC4uptPjF1ncD6O9GaF">收入天花板</strong></td>
+  <td data-page-node-id="Wg6UK3PEagRKokG7kGOYuy">高（可规模化，ARR 可期）</td>
+  <td data-page-node-id="xSx0mUuU4yFmKACndKiVif">中（受人力交付限制，但单笔厚）</td>
+  <td data-page-node-id="OxgtrcLjNfkFqkZ6IW4jX5">低（主要作为获客漏斗）</td>
+</tr>
+<tr data-page-node-id="f9m71JpwV0W7aoJ4CHKMaD">
+  <td data-page-node-id="jfYFvM5hYI6LTT5B0I1qFf"><strong data-page-node-id="EPslsFKjh5QClPIsXkO5Px">MIT 冲突风险</strong></td>
+  <td data-page-node-id="2I3snEzIITXDUWWfiUGZLX"><span style="color:#e07b00" data-page-node-id="LcPBQUwfIhmm6Tha2lHAAv">中</span>（用户可自托管替代）</td>
+  <td data-page-node-id="EW00hBBBDWgrlT1wSHtU1m"><span style="color:#0f9d58" data-page-node-id="i7qY94AvGRMsJtaVXwsKWd">低</span>（客户买的是交付与责任，不是代码）</td>
+  <td data-page-node-id="YmkDoSyu85DXiRAqnSYG4p"><span style="color:#0f9d58" data-page-node-id="FKAaaRH61NjLZO4on9BFnf">低</span></td>
+</tr>
+<tr data-page-node-id="XN9qBt04EywIRm02xyaa31">
+  <td data-page-node-id="7lmMCTQyUGsRj7ETlK3IsE"><strong data-page-node-id="U3Dezypnlu8ek4QgojGqEe">关键壁垒</strong></td>
+  <td data-page-node-id="3VDptqQ3FvfH1lZwEdYszb">运维省心 + 中文质量 + 规模成本</td>
+  <td data-page-node-id="uQvEYU3DFoOlfXIySuP3m2">信任关系 + 内网交付能力 + SLA</td>
+  <td data-page-node-id="0Z9stuHvuZ2AjgfAIhmGP3">品牌与心智</td>
+</tr>
+<tr style="background:#f0f4f9" data-page-node-id="xI4CBqOSgqaqUa2TBlHWwp">
+  <td data-page-node-id="8OrECSPzWv5UmIDYRgTUxK"><strong data-page-node-id="lE34WlYEDVkm8dTpe0NfJA">综合建议</strong></td>
+  <td data-page-node-id="HqRQFCxtcWv4tqtaGrX0J4"><strong data-page-node-id="FyJE7poU5kWy6gf8azv1th">第 3–8 周建设，第 9 周上线</strong></td>
+  <td data-page-node-id="e1f69Dn7pOfI0wupFk8n1w"><strong style="color:#0f9d58" data-page-node-id="2FLQ8IZcsBQSQbfnmiRRBG">立即启动，第 14 天开单</strong></td>
+  <td data-page-node-id="bL5i7vGsKFWdpx3qByauqS"><strong data-page-node-id="GnJUaPiUsH29jAPVBTNeZC">同步进行，长期投入</strong></td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="HmtgCJ2HhlHwGN4PMBriad">6.2 推荐组合：B 打头 → A 跟进 → C 长期</h3>
+<div class="tl" data-page-node-id="iBdgRz7JiIZ0JWKR0RD4YY">
+  <div class="item" data-page-node-id="hEWVPgnM24V91a2Xqm64od">
+    <div class="when" data-page-node-id="vg7IDtK8OeLIa2akbFeeJU">WEEK 1–2 · 现金流启动</div>
+    <h4 data-page-node-id="wBoUL626BJt65PJi61CZYx">路线 B：企业私有化交付</h4>
+    <p data-page-node-id="rjMmMJC2iKOrpLhjWUEpGw">修 P0（7.75 人日）→ 打包「离线交付版」（docling 模型 + CJK 字体 + 一键脚本）→
+    准备 SLA 模板与商业授权书 → 接触 2–3 家目标客户。<strong data-page-node-id="EKHN81R7FGFeoERdAJBoqE">第 14 天开票。</strong></p>
+  </div>
+  <div class="item" data-page-node-id="eOD5MGqk0iWwOoQKcanpvo">
+    <div class="when" data-page-node-id="YvdClHQSPJxMECed8xiMab">WEEK 3–8 · 规模化建设</div>
+    <h4 data-page-node-id="SplfyyY2FQVel437EXZOq2">路线 A：SaaS 基建</h4>
+    <p data-page-node-id="0ZXDyQE3rBDnS9HSN41q9C">用 B 的现金流投入：多租户 → 计量 → 配额 → 支付 → 用户体系 → 持久化（19 人日）。
+    <strong data-page-node-id="0fZ26Pd47l27jUtxFjEr30">第 9 周上线 SaaS。</strong></p>
+  </div>
+  <div class="item" data-page-node-id="7HhNjBsoWo02c7p8LpkCRB">
+    <div class="when" data-page-node-id="NnUGR2ZQ3DImN0BQmXS929">WEEK 1–12 · 持续进行</div>
+    <h4 data-page-node-id="OPjXKFMftOtA1OCXv90taW">路线 C：生态获客</h4>
+    <p data-page-node-id="W15Ym7VkRlxcBhmV0c86QX">PyPI 发布 CLI → 技术文章（中文场景最佳实践）→ GitHub 运营 → Landing Page。
+    为 A 提供低成本流量。</p>
+  </div>
+</div>
+
+<h3 data-page-node-id="5OWjBRkTbCgB5cGZoDT11C">6.3 为什么企业私有化交付是「最快」的（详细论证）</h3>
+<div class="grid3" data-page-node-id="EiEmkoEpvxWYE6K9GZJByn">
+  <div class="card" data-page-node-id="ggUU04PUwk2GZQyECgy3Sy">
+    <h4 style="margin-top:0" data-page-node-id="NA2Z4iJyHDMqonYgc3O1IA">① 绕开全部计费基建</h4>
+    <p style="font-size:13.5px;margin-bottom:0" data-page-node-id="hc8kCDqK4kbKzscntS3YjT">企业客户走<strong data-page-node-id="r7ouuqFRWanWXwPBJd5Jjq">合同 + 对公转账 + 发票</strong>，
+    不需要 Stripe、不需要订阅系统、不需要用量计量。
+    SaaS 那 19 人日的基建，<strong data-page-node-id="FnvhqYG01HaZL6xbDLmVOT">企业交付一分钱都不用花</strong>。</p>
+  </div>
+  <div class="card" data-page-node-id="mZHH2uCO2S2uEaAny5RRqD">
+    <h4 style="margin-top:0" data-page-node-id="1Un4Mu0OWKplVnPrPFeE0t">② 缺陷变成卖点</h4>
+    <p style="font-size:13.5px;margin-bottom:0" data-page-node-id="PwYOpzD4VK4yykZxmzkPIz">「docling 模型 3GB 难下载、Pango 依赖难装、中文排版难调」——
+    对 SaaS 是缺陷，<strong data-page-node-id="ChJWzcGMFRKyhqq5JfnHvT">对企业交付恰恰是付费理由</strong>：
+    客户不想自己解决这些，你打包好交付给他们，价值感极强。</p>
+  </div>
+  <div class="card" data-page-node-id="67xvxIwsyEIf7jYXDhtNTH">
+    <h4 style="margin-top:0" data-page-node-id="3bdP1rl50zpmUgrV9Ztusq">③ MIT 不冲突</h4>
+    <p style="font-size:13.5px;margin-bottom:0" data-page-node-id="COAF6gB6Q3B4z9HpsEhHwU">客户买的不是代码（代码 MIT 免费），
+    买的是<strong data-page-node-id="x0BEdAx2hO7THJciUkS7hw">「部署好的系统 + 运维责任 + SLA 承诺 + 中文质量兜底」</strong>。
+    这在法理和商务上都站得住，不会引发「为什么不直接用开源版」的质疑。</p>
+  </div>
+</div>
+
+<div class="note" data-page-node-id="tvUDldyuAkzQapz5e5hQZz">
+  <strong data-page-node-id="NsU2l0sD7FRCufprdwHYXs">企业版「离线交付包」应包含什么（这是你真正的商品）：</strong>
+  <ol class="pl" style="margin:8px 0 0" data-page-node-id="RIlRaDIWvjxRAVkdiDc7nT">
+    <li data-page-node-id="TG6fDTIfoe3KBs5tOfBMWO">Docker 镜像（docling 模型已 bake，约 3GB，内网可直接 <code data-page-node-id="4aRhbdnt6P8cWAULhZqeIi">docker load</code>）</li>
+    <li data-page-node-id="1C405hkQumAHC0ZDbwKi0A">CJK 字体包 + PDF 中文排版配置（解决 P0-1）</li>
+    <li data-page-node-id="BHU0DnpGcFKl3wRATYWJmA">一键部署脚本（<code data-page-node-id="KgnCLVUSQhcVe9AM8UzE73">./install.sh</code>）+ 离线文档（PDF/HTML）</li>
+    <li data-page-node-id="EZ6plB6XK23O2C2pTkKhmT">License Key 校验模块（离线激活，按机器指纹 / 到期时间）</li>
+    <li data-page-node-id="40OEC6hrAPxvxKi2u3k3Lp">SLA 模板 + 商业授权书 + 运维手册</li>
+    <li data-page-node-id="nDlQpC6rvJ917ZwelsDemk">3 个月免费维护 + 后续 ¥8,000/年</li>
+  </ol>
+</div>
+
+<h3 data-page-node-id="2XptOx3XeL8dMknqA3rfjN">6.4 目标客户画像与切入话术</h3>
+<table data-page-node-id="GrBmAW1idebHVR8Fz3c13n">
+<thead data-page-node-id="BgXH6ylHZMeITCwlNkshL7"><tr data-page-node-id="2695ScUQWavZUBs5mXdmT4">
+  <th style="width:130px" data-page-node-id="ibeCQihIAtQTCzFIFJRHYL">行业</th><th style="width:230px" data-page-node-id="lShnMzt3GbLAMa0woPT9Ue">痛点场景</th>
+  <th data-page-node-id="6utmfOqdDvubCTTFGynRzI">切入话术</th><th style="width:100px" data-page-node-id="8W6le230jNycDDuTiNGiHA">预估客单价</th>
+</tr></thead>
+<tbody data-page-node-id="kK93v89SybtVDHFYsIyEHE">
+<tr data-page-node-id="8ObIqZTTHBe3RcH4UDbcCD">
+  <td data-page-node-id="FXWydngWMFNc33IBgdSGIH"><strong data-page-node-id="Q5PQKGCQbYU0t8ZC6JTo3v">律所 / 法务</strong></td>
+  <td data-page-node-id="7iy2tbC676dlfqDgSk6ag9">大量历史合同 PDF → 结构化文本，用于检索与要素提取；数据不能出内网</td>
+  <td data-page-node-id="M6I589UaIcRdypHsIGHRgQ">「历史合同 10 万份，本地跑一遍全转结构化，不上云、不泄露，两周交付」</td>
+  <td class="num" data-page-node-id="GejmWdqAV02yehXVIMvAU5">¥30,000–50,000</td>
+</tr>
+<tr data-page-node-id="Ehw9fri5viTFpPZDEUph9y">
+  <td data-page-node-id="PB6wpDQuCcOzrVPZQuDy3M"><strong data-page-node-id="LXBdyuVatfAds2MYgvreXD">金融 / 券商</strong></td>
+  <td data-page-node-id="hGUmKEBqXjg2wev8E1uxi1">研报 PDF → Markdown 喂给内部 RAG 知识库；表格结构必须保留</td>
+  <td data-page-node-id="AvSM2EaEDACX1DgrNSl1Dh">「研报表格结构零丢失转 Markdown，直接进向量库，合规不外传」</td>
+  <td class="num" data-page-node-id="Gfrf7U8u2Y7DyvwnyquNWQ">¥30,000–50,000</td>
+</tr>
+<tr data-page-node-id="eC6obvxywi5zJQM8bSyN6w">
+  <td data-page-node-id="s1oTS9wEZvPMXhHmtjOv2C"><strong data-page-node-id="Q16F33o7F9ifl5yrpAlpKn">医疗 / 政务</strong></td>
+  <td data-page-node-id="MXnnUfwxTRWrpd6R7QuXml">OFD/PDF 公文与病历归档；强合规、强内网要求</td>
+  <td data-page-node-id="X3zZFqM1s8CxnJXo2bo8I3">「纯内网部署，无外联，审计日志完整留痕，满足等保要求」</td>
+  <td class="num" data-page-node-id="hvOpHjzjeYwoAEbGeKleui">¥40,000–50,000</td>
+</tr>
+<tr data-page-node-id="gqWZQiv3i2rw5Xer2tyq51">
+  <td data-page-node-id="KxBg4Ev07ByJT2lD6oMYR6"><strong data-page-node-id="ASkk9n3BbLhjIUNg8lW4ZA">制造业 / 大企业 IT</strong></td>
+  <td data-page-node-id="7UXywS3gJ9ygr0s2BcqIVa">技术文档多格式互转（DOCX ⇄ PDF ⇄ MD），统一归档</td>
+  <td data-page-node-id="kkv5Es2OTc6HTTnFKrS5kE">「14 进 15 出全打通，一套系统替换掉 3 个工具」</td>
+  <td class="num" data-page-node-id="qacDKtznyVeRvdP7LzbGLW">¥15,000–30,000</td>
+</tr>
+<tr data-page-node-id="Ff7H1MRYXasyZEOX0IDEMO">
+  <td data-page-node-id="gvnMldTEUnxm7m33JWt0au"><strong data-page-node-id="Ek1D7F7pYhR8cKmS8EpF74">出版 / 教育</strong></td>
+  <td data-page-node-id="O85QvdDaA06YcLVGacb7GU">EPUB / MOBI / AZW3 / KF8 电子书格式批量互转</td>
+  <td data-page-node-id="37E3Zw7avDdyPrTcf9tdDz">「电子书全格式支持，含 azw3/kf8，批量目录一键转」</td>
+  <td class="num" data-page-node-id="msleSXdboNNu9pl7rl11h5">¥15,000–25,000</td>
+</tr>
+</tbody>
+</table>
+</section>
+
+<!-- ══════════ 7 ══════════ -->
+<section id="s7" data-page-node-id="GFKKyFxysHh4uGRqrdDETa">
+<h2 data-page-node-id="TW9pYDHdaYbN2CbyvnW0nq">7 · 定价模型与单位经济测算<span class="en" data-page-node-id="7LipwozKML8Qs80CqxNxmZ">Pricing & Unit Economics</span></h2>
+<p class="lead" data-page-node-id="vb9dx9TwWct09oyJsoIoKZ">
+  定价不是拍脑袋。基于实测性能数据推算单机容量，再倒推成本，最后锚定竞品价格带。
+</p>
+
+<h3 data-page-node-id="OjXbRGfSAF3P2vEkmUsF7F">7.1 实测性能 → 单机容量推导</h3>
+<table data-page-node-id="N4KDizBRNvFltWpurS2JNl">
+<thead data-page-node-id="v6QWf2Ur7igTCPK9ybEMOm"><tr data-page-node-id="bVmcEkwaLdzDNi5m2AGAiI">
+  <th style="width:200px" data-page-node-id="Y2m8xjpF29IW8MyBk5swEF">场景</th><th style="width:130px" data-page-node-id="wEuex7fWuUep1rGyDI90p0">实测吞吐</th><th data-page-node-id="tTtlyjFeGewjGYRzvtVMFD">推导</th>
+</tr></thead>
+<tbody data-page-node-id="nUuUmhfX8V9phyE5BJBSDY">
+<tr data-page-node-id="jL5O2qPk2P4ANiI3231mMF"><td data-page-node-id="7J9bUXqGOqiFvtqdCgosSB">MD → DOCX（2 万节点 / 572KB）</td><td class="num" data-page-node-id="6HW1uFtRvcXANEWBV3GP2E">2,517 ms</td>
+  <td data-page-node-id="SO4EpVEjzmC9wche3hYtWp">单 Worker 约 <strong data-page-node-id="KxFcCrPcEO2Tz9Q0jQFeZ7">24 次/分钟</strong>；<code data-page-node-id="Gnp89c7bI5Bon7bt9CqcI3">batch_workers=3</code> → 约 72 次/分钟（纯 CPU 密集）</td></tr>
+<tr data-page-node-id="kVUIHI6X8eyKuBhWxqUtfp"><td data-page-node-id="OXX9964FOIECnA8oo9XWET">MD → HTML（2 万节点）</td><td class="num" data-page-node-id="vUhxsHKK1jAhBIxIvOHTNY">462 ms</td><td data-page-node-id="iChhCBG5GGIxuUWF1u0hyW">单 Worker 约 130 次/分钟，轻量路径吞吐高</td></tr>
+<tr data-page-node-id="hs2PW9PVzDu0gQ3RqAvMcl"><td data-page-node-id="dDFc4tCKoKtrHqu08o4n0S">MD → TXT / MD（回环）</td><td class="num" data-page-node-id="i4ApIeBOv6Phyxbi2B8DfG">~0 ms</td><td data-page-node-id="Dfe72Anou8qXjypHAHYbGX">可忽略，缓存命中达 0.166ms</td></tr>
+<tr data-page-node-id="D5Ook171grai7xvmvGhi8k"><td data-page-node-id="OZ7E8XL5fchZp70ZA9Dvth">小文件 MD → DOCX（13.5KB）</td><td class="num" data-page-node-id="BEj4J0jo8Hgg9DV2xF4vaa">50.6 ms</td>
+  <td data-page-node-id="7BIeKcX9DZpIoKTrvGokge"><strong data-page-node-id="88vHwF1x4liF1GFVMfC9oa">典型场景</strong>：单 Worker 约 1,180 次/分钟，3 Worker → 3,500 次/分钟</td></tr>
+<tr style="background:#fdeceb" data-page-node-id="szu28kPpK40Zod75TlkvLF"><td data-page-node-id="dOMoBdHBWuv7JWEJTJSf9R">PDF → MD（当前，含 150s 阻塞）</td><td class="num" style="color:#d92d20" data-page-node-id="8lDS047sdvBHZh3yBRDNEy">150,000 ms</td>
+  <td data-page-node-id="oBgHqyeibGKFSkXAJaxbFE"><strong data-page-node-id="BLEqzBZ7qS8QyqErUE38kL">单 Worker 0.4 次/分钟</strong> —— 完全不可用。修复后（模型本地 + 文本层）预估 200–800ms，
+  单 Worker 约 75–300 次/分钟</td></tr>
+</tbody>
+</table>
+
+<div class="note warn" data-page-node-id="ApeNgLZbseFQ5pzJA8cQQJ">
+  <strong data-page-node-id="EaNxtSeZiE257vHFO4F9sa">成本测算基准（SaaS 场景）：</strong>以 <strong data-page-node-id="P87chJT90M2Aqwrpn1eYyt">4 核 8G 云主机（约 ¥300/月）</strong>为例，
+  典型小文件场景吞吐约 3,500 次/分钟理论值，考虑 IO 与调度损耗按 <strong data-page-node-id="q2FqToSce8q2V551XZNvdh">30% 折算 → 约 1,000 次/分钟有效</strong>，
+  月可用分钟按 40% 利用率 → <strong data-page-node-id="Ouot9jl0LZlwkRFpHGTamM">约 1,700 万次/月</strong>。
+  即便按最保守的 <strong data-page-node-id="eGwrns9KAXhAUS2wyQGEWf">100 万次/月</strong> 计算，单次转换云成本约
+  <strong style="color:#0f9d58" data-page-node-id="7Hd6wxazEVzQy3aUbVwJ0z">¥0.0003</strong> —— 云成本几乎可以忽略，
+  <strong data-page-node-id="yZOKiATTyntAUqXxqs4zrz">真正的成本是 PDF 链路的模型加载与人力，不是 CPU。</strong>
+</div>
+
+<h3 data-page-node-id="uDL3VqflUf53hLJNlrhRI7">7.2 SaaS 分层定价建议</h3>
+<table data-page-node-id="NKb4NATCBkjU7689rXcdMd">
+<thead data-page-node-id="c1fF618gMI2PkEFjxHLE1I"><tr data-page-node-id="ClEURAV7XZNEQ8CVGG9s0g">
+  <th style="width:130px" data-page-node-id="qhXXGB7DCyr4yayLkIs6ZI">套餐</th><th style="width:110px" data-page-node-id="TA7iqjukMUuXKUZmSuBKyP">月费</th><th style="width:130px" data-page-node-id="H5WRDmaL3lCDLIDp9ECigO">配额</th>
+  <th data-page-node-id="6ZuVmwVj565xSigCesc4Ry">权益</th><th style="width:150px" data-page-node-id="rLiYI2A3n2mdecTyCeeSE2">目标转化</th>
+</tr></thead>
+<tbody data-page-node-id="vnDcUiUsKbiGNVuOLiO6Fb">
+<tr data-page-node-id="1aD0A04bLPdBWkgvSPdh45">
+  <td data-page-node-id="NjrUeqOTNjMYDfonn1n3bW"><strong data-page-node-id="wLuzg7m5WR6VbKQ5ER8cwF">Free</strong></td><td class="num" data-page-node-id="CGu10wbxErdYb4KzsVErW6">¥0</td><td data-page-node-id="WzHNvCCF6PW0v0yQ3oVcwt">50 次 / 月<br data-page-node-id="RrRenMqoNLEuGWMq9ZMmzT">单文件 ≤ 5MB</td>
+  <td data-page-node-id="fVE7j9jyzlYhUDPej2kOax">全格式、Web UI、CLI、社区支持</td>
+  <td data-page-node-id="TLEd1Shd7IGU3BDGRhSOnH">获客漏斗顶部，转化目标 3–5%</td>
+</tr>
+<tr data-page-node-id="5tCyQO6Y5B1yLpGP8K03db">
+  <td data-page-node-id="CtzCNqxknOuMQPJlAw4H6Q"><strong data-page-node-id="VuiaDkWLTES3C4gldfHIsJ">Pro</strong></td><td class="num" data-page-node-id="KdfLNvgJ5ke1XFRzNbd2GT">¥39 / 月<br data-page-node-id="z5b3J64QkXuGzwoENlc2xg"><span style="color:#6b7a8d;font-size:12px" data-page-node-id="BY049eHIxLgGUQHGiFrudo">年付 ¥390</span></td>
+  <td data-page-node-id="xI95HaTxsaKtYUwzQrF0W5">2,000 次 / 月<br data-page-node-id="JC4ZnoYdCTAI27HAyt3bYX">单文件 ≤ 50MB</td>
+  <td data-page-node-id="LlYJmEOcetCxMOkiuPySuY">+ 异步任务队列、批量 ZIP、PDF 版面定制、邮件支持</td>
+  <td data-page-node-id="hcDC3xbp5Js8rtkhxLMZVO">主力收入层，个人开发者 / 小团队</td>
+</tr>
+<tr data-page-node-id="NVqR8Mb5X0BXFCEC31mll6">
+  <td data-page-node-id="EYE3n13ie4UHTDI6Cxee5g"><strong data-page-node-id="HAkqCirDPd1uHJeWMBvRXZ">Team</strong></td><td class="num" data-page-node-id="pIpcejY9eFOOXobXT9yU3s">¥199 / 月<br data-page-node-id="FSUuLNd7LcYWSgpyoFyx5w"><span style="color:#6b7a8d;font-size:12px" data-page-node-id="3asQvIjuqwsGUiN6V7NPK2">年付 ¥1,990</span></td>
+  <td data-page-node-id="V9SmQqK3oOdxaoV2fpy3bS">10,000 次 / 月<br data-page-node-id="jfkcwrvh1AP5Yb1gNkmUtN">5 个席位</td>
+  <td data-page-node-id="QxACO4eamsH1GpCwF3iaWE">+ 多成员协作、用量看板、优先队列、API 优先支持</td>
+  <td data-page-node-id="cg4Sk3FL1mc7rjnk7FP6qQ">中小企业部门级采购</td>
+</tr>
+<tr style="background:#e8f0ff" data-page-node-id="fPXmMyL7L3G6sP4hFdpQdn">
+  <td data-page-node-id="W1lwYQEd2BX9HGuNNT48xc"><strong data-page-node-id="7OhHv94BpEG64BONdU4JTB">Enterprise</strong></td><td class="num" data-page-node-id="Sn9ALVRT0d9NctbPnvHcp2">¥2,000+/月<br data-page-node-id="q5wmODWjal8pkWxkranmHX">或私有化 ¥30,000/年起</td>
+  <td data-page-node-id="g2IBQA561mcXhMLTNea9VS">不限或按合同</td>
+  <td data-page-node-id="IHK8YDNqdqsMkFOOHrVd0j">+ 私有化部署、内网隔离、SLA 99.5%、专属支持、定制格式、审计导出</td>
+  <td data-page-node-id="gwBAxzimghmkEKZVMqtMLt"><strong style="color:#0f3cc4" data-page-node-id="7iQckhp1nD0GkaFJzoZV8o">这才是真正的利润来源</strong></td>
+</tr>
+</tbody>
+</table>
+
+<div class="note" data-page-node-id="ATyAGbCTtQh0F96ewtHlVL">
+  <strong data-page-node-id="E7dn1YWjrUzv3K24G7lb4t">定价锚定逻辑：</strong>不要按「功能多少」定价（用户会拿开源版对比，功能都一样），
+  要按<strong data-page-node-id="Rj0djxBrBljVajqwKqv48I">「省下的麻烦」</strong>定价。一个工程师装 Pango + 下 docling 模型 + 调中文排版，
+  保守要花 <strong data-page-node-id="qfGMdY9XFdblP6KpzXT2J0">1–2 个工作日</strong>，按 ¥1,500/日人力算，<strong data-page-node-id="G1dZkPNE7oVAyvUAI6tKiU">¥39/月买断这个麻烦，客户心理上极度划算</strong>。
+  这就是为什么 Pro 档定价可以做到 ¥39 而客户不觉得贵。
+</div>
+
+<h3 data-page-node-id="CZvv0bfqzAERw0JTdbVP1C">7.3 企业交付定价与单位经济</h3>
+<div class="grid2" data-page-node-id="IQZQh4jyAz3YxrLppdtesG">
+  <div class="card" data-page-node-id="g3XJj3PaQnMluagg35O7eG">
+    <h4 style="margin-top:0" data-page-node-id="rCHAeIArun9t8BP1fB0luE">单次交付成本结构</h4>
+    <table style="margin:8px 0 0" data-page-node-id="BfLxmbenQzkH3Cc7Xf66VO">
+      <tbody data-page-node-id="dA3ADMbB02KJ7DH9mr590y">
+        <tr data-page-node-id="VOWZ9RvV6IIJD6rBLDhPFn"><td data-page-node-id="ixpJN2Kx6e2LjHuenWOLLf">售前沟通 + 需求确认</td><td class="num" data-page-node-id="bTFHa1eJrnkAJy9l5TZp3l">1.5 人日</td></tr>
+        <tr data-page-node-id="wawT9PMiYD1SsSgT2ryEKG"><td data-page-node-id="JkDM70GKRb3CivxefRIXi5">环境适配与部署实施</td><td class="num" data-page-node-id="24oqu1AwjrCPKdJpB1Xul2">2 人日</td></tr>
+        <tr data-page-node-id="cLuRbyXh7XoArPGdkgAwvo"><td data-page-node-id="UQmnylpNHdbGx8OhfvmVcH">定制（格式 / 排版 / 接口）</td><td class="num" data-page-node-id="GDcL5AdF9qsR2wPrj7jlzl">2 人日</td></tr>
+        <tr data-page-node-id="L8RDd0KcNEBA84YvvKG242"><td data-page-node-id="WqrJRgeujG1pVq1tDl47wu">验收文档与培训</td><td class="num" data-page-node-id="eopUKmlqgm7T4bPBHfDdSf">1 人日</td></tr>
+        <tr style="background:#f0f4f9" data-page-node-id="fPM2GkSbk2hJU1E3eCkRF5"><td data-page-node-id="G1o0LFdH3wdG8HV7zyCn6P"><strong data-page-node-id="zOut1JVR7U83yQvpszsdcS">合计</strong></td><td class="num" data-page-node-id="knKGO4tmbaQUhB8KKaVHJI"><strong data-page-node-id="m1jcg7eGNCXzSTeLeOApiu">6.5 人日</strong></td></tr>
+        <tr data-page-node-id="4V7p20DVIruA0iQtVPNnR3"><td data-page-node-id="khQj1tBsHtNVzk1p35EV1W">按 ¥1,500/人日 折算成本</td><td class="num" data-page-node-id="PH99G91kWcjdS5HfqAPq2N">¥9,750</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card" data-page-node-id="CCrvrJbs7Fkb51yU9QucWp">
+    <h4 style="margin-top:0" data-page-node-id="wKTUpR45c3CpqJcFKqBhhY">收入与毛利</h4>
+    <table style="margin:8px 0 0" data-page-node-id="FhByGHHUU3eHHlORmExHwn">
+      <tbody data-page-node-id="bOeJWmTeBX0SYXmg8kw9By">
+        <tr data-page-node-id="uQE0XbmGwoiIRft559pGtZ"><td data-page-node-id="1zfPdYE4XW9KNZoF13n4An">首单报价（区间中值）</td><td class="num" data-page-node-id="1uFA6aEWeDF2LEZrC1J54g">¥30,000</td></tr>
+        <tr data-page-node-id="mXfBb64sIekgce0kO2lAo8"><td data-page-node-id="v1hm4hfsWpZGBGy5nbYosA">交付成本</td><td class="num" style="color:#d92d20" data-page-node-id="87qNhpHwkUnFwggGgXkWUe">−¥9,750</td></tr>
+        <tr style="background:#e8f6ed" data-page-node-id="SxxbVUzTkQw0jPJrKohJP6"><td data-page-node-id="WB4nwb8fYKpi9v7OOPEEvJ"><strong data-page-node-id="Mg1avFu40IbvxPQ11fR6nX">首单毛利</strong></td>
+          <td class="num" data-page-node-id="peC41jbLEqgRkpgAG8ephK"><strong style="color:#0f9d58" data-page-node-id="Jss2WyanBVHMiiBTUEC9jV">¥20,250（67.5%）</strong></td></tr>
+        <tr data-page-node-id="DSrf5DPYXXV2uxVVP9aBKp"><td data-page-node-id="uUbndyhBMh7bhnAX8Ndata">年度维护费（第 2 年起）</td><td class="num" data-page-node-id="NmLyDKJFWOwilRbsOS0qMr">¥8,000 / 年</td></tr>
+        <tr data-page-node-id="IikH4yomeGjTxToJOzRV7G"><td data-page-node-id="zEe10Fx2DzB9gGSC7SRZlA">维护成本（约 2 人日/年）</td><td class="num" style="color:#d92d20" data-page-node-id="ZiX7HH839f4PMmFNhEGtai">−¥3,000</td></tr>
+        <tr style="background:#e8f6ed" data-page-node-id="Sqi5YNE0XwqAtynqdK3pCC"><td data-page-node-id="w26PWXFtd5yogkHSYpx0m2"><strong data-page-node-id="7JA6ok5jfCYZ1QujBP2mGx">维护毛利</strong></td>
+          <td class="num" data-page-node-id="lw5K6QtXfZz9LvBC7tGXks"><strong style="color:#0f9d58" data-page-node-id="ieHvg8VbiC83JeCDIvO4TR">¥5,000（62.5%）</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="note" data-page-node-id="FIDBi2gjq3nXVPdRdebaNV">
+  <strong data-page-node-id="a9g9GF3HW4S40eoNDP9s1e">规模化路径的经济性：</strong>第 1 单毛利 ¥20,250，覆盖 13.5 人日的投入
+  （7.75 人日 P0 修复 + 6.5 人日交付，按 ¥1,500/人日 = ¥20,250）—— <strong data-page-node-id="Z4hay3xP77mYOA75WE3HMC">第 1 单刚好打平全部前期投入</strong>。
+  第 2 单起，交付包可复用，边际成本降至约 3 人日（¥4,500），<strong data-page-node-id="7PcZV8jsZ9pE72Puu4DNCi">毛利提升至 85%</strong>。
+  拿到 3 单即可产生 <strong data-page-node-id="IOzHqNOtrQmLtrAeOzrVwh">约 ¥76,500 毛利</strong>，足以支撑后续 SaaS 基建的 19 人日（¥28,500）投入并留有盈余。
+</div>
+</section>
+
+<!-- ══════════ 8 ══════════ -->
+<section id="s8" data-page-node-id="Xnx9Scjmfyh2xKBhYZAFKI">
+<h2 data-page-node-id="fPQd8I1375TJiSFc6bkE32">8 · 90 天变现路线图（WBS）<span class="en" data-page-node-id="QaQlZ5pknIvE44rwsGoUmK">90-Day Monetization Roadmap</span></h2>
+<p class="lead" data-page-node-id="CScuyVuUIx9a9DjCdXa4G1">
+  按「现金流优先」排序，每个阶段都有明确的<strong data-page-node-id="v4EnXgma10IooubtrbWgKz">可验证交付物</strong>与<strong data-page-node-id="MegU2cldcWCo7j10tyaJCu">收入里程碑</strong>。
+  总投入 <strong data-page-node-id="Edn8Mreg6dvAVBkpd342ZP">37.25 人日</strong>，其中前 14 天仅投入 <strong data-page-node-id="5IIXseQrn3LqrjhbPBbg91">7.25 人日</strong>即可开单。
+</p>
+
+<h3 data-page-node-id="9iCkg81a1aUdxBlm7TudgI">8.1 阶段一：止血与开单（Day 1–14，7.75 人日）</h3>
+<table data-page-node-id="Kil9j4bU6JNa9BW7MXl9Zt">
+<thead data-page-node-id="Z55i48dG2JqhYJ85E7rroU"><tr data-page-node-id="X8As2rTPolIjoGCSQOSYzi">
+  <th style="width:44px" data-page-node-id="NPUJGDY4RCS8orfCWEE3o1">#</th><th style="width:210px" data-page-node-id="sIFXbJcpcdGS20ZERNNz34">任务</th><th data-page-node-id="9pwTMTwcp9XvV5B6XPnttW">交付物</th>
+  <th style="width:70px" data-page-node-id="KupYRGBkX8Ex1UyEj8VwB7">人日</th><th style="width:76px" data-page-node-id="dICQMQRWYybrdg3AXmGOKn">优先级</th>
+</tr></thead>
+<tbody data-page-node-id="Jpt6jEV6xaIU5B47cwvaCu">
+<tr data-page-node-id="apsJYLWhLng3yPBjdFPa5p"><td data-page-node-id="hUQmVwWcXJP839XAyzsTlT">1.1</td><td data-page-node-id="SultsVSrRWrBMDEfIuz8Ff">PDF 导出中文止血</td>
+  <td data-page-node-id="fGPpHCJOGsYDHNcayntHow"><code data-page-node-id="khkrR2WQyhvixQBUnzRj6L">pdf_simple</code> 检测到非 Latin-1 字符时返回 <code data-page-node-id="lWahm4RyNIGKhvPEs0rnLC">422 CJK_UNSUPPORTED</code>，停止产出损坏文件</td>
+  <td class="num" data-page-node-id="68FLCZEy0c5bOAhqGIyFAO">0.5</td><td data-page-node-id="2O14LDsH9hFBA5WExTzHJ9"><span class="b b-p0" data-page-node-id="S9mlQG1FqgF8LIMhGqMMLD">P0</span></td></tr>
+<tr data-page-node-id="ZdAOsKiPqeA7fW3wWWHnHu"><td data-page-node-id="fSv32xjgfLFRbin2FhcCj2">1.2</td><td data-page-node-id="UcZBbSoa06prVvjSV7LgTq">PDF 导出中文根治</td>
+  <td data-page-node-id="rFYYXppfeFTaH2DRDtr1S5"><code data-page-node-id="cfqWHo7wQAAXtBWsWoUOuj">pdf_simple</code> 改用 <code data-page-node-id="LTGgo9zMusYF22SVHnJmM7">Identity-H</code> + 嵌入 Noto Sans SC 子集 + ToUnicode CMap；
+  或 Docker 内强制 Pango。实测中文 PDF 输出正确</td><td class="num" data-page-node-id="t5A3k4wvJJ84NWRcOBHvzz">2.0</td><td data-page-node-id="MZP6GSJyBKBbLDojHiMr4g"><span class="b b-p0" data-page-node-id="BqE4ANNFCGdv7G4UnBGPoz">P0</span></td></tr>
+<tr data-page-node-id="Oup4RqXfvf4rdJZz1iUXOo"><td data-page-node-id="AWmD5wb7RtWlL0AKllaajx">1.3</td><td data-page-node-id="zAT2EcLwJI0wYF83dzwpR9">docling 模型构建期 bake</td>
+  <td data-page-node-id="lwUfFVMzE4WlABFy985kX5">Dockerfile 内执行 <code data-page-node-id="yaklZ8ivDCusJHMVSGF46D">download_docling_models.sh</code>（<code data-page-node-id="pPNtSty9HxbkYIbIc65rqw">HF_ENDPOINT=hf-mirror.com</code>），
+  镜像内置模型</td><td class="num" data-page-node-id="amcnlAXz7bQxBb6Qyq8Glt">1.0</td><td data-page-node-id="KgSqPuHEr8hvzDrGKyTNLB"><span class="b b-p0" data-page-node-id="nqyiBLmmZHeXvRVa2FtNpo">P0</span></td></tr>
+<tr data-page-node-id="YBCqUAx2EGY5wkoO75r9pH"><td data-page-node-id="RMLToextBQd3NFK9trSELf">1.4</td><td data-page-node-id="s6UvQwNmWNhCYanCNUrHKG">模型缺失快速失败</td>
+  <td data-page-node-id="hfLhZs8BTxVhO5Ng9yCXM6">启动时探测模型目录，缺失则直接禁用 docling 路径（不联网），走文本层；加显式 timeout</td>
+  <td class="num" data-page-node-id="VOsaTmBPAujtsiubXb6oTC">0.75</td><td data-page-node-id="9VXRGJFjkVzsUmUUPPtrlS"><span class="b b-p0" data-page-node-id="MqcZD1f0RTGSKVWARsBxlv">P0</span></td></tr>
+<tr data-page-node-id="u11cqZgVXoBIkDYP63fEC3"><td data-page-node-id="n93D3kgq3NYDOA7jEE8A3t">1.5</td><td data-page-node-id="1IUt254lnXG9EDpgmHKh6q">审计日志轮转</td>
+  <td data-page-node-id="gLfkp5HEh7W56Sem5kZiLQ">改 <code data-page-node-id="C5FXtcaD8Y57Da54xMNrUP">RotatingFileHandler(maxBytes=50MB, backupCount=10)</code></td>
+  <td class="num" data-page-node-id="Q9EOikdGpUvkEtwBFETMmq">0.5</td><td data-page-node-id="tO3MPk5dKy2G6KkTLW7s35"><span class="b b-p1" data-page-node-id="KND7ry15Gi3JSJix365U9D">P1</span></td></tr>
+<tr data-page-node-id="NCOPxXu9SKHVlSpB2r9sWu"><td data-page-node-id="YOk4VkFqkmUfYKwto1bp8j">1.6</td><td data-page-node-id="Fm8cPgr378TwyK2YXsKeeM">batch 接口 client 透传</td>
+  <td data-page-node-id="NBKn4OoF6v7XzKiShLddgl"><code data-page-node-id="FGZV1dab3q7vAwBoT8cfDV">_one()</code> 补充 <code data-page-node-id="6s7YDzLDIek0DnHymLuQP5">client=</code> 参数</td>
+  <td class="num" data-page-node-id="BOzv0ZERNu1tOA1HAHMZjd">0.25</td><td data-page-node-id="COpzZmKbWFH14AGMSAZtYz"><span class="b b-p2" data-page-node-id="C9L5RIxSWdAJSK0bIqVqUK">P2</span></td></tr>
+<tr data-page-node-id="WV7yjrnKhtnMSVjATUucR6"><td data-page-node-id="WdlBHkm31yVEhszjBkJKzz">1.7</td><td data-page-node-id="TCoVNLYKkICkC92mqt3W5D"><strong data-page-node-id="qOFZ3wPfDoJYWVFDAdQXxx">企业离线交付包</strong></td>
+  <td data-page-node-id="CVzve8w2OLPKEDm7Akrege">镜像 + CJK 字体 + <code data-page-node-id="sD2AZsYeyGTPySJLxYMccF">install.sh</code> + 离线文档 + SLA 模板 + 商业授权书</td>
+  <td class="num" data-page-node-id="No27sKztg7xPrYcQWCsdHy">2.0</td><td data-page-node-id="U1GNTdg5mFAbqLyWsvoaKN"><span class="b b-brand" data-page-node-id="ujHtPE5OwNAG3Zxd4ZFy4X">商业</span></td></tr>
+<tr data-page-node-id="tHC3PKDmsSZlPvxoVsYK9R"><td data-page-node-id="Lv2TOj0FxOQXV5yUu9ptFt">1.8</td><td data-page-node-id="4KyD3yCdXD1czCdbih8VOn">README 商业支持章节</td>
+  <td data-page-node-id="WezpXMetv3GkXS0kMqphzk">加入企业版入口、联系方式、SLA 说明</td>
+  <td class="num" data-page-node-id="N9oNUh0muXE1hhGy5PuUZQ">0.25</td><td data-page-node-id="qsCGK588gvZQ5pu1iDAnT3"><span class="b b-p3" data-page-node-id="zCpMwQ8KgdcDcCxGCUSNLc">P3</span></td></tr>
+<tr style="background:#e8f6ed" data-page-node-id="kNsYM20LWN0mbKjmr27314">
+  <td colspan="3" data-page-node-id="QGYnj2OfSA8ZFBEnAyMQ4F"><strong data-page-node-id="5ngCaAwYSTbtgRlnaeNzJS">阶段一合计</strong></td>
+  <td class="num" data-page-node-id="uV8NKDbNb3hpgpQ63UrLuR"><strong data-page-node-id="lRCaLK0Cd9MdUU6Q8Onjtg">7.25 人日</strong></td>
+  <td data-page-node-id="Ne6vphOVAsnvl8T5MiGqBs"><strong style="color:#0f9d58" data-page-node-id="7qGpOk7BDQarwpE386KMNh">可开单</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="note" data-page-node-id="DruFleG316RaKaTVoHRJpO">
+  <strong data-page-node-id="4fBoQGkJ4aWTJcREZi6oX5">Day 14 里程碑：</strong>产品中文 PDF 可用、PDF 导入 &lt;1s、离线交付包就绪 →
+  <strong data-page-node-id="Ex219eNxnsH3AVd8NpvrEE">可以接触客户并报价。</strong><br data-page-node-id="iXxozunEsJfmz4bCZ7RdXe">
+  <span style="color:#6b7a8d" data-page-node-id="Lkpm9sHl0ZoiT7pti6FKnE">注：本阶段 <strong data-page-node-id="42WzmH7kNoopvYmBJg2cBG">7.25 人日</strong>覆盖 P0-1（PDF 导出中文，2.5）+ P0-2（PDF 导入阻塞，1.75）
+  + P1/P2/P3 杂项（1.0）+ 企业交付包（2.0）。
+  <strong data-page-node-id="yBNHb0SbqyKPPldURdVR0D">P0-3（多租户隔离，3 人日）不在此列</strong>——企业私有化交付用 License Key 即可绕过，
+  仅在阶段二做 SaaS 时才需要。故与 §5 中「P0 合计 7.75 人日」的口径差 3 人日。</span>
+</div>
+
+<h3 data-page-node-id="nmbcpwCDdXu2kbV4VKHmlj">8.2 阶段二：规模化基建（Day 15–56，21 人日）</h3>
+<table data-page-node-id="sXiVltnFiwhY7o2o1A7Sh1">
+<thead data-page-node-id="sK6mr46w6z1WWG3LUsrxph"><tr data-page-node-id="C7hbSW7EyTkjux1754sBuN">
+  <th style="width:44px" data-page-node-id="mp8yskRMGDsj6xpYihnWFL">#</th><th style="width:210px" data-page-node-id="sFCTdDVr8FaoXcEwIs1abf">任务</th><th data-page-node-id="OVymTPShzHQEvCjrnC9FNI">交付物</th>
+  <th style="width:70px" data-page-node-id="bHvLFZ0L4hCIAuHGZFkeJ2">人日</th><th style="width:76px" data-page-node-id="aVBeeDmBRnumkZPAZGjWzt">优先级</th>
+</tr></thead>
+<tbody data-page-node-id="Rqt8FsxgIeMwGyWfhaLAKQ">
+<tr data-page-node-id="W0yCEgLqUESqvHGeUy09nt"><td data-page-node-id="qsEbKpfZPcjKzfDwyTO8Q7">2.1</td><td data-page-node-id="n2Nhk94UeVDvy0sj14KHDC">多租户与租户上下文</td>
+  <td data-page-node-id="CvX5BbDjZ2QfIzcJAQMvSe"><code data-page-node-id="HcHHBR1BqXTHAEXzRXLULd">tenants</code> 表 + API Key 绑定租户 + 请求上下文传递 <code data-page-node-id="PBwvB7A9rXQCPPvHF2j4YE">tenant_id</code></td>
+  <td class="num" data-page-node-id="l8xsDTFLHy6Ark4wWyUPob">3.0</td><td data-page-node-id="AyS5PGtUGi3YVehAOARsx9"><span class="b b-p0" data-page-node-id="6q6KOsHgVGFXJE4YMXD2Bs">P0</span></td></tr>
+<tr data-page-node-id="FbkpFfX1Psym6sOKP14psC"><td data-page-node-id="VpsMLwKELJX5MMkl7KoMhG">2.2</td><td data-page-node-id="hVa2CklxX0520NAhrNii7N">持久化层</td>
+  <td data-page-node-id="Jlbe6O399LEqURk3s7y1GL">SQLAlchemy + SQLite（起步）/ Postgres（生产）；JobStore 与用量落库</td>
+  <td class="num" data-page-node-id="zRfVzduvUVNDGX03vYGwXq">3.0</td><td data-page-node-id="rBNDlcl7AgB2UElm5RNPGL"><span class="b b-p1" data-page-node-id="A8TAGbB0E3dbymofOmnnea">P1</span></td></tr>
+<tr data-page-node-id="uGeo4MlpUmvzncL9uqKW7K"><td data-page-node-id="NbNbta3cDheeSuyduAFDEz">2.3</td><td data-page-node-id="sKNg93T7F7xohrkEoGudDJ">用量计量</td>
+  <td data-page-node-id="y5EG5Xo5CRYDn8E3xqgMHM">metrics 增加 <code data-page-node-id="E7nXmA5TT1wnyk0oDxXgGw">tenant_id</code> 维度 + 落库聚合 + <code data-page-node-id="LVAwaqOibJ4eBu9tQVEaoi">/api/usage</code> 端点</td>
+  <td class="num" data-page-node-id="I6o5fHY47iQB74rDfIzcA6">2.0</td><td data-page-node-id="w5S6ylkoQ9n8WBRxb5hgTy"><span class="b b-p1" data-page-node-id="lVediue4VAoigfFSDwjiyk">P1</span></td></tr>
+<tr data-page-node-id="fO294OH5fHqZCAVaMbIKqq"><td data-page-node-id="jknwDH1b88tGDvvHYFcfge">2.4</td><td data-page-node-id="1yYqjwvWj7fwXdMuElUIFl">限流改造</td>
+  <td data-page-node-id="Iqt5ataj7CUL0Y8WdArJV1">按 <code data-page-node-id="zIsvmZmUeiG8aydZpAS9p0">tenant_id</code> 计数 + Redis 原子操作，支持按套餐差异化</td>
+  <td class="num" data-page-node-id="NAnH5l9Xyl6fR18JzDnJGV">2.0</td><td data-page-node-id="GVKonyKXSet2K5HXkaQabq"><span class="b b-p1" data-page-node-id="GQREaZgVZY9nDNcGX2kpdy">P1</span></td></tr>
+<tr data-page-node-id="BoO0ObEso2GkAFxDPka6Nf"><td data-page-node-id="pYksYOHTot1dexRaWdHWvE">2.5</td><td data-page-node-id="tn2ZSLQh2iDvXjdDBEkdBo">配额与套餐</td>
+  <td data-page-node-id="MAUHiBDTvGCSr268OXcCp5"><code data-page-node-id="gu8Zv7wUEABr9AOCi3D44N">plans</code> 表 + 月度配额 + 超额策略（拒绝 / 排队 / 计费）</td>
+  <td class="num" data-page-node-id="6ctZ6QITrEzTlRmOe6hDzm">3.0</td><td data-page-node-id="kNXKqqLGJVohi0A31gRlzo"><span class="b b-p1" data-page-node-id="2cxqbGA4gTF6nbUErTGcFA">P1</span></td></tr>
+<tr data-page-node-id="CgrvrdT6gko9lhV46IFA8d"><td data-page-node-id="Frep780rEcFX7iLraE5kwF">2.6</td><td data-page-node-id="Woj6LuBlzIKHuSPd9QfP1J">用户体系</td>
+  <td data-page-node-id="eBtBwD5xiQ0iAmMPm1AcS5">注册 / 登录 / 组织 / 成员 / 自助 Key 管理 + 前端页面</td>
+  <td class="num" data-page-node-id="cIXPPQkOJSeECJDPwgdqkJ">4.0</td><td data-page-node-id="zB3XMp5ZZHznv0Ho3pBNPn"><span class="b b-p1" data-page-node-id="agDBjiaCnkxv6zH1Q5XeZA">P1</span></td></tr>
+<tr data-page-node-id="eNwvsLPzGnAZymoEkueh8A"><td data-page-node-id="Tv8ISoGrcXhcx89nmgMHbK">2.7</td><td data-page-node-id="NQwauTOadw8lw1XHLzmBWN">支付与账单</td>
+  <td data-page-node-id="6CRVotFFBSBxwK7TOmoJyA">微信 / 支付宝（国内）+ 订阅周期 + 发票 + Webhook</td>
+  <td class="num" data-page-node-id="tFJ9eJjFTOnH6Mw0X43xfK">4.0</td><td data-page-node-id="xlavvIHVJzMVpHe6jaKwdN"><span class="b b-p1" data-page-node-id="4ojuXDyMdRwMG2R12yyj9A">P1</span></td></tr>
+<tr style="background:#e8f0ff" data-page-node-id="KVHFDN4PozXhFSZZaZWHnQ">
+  <td colspan="3" data-page-node-id="BVMdG8aYjpkNVHbqMgEeUG"><strong data-page-node-id="MhbUTzRNzfTP8saPQNXEYj">阶段二合计</strong></td>
+  <td class="num" data-page-node-id="WnDXDZ3YsZzl6rKcKdOM6n"><strong data-page-node-id="gYhMmVC84A0OuAzSQCgIWj">21 人日</strong></td>
+  <td data-page-node-id="T0PXYdRlUHHwzEZlOgJN8Q"><strong style="color:#0f3cc4" data-page-node-id="HySA0MGF7QEkNO7gGbBIwS">可上 SaaS</strong></td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="ujZcfbHXQyDg6HayCpJnOT">8.3 阶段三：GTM 与优化（Day 57–90，6.25 人日）</h3>
+<table data-page-node-id="IDbeQsYTTRVOQX77E8K0XU">
+<thead data-page-node-id="jVB4yfPTvEFF5e6ySGkVSc"><tr data-page-node-id="yNMgjzTGeWZrQ5dDJe9OKG">
+  <th style="width:44px" data-page-node-id="8NKvn4lZ3oWac9azGCq3mt">#</th><th style="width:210px" data-page-node-id="Nquq7RtgAt8t9VC31MAQVv">任务</th><th data-page-node-id="1sNBzREjC6wWevD1CMN6XP">交付物</th>
+  <th style="width:70px" data-page-node-id="B56w1WUTwQoOk7zg2UDdYa">人日</th><th style="width:76px" data-page-node-id="i6VUF6LDJtH9x1elqCLt0S">优先级</th>
+</tr></thead>
+<tbody data-page-node-id="IEyOESY16uV90mDWalxVZd">
+<tr data-page-node-id="C6uNuSNgQAnQbFWSdnB27z"><td data-page-node-id="5CMWjqTByHOIBIKZhVRQgK">3.1</td><td data-page-node-id="JKxX2SCLhr9CdPmXHZLCXp">azw3 / kf8 / latex 导入补齐</td>
+  <td data-page-node-id="LrgQdey4uu7EZ9c7KElH5z">或明确标注单向格式，消除宣传与实现不符</td>
+  <td class="num" data-page-node-id="NMOpSWJeFQRHtfqOEbRdkN">3.0</td><td data-page-node-id="IvhHS0zxDIiGZgCOqy2VBc"><span class="b b-p1" data-page-node-id="bMMNCFuMj0pFAWVusCgAtq">P1</span></td></tr>
+<tr data-page-node-id="mTulEMURYJEULRFTp7pk9H"><td data-page-node-id="1EjlUQZ7pxXPUWnHooUzfd">3.2</td><td data-page-node-id="8o8tk0kEMhOSOlXs3zwA9H">Landing Page + 文档站</td>
+  <td data-page-node-id="J87ghraFJQ9Z4nSEXDNINi">定价页、对比表、快速开始、API 文档</td>
+  <td class="num" data-page-node-id="8TbRoZSBCKTOjkemYvCWdV">2.0</td><td data-page-node-id="CAJzM19IP3y02XUjovz7tn"><span class="b b-brand" data-page-node-id="bqrPBE4EK9xnVxHAoHToaF">GTM</span></td></tr>
+<tr data-page-node-id="bQGwxrMI1kEEF2KeVpyerm"><td data-page-node-id="FscHlFAybenp3El18mpFzW">3.3</td><td data-page-node-id="tI2OhN7mOlt9pnHgiSldQj">PyPI 正式发布</td>
+  <td data-page-node-id="sRLk4z2RM3pDA9LvbaYPOU">已具备 Trusted Publishing，执行 <code data-page-node-id="2N4YH6eBDdB011vgQfPRvg">publish_dry_run.sh</code> 后正式发布</td>
+  <td class="num" data-page-node-id="C02lHm9Eg2Kf0mgJEuzTki">0.5</td><td data-page-node-id="i5D7CfZ4TNi0rUU6wYrKGg"><span class="b b-brand" data-page-node-id="t0ipagENP0IQLfL31H0QDZ">GTM</span></td></tr>
+<tr data-page-node-id="J2Z32SxkXFCGD5b3sryvsj"><td data-page-node-id="H3KOcMgd37qnFU0fHh9ywB">3.4</td><td data-page-node-id="LX2YM1pErJAwOSWN6m26GY">virus_scan 默认开启</td>
+  <td data-page-node-id="mTrHKMg3kUd1kK4Je3kWkP">SaaS 环境 <code data-page-node-id="FGd6GdsTVt8TQ7dEc5FAN1">virus_scan=True</code> + <code data-page-node-id="aCYMbWBE5qkXmv0xUgLJK2">fail_closed=True</code></td>
+  <td class="num" data-page-node-id="To7TSSu88S5vOMPDSa7hlL">0.5</td><td data-page-node-id="FtNi8WoNXahkxdgGOKkadX"><span class="b b-p2" data-page-node-id="vBS4G2UJ0JD5Xqt6sGn8A6">P2</span></td></tr>
+<tr data-page-node-id="wdE5yfD7DYdZmwCkMHyhkV"><td data-page-node-id="LauzbHE47OlbxG7qhoBbm9">3.5</td><td data-page-node-id="A9yRqoVw4yJ5PCxaWxotXX">DOCX 超大文档分片</td>
+  <td data-page-node-id="bFRnYSiYahYxMhwCV6GSxa">超过 2 万节点自动分片处理，避免超线性劣化</td>
+  <td class="num" data-page-node-id="RfcbQNkamNfj4ARWlEHngj">2.0</td><td data-page-node-id="enAtq02quFU8F2C6x4KVuA"><span class="b b-p2" data-page-node-id="Wpo5p4E2jXc4veXHl8w2wq">P2</span></td></tr>
+<tr data-page-node-id="IJCZruTKVdy4Z01vLV4u01"><td data-page-node-id="S4LYpj0T4zEVWz2f3kmxtc">3.6</td><td data-page-node-id="T5pOlmYNToAsIuBiO2IO8Q">CSV 导出语义澄清</td>
+  <td data-page-node-id="GNFgo3gIaoRaJbOhhIexvG">文档 + UI 标注「table-first」，提供全量模式开关</td>
+  <td class="num" data-page-node-id="KiyLRp8HqwKyORdM2fbnt4">1.0</td><td data-page-node-id="pNZn4EnzEeEs6i9qs30BtX"><span class="b b-p2" data-page-node-id="B8xmY10p4VQPxqSlGyx9Zi">P2</span></td></tr>
+<tr style="background:#f0f4f9" data-page-node-id="IRTdeE3fF1uE1Bm3YEkZ5v">
+  <td colspan="3" data-page-node-id="XFtOxDSHuhxZIvqwYZaZEH"><strong data-page-node-id="EdiIKWD8iDww8uDqm6SAAS">阶段三合计</strong></td>
+  <td class="num" data-page-node-id="3Nn6HK74o2v8T9mXzF3oi0"><strong data-page-node-id="691oWsHQDVc0eYMluCAoLM">9.0 人日</strong></td>
+  <td data-page-node-id="3tJlJz9Ub4PMOPVJLbW2aV"><strong data-page-node-id="0m7Hcvx0o8GBIGyYf3u7T8">规模化</strong></td>
+</tr>
+<tr style="background:#0d1b2a;color:#fff" data-page-node-id="eW0tzvtVCkWzAkbJFSL0eK">
+  <td colspan="3" style="color:#fff" data-page-node-id="AWZ3MbNjOTmNwEnvLCAn7d"><strong style="color:#fff" data-page-node-id="3sdQJNEoq6foUbXM4ykxkD">总计（90 天）</strong></td>
+  <td class="num" style="color:#fff" data-page-node-id="kQunLPEKrGZGifKEo57agc"><strong data-page-node-id="Hw4mXRJ18TggD15VWqfc2X">37.25 人日</strong></td>
+  <td style="color:#b8c9dc" data-page-node-id="9oJ8x7PCzqMGDx0iTx7Xkz">≈ 7.5 周</td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="F2S8kzaz86PRoTSV1GXFzI">8.4 收入里程碑</h3>
+<div class="tl" data-page-node-id="uy96v9nJqPsuOtCVhZDQls">
+  <div class="item" data-page-node-id="WWCaGrHHLVZj18TAkVVgUC">
+    <div class="when" data-page-node-id="H5RVUQN5xnCw0Vwez58n3k">DAY 14</div>
+    <h4 data-page-node-id="q2d4eSdnCnRCJCB1E5gW6a">首个企业单签约</h4>
+    <p data-page-node-id="HnHrNwLyMjMjEBJC34m7WZ">P0 修复完成 + 交付包就绪 → 目标 <strong data-page-node-id="TEWGum3KO4BjUeJW67lfDm">1 单 ¥30,000</strong>。累计投入 7.25 人日。</p>
+  </div>
+  <div class="item" data-page-node-id="hdAP2QVvfVfWHmtN3EDO3O">
+    <div class="when" data-page-node-id="P3GVlaDP6RtrSK4Bj3xhlr">DAY 45</div>
+    <h4 data-page-node-id="YHH0VgeAPZZnNyMp8Imcli">3 单落地，现金流转正</h4>
+    <p data-page-node-id="dBZiabFCTxn9H66cwCy2h9">累计 <strong data-page-node-id="bV9Dmx3DUZMLqLiMM9NJSY">3 单 ≈ ¥90,000</strong>，累计毛利约 ¥76,500。此时已覆盖全部前期投入，
+    并有余力支撑阶段二。</p>
+  </div>
+  <div class="item" data-page-node-id="BPhqQtcAID9XA343abkD5O">
+    <div class="when" data-page-node-id="z0kIUOI0hiGSklBxtIrDdJ">DAY 60</div>
+    <h4 data-page-node-id="ibWqYATdANvg3tedhJEZrm">SaaS 内测上线</h4>
+    <p data-page-node-id="n4DPA9N9AQBpsQ8AoBEdxA">多租户 + 计量 + 配额 + 支付完成，邀请种子用户内测。目标 <strong data-page-node-id="OICrob0WfOnhzUdEuSRNwA">50 注册 / 5 付费</strong>。</p>
+  </div>
+  <div class="item" data-page-node-id="MHtdL3CfyJZg8kCxaAc6rz">
+    <div class="when" data-page-node-id="o6a5OLaXiJcC5OXGNfH0Vb">DAY 90</div>
+    <h4 data-page-node-id="cnOANCUvRPDvB9ZURSm01U">SaaS 正式发布 + 企业线稳定</h4>
+    <p data-page-node-id="61t3sBsrIUppESfkSghk2Q">目标：<strong data-page-node-id="8y3rY96Xb5FYG8uWwMnlQp">企业线 4–5 单（¥120,000+）</strong> + <strong data-page-node-id="xj9qzXHEWjfOdn6MpTPeDC">SaaS MRR ¥3,000–5,000</strong>。
+    90 天累计营收目标 <strong data-page-node-id="WJBaCQTqewLCUF3BOHi70H">¥150,000+</strong>。</p>
+  </div>
+</div>
+</section>
+
+<!-- ══════════ 9 ══════════ -->
+<section id="s9" data-page-node-id="vu5tJVvgxk0bOZV9vbbW8A">
+<h2 data-page-node-id="N3jYlhOQflPk7AYlqMnANH">9 · 竞品对标与差异化护城河<span class="en" data-page-node-id="qmLP0X8IkZVaPhzz3b1TI7">Competitive Landscape</span></h2>
+<p class="lead" data-page-node-id="GKulrznKoBW3QS77VZQLbB">
+  文档转换是红海，但<strong data-page-node-id="rYLxfm7gLgxOCu3HG2vJ61">「中文场景 + 私有化 + 全格式」</strong>这个交集里，玩家很少。
+</p>
+
+<h3 data-page-node-id="xIbWtZTL2txvaYeYMKDozv">9.1 竞品对比矩阵</h3>
+<table data-page-node-id="EMPceCbEZF7glVdQK8zvbT">
+<thead data-page-node-id="jx0UyQZQIB5OJjc4fDFWvr"><tr data-page-node-id="C4toVmAIiDSZCbypBIakhD">
+  <th style="width:150px" data-page-node-id="45ywMWfkxjqOWzE3pxiCwe">竞品</th><th style="width:110px" data-page-node-id="ZviCWyakMHxHfm2x44GsNE">协议</th><th style="width:100px" data-page-node-id="7PEJDvifkiKUH1YeHvWF8L">格式覆盖</th>
+  <th style="width:100px" data-page-node-id="GWKTw3Ha8cNbMABRPrbfc6">中文 PDF</th><th data-page-node-id="iBrKkLj9Irfd4hkYeAfq0a">md-bridge 的相对位置</th>
+</tr></thead>
+<tbody data-page-node-id="kYnyZNJJONS07ULGoFuFjf">
+<tr data-page-node-id="e5HnarrMQwMnRHckiof7NX">
+  <td data-page-node-id="4wslPuH0pK4GZLnRrnEHws"><strong data-page-node-id="o2n1ald6unpDNJRqANsMvy">Pandoc</strong></td><td data-page-node-id="NBNtbSIYv0kb3c61xEs8yb">GPL-2</td><td data-page-node-id="zDFHw7lSKpAdyzY6Zj4Y0Q">极广（40+）</td><td data-page-node-id="y5Ua2M7YgpCvJBydAloW7X">依赖 LaTeX</td>
+  <td data-page-node-id="Z3VZIFBylY1vQkKML7VAa7">md-bridge 明令禁止打包 Pandoc（GPL 污染）。差距：格式广度。
+  <strong data-page-node-id="Ci90qqTh3gr9wk4LaMFihZ">优势：MIT 可商用、无需 LaTeX 环境</strong></td>
+</tr>
+<tr data-page-node-id="9ippHDqrmQW4dL1TAf7qYK">
+  <td data-page-node-id="csUqPGwHBkyUPyNiXaXir4"><strong data-page-node-id="jX4JX3VpC37JCW2YZCZIv5">CloudConvert</strong></td><td data-page-node-id="fTH2sOzJkuEHVG1af8PWY9">商业 SaaS</td><td data-page-node-id="lCLmWzNwGMQSzSmXUEFXP4">极广（200+）</td><td data-page-node-id="RuxZB5Oe3ouvWFqmiGwaGF">良好</td>
+  <td data-page-node-id="YgrSVBxXFESkatBglJUHbu">它是 md-bridge SaaS 路线的直接对手。
+  <strong data-page-node-id="8Wp2wY2TxhAaN9ZkI0qC0S">差异化：私有化部署 + 数据不出内网 + 国内支付</strong></td>
+</tr>
+<tr data-page-node-id="6rrmsetENrTZHN3MiXlnsq">
+  <td data-page-node-id="QmglZkTWLqTHUhyMlPug7E"><strong data-page-node-id="LXoSyRN7DKaFtunHrbHrNy">Zamzar / Convertio</strong></td><td data-page-node-id="Tvk2z5Ip4gWCqwYx5Odo2O">商业 SaaS</td><td data-page-node-id="dIHOWfLEQFsoIZAgu6Ihtt">广</td><td data-page-node-id="fW1apZjcecU6S8NzWgXcRx">一般</td>
+  <td data-page-node-id="hySS2o967q83ZhhhJhg8He">同上，且中文排版较弱。<strong data-page-node-id="FN2kPrWVBy2ZSouG8WNUdN">差异化：中文排版质量 + API 友好度</strong></td>
+</tr>
+<tr data-page-node-id="Mcopjojj582SULRwGbmKch">
+  <td data-page-node-id="UdZANAfvONVJ6a0tlri6nB"><strong data-page-node-id="lvCLDuSVwW0cwIaJh3IwRS">docling（IBM）</strong></td><td data-page-node-id="I1aYA8VA83ksFZPiaQBAbe">MIT</td><td data-page-node-id="B2HNBfvtCSl29plWSxoDDx">聚焦 PDF 解析</td><td data-page-node-id="lTTL53z7ZEfQNhsIHG47wh">需自行配置</td>
+  <td data-page-node-id="4shKsGPldpSYcMd4ds9Yz8">md-bridge 已作为内置引擎使用。
+  <strong data-page-node-id="E2LmtmdCRfdMKJXntMTlnG">关系：依赖而非竞争，但需解决其模型分发问题</strong></td>
+</tr>
+<tr data-page-node-id="mkkzDhTgSRHawtcYxIhnCm">
+  <td data-page-node-id="lqnupIeXz5gfVwV5hDLOEl"><strong data-page-node-id="cx6fD4XOGs5LisazwNGs4m">MinerU</strong></td><td data-page-node-id="MPYcBYaH7tSb5GbxftDBac">AGPL-3</td><td data-page-node-id="2sSyZpOCepRgCfNY1RpnHs">PDF → MD</td><td data-page-node-id="dFox3BJnAZ0nUbEWs4tYK8"><strong data-page-node-id="BEheH7BQkRBAqCK4yYFird">优秀</strong></td>
+  <td data-page-node-id="a9XVNNVq7G3zE03sfhZhEU">中文 PDF 解析的强力对手，但 <strong data-page-node-id="2sguLDDADIWeorcbNDl4Wu">AGPL 协议对商业闭源极不友好</strong> ——
+  这正是 md-bridge 的机会窗口</td>
+</tr>
+<tr data-page-node-id="2HXMDwH7QThVFG7ZAbXOoY">
+  <td data-page-node-id="Ir0at6KQiUAFoe0xHXtXgc"><strong data-page-node-id="Og5v0JZSGwYC0kCv2yMJ0n">Marker / Nougat</strong></td><td data-page-node-id="zCPgJYqFqhtkOqZAWN7q2X">MIT / Apache</td><td data-page-node-id="uu6GYHy21vIQuKVwNGQfr7">PDF → MD（学术）</td><td data-page-node-id="EfukbvKsbftoCrWC8xAcql">弱</td>
+  <td data-page-node-id="EdPY3Uuu8mG8iMt8StC7Ui">偏英文学术论文，中文支持弱。<strong data-page-node-id="EBKn7rZ9IRdKHXdkrFSsVO">md-bridge 中文场景占优</strong></td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="QVkcl70NXS1vHI0B5ymjZb">9.2 护城河分析：什么能守住，什么守不住</h3>
+<div class="grid2" data-page-node-id="6n1LjjdkEHZMVjbfFAmGXC">
+  <div class="card" style="border-color:#f3c9c4" data-page-node-id="V44x79CUPRn6hGLp015yJf">
+    <h4 style="margin-top:0;color:#d92d20" data-page-node-id="fTnPXh4PR10Up7UESr9ttE">✗ 守不住的（不要押注）</h4>
+    <ul class="pl" style="margin-bottom:0" data-page-node-id="aYLL1XmlGiG6BlvGFgGeEF">
+      <li data-page-node-id="Xww87yy2eDuVXtZa4vHWBY"><strong data-page-node-id="KlZCv9n31xKDKapXSolBC2">格式数量</strong> —— CloudConvert 支持 200+，你永远追不上</li>
+      <li data-page-node-id="8SXb9xEAkjPqHKKbQIylHh"><strong data-page-node-id="TN5ntF2ZWMLgDEbWBYf2dM">转换速度</strong> —— 纯 CPU 任务，没有结构性优势</li>
+      <li data-page-node-id="uY5bUB6eNCBp8OVBxrEsYS"><strong data-page-node-id="z5kxOHYdgTVa5uWGvRCHid">代码本身</strong> —— MIT 开源，任何人可自托管</li>
+      <li data-page-node-id="QSVM23s7QElEGNDzCmU6f3"><strong data-page-node-id="oSZnFhUe2YLOIIizgPwjXp">价格战</strong> —— 大厂可以免费，你打不起</li>
+    </ul>
+  </div>
+  <div class="card" data-page-node-id="hZBK5B9Dl9vTcGCf7j9ImR">
+    <h4 style="margin-top:0;color:#0f9d58" data-page-node-id="81314dXNSILZT21hjcLr1D">✓ 守得住的（重点投入）</h4>
+    <ul class="pl" style="margin-bottom:0" data-page-node-id="6HpIcREXHjqCnMRIIlxnHz">
+      <li data-page-node-id="uP0XGVxC8i1T8bwvNOP86T"><strong data-page-node-id="7wtMaf6wS4JuM0Ee6FG1tw">私有化交付能力</strong> —— SaaS 竞品天然做不了内网交付</li>
+      <li data-page-node-id="1y2ZHRQUPKVMYQj2n4BTbB"><strong data-page-node-id="BitGkZ4BJQPNSu7KNv02uw">MIT 协议洁净度</strong> —— 对标 MinerU 的 AGPL 与 Pandoc 的 GPL，
+      这是<strong data-page-node-id="o4i2TnGWYyOJnnpS8puFIh">企业法务评审的硬指标</strong></li>
+      <li data-page-node-id="jJ3rS8o9d92ELWFm042LIO"><strong data-page-node-id="kOWkJM4k5VbTH5T5B24fmz">中文排版质量</strong> —— 英文系工具普遍做不好 CJK，
+      修复 P0-1 后这是真实壁垒</li>
+      <li data-page-node-id="UAjoyr87VCZYsHgSKpUaLq"><strong data-page-node-id="jkX4neOv6881E3m07JBe5E">离线可用</strong> —— 无外网环境（政务、军工、内网）刚需</li>
+      <li data-page-node-id="kn6z4Bbohibgjrqr26zHDG"><strong data-page-node-id="DwxEVUvQ8kyiyqiIm2ICtx">本地客户关系与服务</strong> —— 响应快、可定制、可上门</li>
+    </ul>
+  </div>
+</div>
+
+<div class="note" data-page-node-id="lz61utwIKans91L5lY12gA">
+  <strong data-page-node-id="y7Sftb2IKIlQ4C7Yr2ZUuj">最重要的战略判断：</strong>md-bridge 的最大资产不是 210 个格式组合，
+  而是<strong data-page-node-id="PO1YTjBQ626JSCcRV4rmVk">「MIT 洁净协议 + 可完全私有化」</strong>这个组合。
+  中文 PDF 解析做得最好的 MinerU 是 <strong data-page-node-id="5HA3DbVQDWzpzTSJEgUQnt">AGPL-3</strong>——企业一旦使用就面临开源传染风险，
+  法务基本会否掉。<strong data-page-node-id="tx7yZRgomiKifSpmcz8RKg">把「协议洁净」做成营销卖点，比多做 20 个格式更有商业价值。</strong>
+</div>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="s10" data-page-node-id="X1y20rPGG3qLxdwR4hy8PQ">
+<h2 data-page-node-id="a1O2LIlK2rZWCiPUJSPqGr">10 · 修复优先级与投入产出<span class="en" data-page-node-id="zO1k9Li8KbqEQfS5H8HMLn">Priority & ROI</span></h2>
+
+<h3 data-page-node-id="sncW6V2P9v3TFj4cRWDric">10.1 投入产出总表</h3>
+<table data-page-node-id="DnAv0B09ozCVOHsAT9cJR2">
+<thead data-page-node-id="9hpEP9depCipyiZFI5pQhc"><tr data-page-node-id="ETrWy6w5SycXcVgH1NN01l">
+  <th style="width:180px" data-page-node-id="jyQuhVIRHQjIdfJ5YpLmhI">投入项</th><th style="width:80px" data-page-node-id="LUQF3uBdmT9IQLcjZsQOSC">人日</th>
+  <th style="width:100px" data-page-node-id="KtaMQfC9FFlgpy1QA4WtjI">成本估算</th><th data-page-node-id="bbQKGjtlXZBp3MatYAsTtZ">直接收益</th><th style="width:100px" data-page-node-id="shAFCFc4WocxKXk1vw6aY2">ROI</th>
+</tr></thead>
+<tbody data-page-node-id="WgV4PAgkxqvjVstzPJNMQH">
+<tr style="background:#e8f6ed" data-page-node-id="EFeO6YII7AKodoBHC0oBGk">
+  <td data-page-node-id="dotSSGZQP6gcN7j2Zl9IlE"><strong data-page-node-id="xqHincjGS4r1ag8Ia7MSbV">P0 修复 + 交付包</strong></td><td class="num" data-page-node-id="YhvCxrngMYwqNDmRUFgx3j">7.25</td><td class="num" data-page-node-id="2OZTPzbBL3TrH2DOuZpWBe">¥10,875</td>
+  <td data-page-node-id="hCsvGuwM68daUv437XGqZV"><strong data-page-node-id="TkqSWaxz9D3FKQor0qCcuV">解锁企业交付能力</strong>，首单 ¥30,000</td>
+  <td class="num" data-page-node-id="Z10lEx9VBTfD8OumhnBYOA"><strong style="color:#0f9d58" data-page-node-id="vkTui927Fbjlz7NWrEkvLF">176%</strong></td>
+</tr>
+<tr style="background:#e8f0ff" data-page-node-id="Ca4dLHBC2RqrbKoOBO6LQ6">
+  <td data-page-node-id="2ZsNJHTkFdVkmugSty2UAF"><strong data-page-node-id="NkVdX8mrfsSm1oMrx36lBp">SaaS 基建</strong></td><td class="num" data-page-node-id="BfDqY8tFMOVNLpdYFLTrsn">21</td><td class="num" data-page-node-id="qggj2J2BW6tlT7TOqRUtfT">¥31,500</td>
+  <td data-page-node-id="Mv7B6xG03hF8JxeoC6NhnA">解锁规模化订阅收入，目标 MRR ¥3,000–5,000</td>
+  <td class="num" data-page-node-id="fje6flbWiPNjiyPKKfKiKj"><strong style="color:#1e5eff" data-page-node-id="w2bPxRByD6dzeJhxZfbVwi">持续复利</strong></td>
+</tr>
+<tr data-page-node-id="sl3bp1kJfLrm8ZQK3cKlbb">
+  <td data-page-node-id="OmA5b3WIW08EMa0dKNHrSm"><strong data-page-node-id="BgbaQMPVZPqYagQ7Um3cuJ">GTM 与优化</strong></td><td class="num" data-page-node-id="SstnJQp9wyohOg8T7tGL6W">9</td><td class="num" data-page-node-id="jPkZ47mwxQOsk4yj5am89e">¥13,500</td>
+  <td data-page-node-id="lw7EZDNUQ4orXMPFBV3dVK">补齐短板、获客渠道、品牌建立</td>
+  <td class="num" data-page-node-id="XdTlugsIBd99FXczYivgee">间接</td>
+</tr>
+<tr style="background:#0d1b2a;color:#fff" data-page-node-id="2buVG6ATjtH2niB4D8DEu6">
+  <td data-page-node-id="bG7Wc4PhznXrVwrZ13D2Oq"><strong style="color:#fff" data-page-node-id="Gwd7CY2m11qJYXcAI2Co9O">合计</strong></td>
+  <td class="num" style="color:#fff" data-page-node-id="YtD2cnniUtfuR9gnvkIAal"><strong data-page-node-id="TPA1kC4c8rIkPXRXFhsJrI">37.25</strong></td>
+  <td class="num" style="color:#fff" data-page-node-id="ESFrUBzphS0z7eCdZ2J5vB"><strong data-page-node-id="popGQhCuNZugB4muga365R">¥55,875</strong></td>
+  <td style="color:#b8c9dc" data-page-node-id="92KYw19o8VOAYsTRChyrQ5">90 天营收目标 <strong style="color:#9ee6a0" data-page-node-id="3iCMBXeIJnelc7HSSRpUVn">¥150,000+</strong></td>
+  <td class="num" style="color:#9ee6a0" data-page-node-id="D7YD1wvLIIgr1FED9KSOWq"><strong data-page-node-id="c3sBvQow1MB9PtyhILzXFe">168%</strong></td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="uA9vy6BHEAVFmlSgc9XmcU">10.2 如果只做一件事</h3>
+<div class="verdict" style="border-left-color:#1e5eff;background:linear-gradient(135deg,#fff 0%,#f0f6ff 100%);border-color:#c3d6ff" data-page-node-id="b1XdEVER0RLo84uKEvIVI2">
+  <h3 style="color:#0f3cc4" data-page-node-id="pR3tfSylrTfoZffRGfZqoT">修 PDF 中文（P0-1 + P0-2，4.25 人日）</h3>
+  <p data-page-node-id="BPeG56fjVEPLBKpdGlRbIj">如果 BOSS 只能批一件事的资源，就批这个。理由：</p>
+  <ul class="pl" style="margin-bottom:0" data-page-node-id="7SFcNuHR2W0xfvO0Yz6non">
+    <li data-page-node-id="IQ75dvGBkf173wXTr0wwkL">PDF 是文档转换<strong data-page-node-id="4IoJkxj1mzwHzSyoqZExE3">付费意愿最高</strong>的场景，其他格式（txt/csv/json）用户不会为此付钱</li>
+    <li data-page-node-id="4Vkx6kBHsYO63JW7Sn79yp">当前 PDF 链路<strong data-page-node-id="bJKzuByMZSr3C454lsPehp">中文 100% 损坏 + 150 秒阻塞</strong>，等于这个最高价值的场景完全关闭</li>
+    <li data-page-node-id="YVlbg9ioNaAbGUpw3gevpn">4.25 人日 unlock 整个 PDF 市场，是<strong data-page-node-id="gRMt5I7RiGgsgA51wGmq2B">全报告性价比最高</strong>的单项投入</li>
+    <li data-page-node-id="Se6wmctRVkLMEYXhyL6GWD">不修的话，无论走 SaaS 还是企业交付，客户第一次试用就会翻车</li>
+  </ul>
+</div>
+
+<h3 data-page-node-id="gD5EV6SjpZMtErhAlu9f47">10.3 风险提示</h3>
+<table data-page-node-id="sGNpxuHnguW3yilyXNN44R">
+<thead data-page-node-id="oKAi5W6YXZdB57dOlDNzIq"><tr data-page-node-id="eLL2T7csnSw9RflqD3Wa2B"><th style="width:170px" data-page-node-id="wTzuUvS6tw8JkyqASITCit">风险</th><th style="width:80px" data-page-node-id="rNQmTKw29ymw1390hHSdvh">概率</th><th data-page-node-id="SqdZhJ9k4OTr9nOg69J7hX">影响与应对</th></tr></thead>
+<tbody data-page-node-id="w5Se4BKE9DhX4nXo9PIxWF">
+<tr data-page-node-id="aBwJ6Lex9wsogDs3kDnlw3"><td data-page-node-id="E6OkZVsVBOzm55qq8GrxiY"><strong data-page-node-id="qdJtA9YzU5n57AFpboOEY5">docling 模型体积</strong></td><td data-page-node-id="S1bYvcajq3AS2BALxqa7xa">高</td>
+  <td data-page-node-id="Av5tBJ8BELwUrUneCRLjea">镜像将达 3–5GB，内网交付需要物理介质或内网镜像仓库。
+  应对：提供「精简版」（不含 docling，仅 MD/DOCX/HTML 路径）作为备选</td></tr>
+<tr data-page-node-id="S2QiTwPGfuuFs3HEAKnMxT"><td data-page-node-id="45yixwySObh55GbusQnVf1"><strong data-page-node-id="YLq63fOMw4rNhPmH19etxY">MIT 被白嫖</strong></td><td data-page-node-id="uo1zrEaTgAhLKhCcw9ozf7">高</td>
+  <td data-page-node-id="YcF3xnlytG9E7DK2SVPhmf">客户拿了开源版自己部署。应对：<strong data-page-node-id="3lZMDhKt9FWpOUMZk0cPgS">不靠代码收费，靠交付与 SLA 收费</strong>；
+  核心增强（CJK 排版、批量引擎、管理面板）可放企业版不开源</td></tr>
+<tr data-page-node-id="UjVZq4nuhHZzMBGFhS4o18"><td data-page-node-id="kFUoUlqvsvLxtbwePmmB63"><strong data-page-node-id="dFpBot9sS8K5TTS7RjQzDe">PDF 修复难度超预期</strong></td><td data-page-node-id="zazz5Oyeh2ezCRLRqsVH1i">中</td>
+  <td data-page-node-id="t5iU9bw8dStaHlAHcHRSAU">CJK 字体嵌入涉及 PDF 规范细节。应对：先做方案 C 止血，
+  方案 A 若超期可临时用方案 B（强制 Pango）过渡</td></tr>
+<tr data-page-node-id="OYBGqoOZow3nUvc4iazEuf"><td data-page-node-id="Qm957u1L8IrTp7xZ78NRxB"><strong data-page-node-id="njeDgN4bzWLcNFlyYm4zKZ">企业销售周期长</strong></td><td data-page-node-id="F536sUlGIlxpPkswGITYwr">中</td>
+  <td data-page-node-id="dQy01ZiGBHVn4ICNEZxpDd">大企业采购流程 3–6 个月。应对：<strong data-page-node-id="dKGF30cjCeZAfhgebnsbFy">优先打中型企业与律所</strong>（决策链短），
+  或先做 POC 付费试点（¥5,000–10,000）降低决策门槛</td></tr>
+<tr data-page-node-id="vZF72yzg7ErnZ8xfKXwNIm"><td data-page-node-id="afLM8mAKld0tSQbEAW9lgV"><strong data-page-node-id="yJ2vfh8oYO469LvyuLqDLY">竞品跟进</strong></td><td data-page-node-id="0DErXTG4e83F8gaBX6DADq">低</td>
+  <td data-page-node-id="hTiWxb9D02DryoFCZpLP6v">CloudConvert 等不会做私有化，MinerU 受 AGPL 限制。窗口期约 6–12 个月</td></tr>
+</tbody>
+</table>
+</section>
+
+<div class="foot" data-page-node-id="vmaceIaddpxdWMehovEJC0">
+  <p data-page-node-id="KzGaUfld0iKtsZYbEHAMme"><strong data-page-node-id="DMXu1wMpBeeh2uY3Hrsos5">评估对象：</strong>md-bridge v0.16.0 · <code data-page-node-id="EKsXCzY7HY5mqfM69SfrIu">backend/app</code> 8,607 LOC + <code data-page-node-id="CROquctwlTKFIE5nzIEYtW">main.py</code> 86 LOC ·
+  Python 3.12 / FastAPI / Vue3</p>
+  <p data-page-node-id="Z0uyTpMVu1EgeDao4bhir2"><strong data-page-node-id="zYW7nc2aTON7fJwuN0fbHK">实测环境：</strong>macOS (darwin) · Python 3.12 (venv) · docling 已装但模型未下载 ·
+  WeasyPrint 因缺 Pango 不可用 · Tesseract 未安装</p>
+  <p data-page-node-id="EnXYUkHnImVhICuOZtTnS8"><strong data-page-node-id="FexmxApY1XFNvU9wvG5Gun">实测方法：</strong>118 项自动化测试全量执行 · 15 目标导出矩阵实测 · 14 源导入回环实测 ·
+  SSRF 8 组恶意 URL 验证 · 大文件扩展性能基准（500–20000 节点）· PDF 链路三样本独立计时 ·
+  鉴权/限流/任务/计量/审计模块逐行代码核验</p>
+  <p data-page-node-id="RaJeV6EyUN5ZyW3BSdsvsx"><strong data-page-node-id="ZkHU8tXrEoTFCHWuvAta6N">评分口径说明：</strong>本轮为「商业化变现」导向，权重与前几轮（功能/性能/垂直广度）不同，
+  故综合分（现 81.7，原评估 66.5）与前轮 88 分不可直接比较。请参考 §2.2 双轴评分理解真实状态。</p>
+  <p class="sig" data-page-node-id="gkA6lfzBSLSCP7CpdZqp37">报告版本 v4.0 · 生成于 2026-08-31 · 小菜 🍤 for BOSS Gavin · crayfish-team</p>
+</div>
+
+</div>
+</body>
+</html>

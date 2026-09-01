@@ -14,14 +14,15 @@ from urllib.parse import quote
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
+from app import __version__
 from app.config import settings
 from app.core.cache import result_cache
+from app.core.convert_isolate import convert_isolated
 from app.core.converter import (
     MIME_TYPES,
     SUPPORTED_FORMATS,
     SUPPORTED_SOURCE_FORMATS,
     SUPPORTED_TARGET_FORMATS,
-    convert,
 )
 from app.core.css_sanitize import sanitize_custom_css, sanitize_font_family
 from app.core.exceptions import (
@@ -34,7 +35,11 @@ from app.core.exceptions import (
 from app.core.format_detect import detect_source_format
 from app.core.jobs import JobStatus, job_store
 from app.core.metrics import metrics
+from app.core.request_context import current_tenant_id
+from app.core.tenants import tenants_configured
 from app.core.upload_stream import read_upload_streaming
+from app.importers.docling_ready import docling_models_ready
+from app.importers.ocr_engine import list_ocr_engines
 
 router = APIRouter(prefix="/api", tags=["convert"])
 
@@ -91,13 +96,19 @@ def _pdf_form_opts(
 
 @router.get("/health")
 async def health() -> dict[str, object]:
+    from app.importers.anydoc_bridge import anydoc_available, anydoc_version
+
+    native_ready = anydoc_available()
     return {
         "status": "ok",
         "service": settings.app_name,
-        "version": "0.11.0",
+        "version": __version__,
         "ocr_enabled": settings.ocr_enabled,
         "max_upload_mb": settings.max_upload_mb,
-        "auth_required": bool(settings.api_key or settings.basic_auth),
+        "auth_required": bool(settings.api_key or settings.basic_auth or settings.api_keys),
+        "tenants_configured": tenants_configured(),
+        "docling_models_ready": docling_models_ready(),
+        "pdf_engine": settings.pdf_engine,
         "max_batch_files": settings.max_batch_files,
         "cache": result_cache.stats(),
         "metrics": metrics.snapshot(),
@@ -105,21 +116,63 @@ async def health() -> dict[str, object]:
         "rate_limit_per_minute": settings.rate_limit_per_minute,
         "memory_budget_mb": settings.memory_budget_mb,
         "virus_scan": settings.virus_scan,
-        "ocr": {
-            "enabled": settings.ocr_enabled,
-            "feature": "scanned_pdf_to_structured_markdown",
-            "engine": "docling+tesseract",
-            "hint": "启用 MDBRIDGE_OCR_ENABLED=true 可将扫描版 PDF 转为带标题/表格结构的 Markdown",
-        },
+        "ocr": list_ocr_engines(),
+        "license_required": bool(settings.license_required),
+        # Vendored anydoc → mdbridge_native._doc
+        "anydoc_enabled": bool(settings.anydoc_enabled),
+        "anydoc_available": native_ready,
+        "anydoc_version": anydoc_version() if native_ready else None,
+    }
+
+
+@router.get("/license")
+async def license_status() -> dict[str, object]:
+    """Public license / machine fingerprint (for enterprise activation)."""
+    from app.core.license import current_license, machine_id
+
+    info = current_license()
+    return {
+        "required": bool(settings.license_required),
+        "machine_id": machine_id(),
+        "license": info.to_dict() if info else None,
     }
 
 
 @router.get("/formats")
-async def list_formats() -> dict[str, list[str]]:
+async def list_formats() -> dict[str, object]:
+    from app.importers.anydoc_bridge import (
+        ANYDOC_ONLY_SIBLINGS,
+        anydoc_available,
+        should_handle,
+    )
+
+    export_only = sorted(SUPPORTED_TARGET_FORMATS - SUPPORTED_SOURCE_FORMATS)
+    anydoc_only = sorted(ANYDOC_ONLY_SIBLINGS)
+    anydoc_led = sorted(
+        f for f in SUPPORTED_SOURCE_FORMATS if should_handle(f) and f not in ANYDOC_ONLY_SIBLINGS
+    )
     return {
         "formats": sorted(SUPPORTED_FORMATS),
         "source": sorted(SUPPORTED_SOURCE_FORMATS),
         "target": sorted(SUPPORTED_TARGET_FORMATS),
+        "export_only": export_only,
+        "anydoc_available": anydoc_available(),
+        "anydoc_only_formats": anydoc_only,
+        "anydoc_led_formats": anydoc_led,
+        "notes": {
+            "csv": "table-first：仅导出文档中的表格；无表格时回退为单列文本",
+            "export_only": (
+                "当前无仅导出格式；latex/azw3/kf8 已支持导入（轻量解析）"
+                if not export_only
+                else "下列格式仅支持导出，不支持作为源格式导入"
+            ),
+            "latex": "LaTeX 导入覆盖 article 常用宏（section/list/verbatim/math）",
+            "azw3_kf8": "AZW3/KF8 走 MOBI 文本抽取路径",
+            "anydoc": (
+                "anydoc_only_formats 需编译 mdbridge_native（scripts/build_native.sh / Docker INSTALL_NATIVE=1）；"
+                "anydoc_led_formats 为 anydoc 优先、原生兜底的共享格式"
+            ),
+        },
     }
 
 
@@ -169,6 +222,7 @@ async def create_job(
             target_format=tgt,
             client=client,
             result_filename=out_name,
+            tenant_id=current_tenant_id(),
             **pdf_opts,
         )
         return JSONResponse(status_code=202, content=job.to_dict())
@@ -179,12 +233,17 @@ async def create_job(
 
 @router.get("/jobs")
 async def list_jobs() -> dict[str, object]:
-    return {"jobs": [j.to_dict() for j in job_store.list_recent()]}
+    return {
+        "jobs": [
+            j.to_dict()
+            for j in job_store.list_recent(tenant_id=current_tenant_id())
+        ]
+    }
 
 
 @router.get("/jobs/{job_id}")
 async def get_job(job_id: str) -> dict[str, object]:
-    job = job_store.get(job_id)
+    job = job_store.get(job_id, tenant_id=current_tenant_id())
     if not job:
         raise MdBridgeError(f"任务不存在或已过期: {job_id}", code="job_not_found", status_code=404)
     return job.to_dict()
@@ -192,7 +251,7 @@ async def get_job(job_id: str) -> dict[str, object]:
 
 @router.get("/jobs/{job_id}/result")
 async def get_job_result(job_id: str) -> Response:
-    job = job_store.get(job_id)
+    job = job_store.get(job_id, tenant_id=current_tenant_id())
     if not job:
         raise MdBridgeError(f"任务不存在或已过期: {job_id}", code="job_not_found", status_code=404)
     if job.status == JobStatus.error:
@@ -259,7 +318,7 @@ async def convert_file(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             _executor,
-            lambda: convert(
+            lambda: convert_isolated(
                 content,
                 src,
                 tgt,
@@ -283,6 +342,7 @@ async def convert_file(
 
 @router.post("/convert/batch")
 async def convert_batch(
+    request: Request,
     files: list[UploadFile] = File(...),
     source_format: Optional[str] = Form(None),
     target_format: str = Form(...),
@@ -335,6 +395,7 @@ async def convert_batch(
 
     loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(max(1, settings.batch_workers))
+    client = request.client.host if request.client else ""
 
     async def _one(name: str, content: bytes) -> tuple[str, bytes | None, dict | None]:
         async with sem:
@@ -348,11 +409,12 @@ async def convert_batch(
                 src = _resolve_source_format(source_format, name, content)
                 converted = await loop.run_in_executor(
                     _executor,
-                    lambda: convert(
+                    lambda: convert_isolated(
                         content,
                         src,
                         tgt,
                         filename=name,
+                        client=client,
                         **pdf_opts,
                     ),
                 )

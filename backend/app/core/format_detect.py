@@ -21,7 +21,10 @@ _EXT_MAP: dict[str, str] = {
     "epub": "epub",
     "mobi": "mobi",
     "azw": "mobi",
-    "azw3": "mobi",
+    "azw3": "azw3",
+    "kf8": "kf8",
+    "tex": "latex",
+    "latex": "latex",
 }
 
 
