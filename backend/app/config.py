@@ -77,9 +77,16 @@ class Settings(BaseSettings):
     # always owned when enabled; this list governs formats that also have a
     # native importer. xlsx is intentionally excluded (kept native for header
     # inference). "*" enables every supported shared format.
-    anydoc_formats: str = "docx,rtf,odt,ppt,pps,pot,pptm,ppsx,ppsm,docm"
+    # Shared formats anydoc leads on (exclusive anydoc-only siblings always lead).
+    # doc/pptx: Rust OLE/OOXML path preferred over heavy docling for →md fast channel.
+    # xlsx omitted on purpose (native header-row inference). epub/csv now default-on (P2-4).
+    anydoc_formats: str = "doc,docx,rtf,odt,pptx,ppt,pps,pot,pptm,ppsx,ppsm,docm,epub,csv"
     # Route Markdown targets straight to anydoc's own GFM (no fidelity loss).
     anydoc_fast_markdown: bool = True
+    # Recoverable AnydocFallback → native importer (False = surface the decline).
+    anydoc_fallback: bool = True
+    # Content sniff via native format_from_bytes when extension is missing/wrong.
+    anydoc_sniff: bool = True
 
     def anydoc_format_list(self) -> set[str]:
         """Parsed allow-list of shared formats anydoc may own."""
@@ -117,6 +124,8 @@ class Settings(BaseSettings):
 
     # DOCX theme: default | academic | minimal
     docx_theme: str = "default"
+    # Emit Word Review comments.xml when AST has Comment nodes
+    docx_export_comments: bool = True
     # Prefix headings with 1 / 1.1 / 1.1.1 on export
     heading_numbering: bool = False
 
@@ -157,7 +166,9 @@ class Settings(BaseSettings):
     magic_bytes_check: bool = True
 
     # PDF text-layer extraction
-    pdf_text_parallel: bool = True
+    # Kept for env compatibility; ignored at runtime — PDFium is not thread-safe
+    # (macOS libpdfium.dylib aborts with EXC_BREAKPOINT / SIGTRAP under threads).
+    pdf_text_parallel: bool = False
     pdf_text_workers: int = 4
 
     # Startup warmup (docling + WeasyPrint)
@@ -171,9 +182,23 @@ class Settings(BaseSettings):
     memory_budget_mb: int = 512
     # Persist finished job metadata (empty = memory only)
     job_db_path: str = "data/jobs.sqlite3"
+    # Persist result blobs beside metadata (empty = memory/spill only; survives restart)
+    job_result_dir: str = "data/job_results"
+    # Long-term archive URI: file:///path or s3://bucket/prefix (s3 needs boto3 extra)
+    object_storage_uri: str = ""
+    job_archive_retention_days: int = 30
+    # EPUB zip passphrase (password-protected zips only; not Adobe/LCP DRM)
+    epub_passphrase: str = ""
+
+    # Job completion webhooks (POST JSON to callback_url)
+    webhook_enabled: bool = True
+    webhook_timeout_seconds: float = 10.0
 
     # Soft warn / reject oversized DOCX AST (0 = disabled)
     docx_max_nodes: int = 50_000
+
+    # PDF text-layer: try left/right half merge when both columns look populated
+    pdf_text_multicolumn: bool = True
 
     # Optional Redis URL for multi-replica rate limiting (empty = in-process)
     redis_url: str = ""

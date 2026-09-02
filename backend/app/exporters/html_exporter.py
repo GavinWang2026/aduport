@@ -19,6 +19,12 @@ nav.toc ol {{ list-style: none; padding-left: 0; }}
 nav.toc .toc-l2 {{ padding-left: 1rem; }}
 nav.toc .toc-l3 {{ padding-left: 2rem; }}
 img {{ max-width: 100%; height: auto; }}
+.pdf-layout-preview {{ max-width: 100%; margin: 1.5rem 0; }}
+.pdf-layout-preview .pdf-page {{ position: relative; border: 1px solid #ddd; margin: 1rem 0; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.08); }}
+.pdf-layout-preview .pdf-block {{ white-space: pre-wrap; }}
+.content-control {{ background: #f0f4ff; padding: 2px 6px; border-radius: 4px; }}
+.text-box {{ background: #f8f9fc; border-left: 3px solid #6b8; padding: 0.5em 1em; margin: 0.8em 0; }}
+.section-props {{ font-size: 0.9em; color: #555; margin: 0.8em 0; }}
 """
 
 
@@ -33,11 +39,20 @@ def export_html(
     safe_css = sanitize_custom_css(custom_css if custom_css is not None else "")
     toc_on = settings.pdf_toc if include_toc is None else include_toc
     style = _BASE_CSS.format(font_family=safe_font) + ("\n" + safe_css if safe_css else "")
+    if (model.metadata or {}).get("pdf_layout", {}).get("blocks"):
+        style += "body { max-width: 56rem; }\n"
     toc = build_toc_html(model) if toc_on else ""
     body = render_body_html(model)
+    katex_head = ""
+    if settings.html_katex:
+        katex_head = (
+            "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'>"
+            "<script defer src='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js'></script>"
+            "<script defer src='https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js'></script>"
+        )
     return (
         "<!DOCTYPE html>\n<html><head><meta charset='utf-8'>"
-        f"<title>{_esc_title(model)}</title><style>{style}</style></head><body>\n"
+        f"<title>{_esc_title(model)}</title>{katex_head}<style>{style}</style></head><body>\n"
         f"{toc}\n{body}\n</body></html>\n"
     )
 

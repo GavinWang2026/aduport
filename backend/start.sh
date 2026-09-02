@@ -26,9 +26,11 @@ fi
 
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
-RELOAD_FLAG=()
-if [[ "${MDBRIDGE_RELOAD:-0}" == "1" ]] || [[ "${ENV:-dev}" == "dev" ]]; then
-  RELOAD_FLAG=(--reload)
+# Opt-in only: --reload + PDFium SIGTRAP can leave a half-dead worker while the
+# parent still answers /health ("在线" but converts crash). Use MDBRIDGE_RELOAD=1 for DIY.
+EXTRA_ARGS=()
+if [[ "${MDBRIDGE_RELOAD:-0}" == "1" ]]; then
+  EXTRA_ARGS+=(--reload)
 fi
 
-exec uvicorn main:app --host "$HOST" --port "$PORT" "${RELOAD_FLAG[@]}" "$@"
+exec uvicorn main:app --host "$HOST" --port "$PORT" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}" "$@"

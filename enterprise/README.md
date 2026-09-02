@@ -4,6 +4,8 @@
 
 **从这里开始：** [DELIVERY.md](./DELIVERY.md)（私有化交付总览与文档地图）
 
+仓库根目录还有精简入口：[ENTERPRISE.md](../ENTERPRISE.md)（能力边界一页纸）。
+
 ---
 
 ## 文档地图
@@ -19,6 +21,7 @@
 | [delivery/PRICING_BOUNDARY.md](./delivery/PRICING_BOUNDARY.md) | 报价边界与加购 |
 | [LICENSE.md](./LICENSE.md) | 一机一码操作说明 |
 | [OCR.md](./OCR.md) | 扫描 OCR（可选加购） |
+| [../docs/ops/prometheus/README.md](../docs/ops/prometheus/README.md) | Prometheus 指标 / Grafana / 告警规则 |
 | [SCORE_93.md](./SCORE_93.md) | 技术四维冲分 |
 
 ---
@@ -60,6 +63,22 @@ cp .env.example .env   # 填写 API Key / License
 ```
 
 产物：`enterprise/dist/md-bridge-enterprise-<ver>-bundle.tar.gz` + `SHA256SUMS.txt`。
+
+---
+
+## 可观测（Prometheus + Alertmanager）
+
+企业 compose 内置可选 profile，开箱抓取 `/api/metrics` 并加载仓库告警规则：
+
+```bash
+docker compose -f enterprise/docker-compose.yml --profile observability up -d
+# Prometheus → http://127.0.0.1:9090
+# Alertmanager → http://127.0.0.1:9093
+```
+
+配置：`enterprise/prometheus.yml`（抓取 backend:8000）、`enterprise/alertmanager.yml`（路由占位，生产替换 webhook）、`docs/ops/prometheus/alert_rules.yml`（anydoc_share / ocr_ready 等）。Grafana 看板 JSON 见 `docs/ops/prometheus/grafana_mdbridge.json`。
+
+CI 证据：`backend/tests/test_observability_pack.py`。
 
 ---
 

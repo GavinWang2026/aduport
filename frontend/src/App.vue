@@ -12,17 +12,14 @@ import {
   listServerJobs,
   type ServerJob,
 } from './api'
-import type { ConvertJob, HistoryItem, SourceFormat, SourceFormatOption, TargetFormat } from './types'
-import { detectFormat, formatLabel } from './types'
+import type { ConvertJob, ConvertOptions, HistoryItem, SourceFormat, SourceFormatOption, TargetFormat } from './types'
+import { DEFAULT_CONVERT_OPTIONS, SOURCE_FORMAT_ORDER, detectFormat, formatLabel } from './types'
 import { t, type Locale as UILocale } from './i18n'
 
-const sourceFormats: SourceFormat[] = [
-  'docx', 'pdf', 'md', 'txt', 'html', 'pptx', 'epub', 'mobi',
-  'odt', 'rtf', 'doc', 'json', 'xlsx', 'csv',
-]
+const sourceFormats: SourceFormat[] = [...SOURCE_FORMAT_ORDER]
 const targetFormats: TargetFormat[] = [
   'docx', 'pdf', 'md', 'html', 'txt', 'epub', 'pptx', 'mobi',
-  'azw3', 'kf8', 'latex', 'csv', 'odt', 'json', 'xlsx',
+  'azw3', 'kf8', 'latex', 'csv', 'odt', 'json', 'xlsx', 'rtf',
 ]
 
 const locale = ref<UILocale>((localStorage.getItem('mdbridge-locale') as UILocale) || 'zh')
@@ -30,11 +27,14 @@ const theme = ref<'dark' | 'light'>((localStorage.getItem('mdbridge-theme') as '
 const activeTab = ref<'convert' | 'tasks'>('convert')
 const sourceFormat = ref<SourceFormatOption>('auto')
 const targetFormat = ref<TargetFormat>('md')
+const showAdvanced = ref(false)
+const convertOpts = ref<ConvertOptions>({ ...DEFAULT_CONVERT_OPTIONS })
 const jobs = ref<ConvertJob[]>([])
 const converting = ref(false)
 const zipping = ref(false)
 const apiOnline = ref(false)
 const previewText = ref('')
+const previewKind = ref<'md' | 'html'>('md')
 const previewTitle = ref('')
 const previewMode = ref<'md' | 'render'>('md')
 const previewFullscreen = ref(false)
@@ -50,6 +50,28 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const HISTORY_KEY = 'mdbridge-history'
 const tt = (key: Parameters<typeof t>[1]) => t(locale.value, key)
+
+const needsPdfOpts = computed(() => targetFormat.value === 'pdf')
+const needsDocxOpts = computed(() => targetFormat.value === 'docx')
+const needsAdvanced = computed(() => needsPdfOpts.value || needsDocxOpts.value)
+
+function activeConvertOptions(): ConvertOptions | undefined {
+  if (!needsAdvanced.value) return undefined
+  const o = convertOpts.value
+  const out: ConvertOptions = {}
+  if (needsPdfOpts.value) {
+    if (o.pdf_font_family) out.pdf_font_family = o.pdf_font_family
+    if (o.pdf_custom_css) out.pdf_custom_css = o.pdf_custom_css
+    if (o.pdf_page_size) out.pdf_page_size = o.pdf_page_size
+    if (o.pdf_orientation) out.pdf_orientation = o.pdf_orientation
+    if (o.pdf_header) out.pdf_header = o.pdf_header
+    if (o.pdf_footer) out.pdf_footer = o.pdf_footer
+    out.pdf_page_numbers = !!o.pdf_page_numbers
+    out.pdf_toc = !!o.pdf_toc
+  }
+  if (needsDocxOpts.value && o.docx_theme) out.docx_theme = o.docx_theme
+  return out
+}
 
 function applyTheme(next: 'dark' | 'light') {
   theme.value = next
@@ -143,8 +165,16 @@ const targetOptions = computed(() =>
   }),
 )
 
+function extractPreviewBody(html: string): string {
+  const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+  return m ? m[1] : html
+}
+
 const renderedPreview = computed(() => {
   if (!previewText.value) return ''
+  if (previewKind.value === 'html') {
+    return extractPreviewBody(previewText.value)
+  }
   return simpleMarkdown(previewText.value)
 })
 
@@ -249,12 +279,15 @@ async function convertAll() {
             // server often stays at 0.1 during long PDF/docling work
             job.progress = Math.max(p, status === 'running' ? 0.15 : p)
           },
+          activeConvertOptions(),
         )
         job.result = result
         job.status = 'done'
         if (result.preview) {
           previewText.value = result.preview
           previewTitle.value = result.filename
+          previewKind.value = job.targetFormat === 'html' ? 'html' : 'md'
+          if (job.targetFormat === 'html') previewMode.value = 'render'
         }
         pushHistory({
           id: job.id,
@@ -300,7 +333,12 @@ async function downloadZipBatch() {
   }
   zipping.value = true
   try {
-    const { filename, blob } = await convertBatchZip(files, sourceFormat.value, targetFormat.value)
+    const { filename, blob } = await convertBatchZip(
+      files,
+      sourceFormat.value,
+      targetFormat.value,
+      activeConvertOptions(),
+    )
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -550,6 +588,64 @@ function simpleMarkdown(src: string): string {
                   </svg>
                 </button>
                 <FormatSelect v-model="targetFormat" :label="tt('targetFormat')" :options="targetOptions" />
+              </div>
+
+              <div v-if="needsAdvanced" class="md-adv">
+                <button type="button" class="md-adv__toggle" @click="showAdvanced = !showAdvanced">
+                  {{ showAdvanced ? tt('advHide') : tt('advShow') }}
+                </button>
+                <div v-if="showAdvanced" class="md-adv__grid">
+                  <template v-if="needsPdfOpts">
+                    <label class="md-field">
+                      <span>{{ tt('pdfPageSize') }}</span>
+                      <select v-model="convertOpts.pdf_page_size">
+                        <option value="A4">A4</option>
+                        <option value="Letter">Letter</option>
+                        <option value="A3">A3</option>
+                        <option value="Legal">Legal</option>
+                      </select>
+                    </label>
+                    <label class="md-field">
+                      <span>{{ tt('pdfOrientation') }}</span>
+                      <select v-model="convertOpts.pdf_orientation">
+                        <option value="portrait">{{ tt('portrait') }}</option>
+                        <option value="landscape">{{ tt('landscape') }}</option>
+                      </select>
+                    </label>
+                    <label class="md-field">
+                      <span>{{ tt('pdfFont') }}</span>
+                      <input v-model="convertOpts.pdf_font_family" type="text" :placeholder="tt('pdfFontPh')" />
+                    </label>
+                    <label class="md-field md-field--wide">
+                      <span>{{ tt('pdfHeader') }}</span>
+                      <input v-model="convertOpts.pdf_header" type="text" />
+                    </label>
+                    <label class="md-field md-field--wide">
+                      <span>{{ tt('pdfFooter') }}</span>
+                      <input v-model="convertOpts.pdf_footer" type="text" />
+                    </label>
+                    <label class="md-field md-field--wide">
+                      <span>{{ tt('pdfCss') }}</span>
+                      <textarea v-model="convertOpts.pdf_custom_css" rows="2" :placeholder="tt('pdfCssPh')" />
+                    </label>
+                    <label class="md-check">
+                      <input v-model="convertOpts.pdf_page_numbers" type="checkbox" />
+                      {{ tt('pdfPageNumbers') }}
+                    </label>
+                    <label class="md-check">
+                      <input v-model="convertOpts.pdf_toc" type="checkbox" />
+                      {{ tt('pdfToc') }}
+                    </label>
+                  </template>
+                  <label v-if="needsDocxOpts" class="md-field">
+                    <span>{{ tt('docxTheme') }}</span>
+                    <select v-model="convertOpts.docx_theme">
+                      <option value="default">default</option>
+                      <option value="academic">academic</option>
+                      <option value="minimal">minimal</option>
+                    </select>
+                  </label>
+                </div>
               </div>
 
               <FileUploader

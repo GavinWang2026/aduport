@@ -18,7 +18,7 @@ def export_epub(model: DocumentModel) -> bytes:
     # Build nav from headings
     nav_items = []
     for i, node in enumerate(model.nodes):
-        if isinstance(node, Heading) and node.level <= 2:
+        if isinstance(node, Heading) and node.level <= 3:
             nav_items.append(
                 f'<li><a href="chapter.xhtml#h-{i}">{html.escape(node.plain_text())}</a></li>'
             )
@@ -33,6 +33,9 @@ body{{font-family:serif;line-height:1.6;margin:1em}}
 img{{max-width:100%}} table{{border-collapse:collapse;width:100%}}
 th,td{{border:1px solid #ccc;padding:4px 8px}}
 blockquote{{border-left:3px solid #ccc;padding-left:1em;color:#444}}
+.comment{{border-left:3px solid #9ab;font-size:0.92em;margin:1em 0;padding:0.5em 1em;background:#f8f9fc;color:#333}}
+.comment-author{{font-weight:600}}
+.comment-anchor{{color:#666;font-weight:normal}}
 </style></head>
 <body>
 <h1>{html.escape(title)}</h1>

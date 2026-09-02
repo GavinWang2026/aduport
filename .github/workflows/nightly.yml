@@ -1,0 +1,34 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  native-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/anydoc -> native/anydoc/target
+      - name: Create venv + install backend
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install -U pip
+          backend/.venv/bin/pip install -e "backend/[dev]"
+      - name: Build mdbridge_native
+        run: bash scripts/build_native.sh
+      - name: Full golden + EPUB roundtrip (native)
+        working-directory: backend
+        run: |
+          .venv/bin/pytest -q tests/test_anydoc_bridge.py tests/test_golden_matrix.py \
+            tests/test_golden_mobi_footnote.py tests/test_golden_ast_xlsx.py \
+            tests/test_golden_xlsx_pipeline.py tests/test_golden_odt_json_deep.py \
+            tests/test_exporter_spans.py tests/test_accepted_depth.py --tb=short

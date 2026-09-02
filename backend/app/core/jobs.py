@@ -39,13 +39,24 @@ class Job:
     result_bytes: bytes | None = None
     result_spill: SpillBuffer | None = None
     result_filename: str | None = None
+    result_path: str | None = None
     bytes_in: int = 0
     tenant_id: str | None = None
+    callback_url: str | None = None
 
     def read_result(self) -> bytes | None:
         if self.result_spill is not None:
             return self.result_spill.read()
-        return self.result_bytes
+        if self.result_bytes is not None:
+            return self.result_bytes
+        if self.result_path or self.id:
+            from app.core.job_results import load_job_result
+
+            data = load_job_result(self.id)
+            if data is not None:
+                self.result_bytes = data
+            return data
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         out_len = 0
@@ -67,7 +78,10 @@ class Job:
             "bytes_in": self.bytes_in,
             "bytes_out": out_len,
             "result_filename": self.result_filename,
+            "result_path": self.result_path,
+            "result_persisted": bool(self.result_path),
             "tenant_id": self.tenant_id,
+            "callback_url": self.callback_url,
         }
 
 
@@ -99,11 +113,16 @@ class JobStore:
         pdf_footer: str | None = None,
         pdf_page_numbers: bool | None = None,
         pdf_toc: bool | None = None,
+        docx_theme: str | None = None,
+        callback_url: str | None = None,
         client: str = "",
         result_filename: str = "",
         tenant_id: str | None = None,
     ) -> Job:
+        from app.core.webhooks import validate_callback_url
+
         tenant = (tenant_id or "").strip() or None
+        cb = validate_callback_url(callback_url)
         spill_prefix = f"mdbridge-job-in-{(tenant or 'anon')[:24]}-"
         spill = SpillBuffer(content, prefix=spill_prefix)
         # Only count in-RAM portion toward budget when spilled
@@ -124,26 +143,30 @@ class JobStore:
                 bytes_in=len(content),
                 result_filename=result_filename or filename,
                 tenant_id=tenant,
+                callback_url=cb,
             )
             self._jobs[job.id] = job
             self._inflight_bytes += charge
             self._prune_unlocked()
 
+        opts = {
+            "pdf_font_family": pdf_font_family,
+            "pdf_custom_css": pdf_custom_css,
+            "pdf_page_size": pdf_page_size,
+            "pdf_orientation": pdf_orientation,
+            "pdf_header": pdf_header,
+            "pdf_footer": pdf_footer,
+            "pdf_page_numbers": pdf_page_numbers,
+            "pdf_toc": pdf_toc,
+        }
+        if docx_theme:
+            opts["docx_theme"] = docx_theme
         self._executor.submit(
             self._run,
             job.id,
             spill,
             charge,
-            {
-                "pdf_font_family": pdf_font_family,
-                "pdf_custom_css": pdf_custom_css,
-                "pdf_page_size": pdf_page_size,
-                "pdf_orientation": pdf_orientation,
-                "pdf_header": pdf_header,
-                "pdf_footer": pdf_footer,
-                "pdf_page_numbers": pdf_page_numbers,
-                "pdf_toc": pdf_toc,
-            },
+            opts,
             client,
         )
         return job
@@ -168,7 +191,13 @@ class JobStore:
         job_tenant = str(snap_tenant) if snap_tenant else None
         if enforce_tenant and not self._tenant_allows(job_tenant, tenant_id):
             return None
-        # Reconstruct a read-only finished job shell (result bytes not restored)
+        # Reconstruct finished job; result bytes load lazily via read_result()
+        from app.core.job_results import result_path_for
+
+        rpath = snap.get("result_path")
+        if not rpath and snap.get("result_persisted"):
+            rp = result_path_for(str(snap["id"]))
+            rpath = str(rp) if rp and rp.is_file() else None
         job = Job(
             id=snap["id"],
             filename=snap.get("filename") or "",
@@ -181,8 +210,10 @@ class JobStore:
             created_at=float(snap.get("created_at") or time.time()),
             finished_at=snap.get("finished_at"),
             result_filename=snap.get("result_filename"),
+            result_path=rpath,
             bytes_in=int(snap.get("bytes_in") or 0),
             tenant_id=job_tenant,
+            callback_url=snap.get("callback_url"),
         )
         with self._lock:
             self._jobs[job.id] = job
@@ -257,6 +288,13 @@ class JobStore:
                     client=client,
                     **pdf_opts,
                 )
+                from app.core.job_results import save_job_result
+                from app.core.webhooks import fire_job_webhook
+
+                persisted = save_job_result(job.id, out)
+                from app.core.object_storage import archive_job_object
+
+                archive_uri = archive_job_object(job.id, out)
                 out_spill = SpillBuffer(out, prefix="mdbridge-job-out-")
                 with self._lock:
                     if out_spill.spilled:
@@ -265,26 +303,41 @@ class JobStore:
                     else:
                         job.result_bytes = out
                         out_spill.release()
+                    job.result_path = persisted or archive_uri
                     job.status = JobStatus.done
                     job.progress = 1.0
                     job.finished_at = time.time()
-                save_job_snapshot(job.id, job.to_dict())
+                payload = job.to_dict()
+                if persisted:
+                    payload["result_path"] = persisted
+                if archive_uri:
+                    payload["object_archive_uri"] = archive_uri
+                save_job_snapshot(job.id, payload)
+                fire_job_webhook(payload, job.callback_url)
             except MdBridgeError as exc:
+                from app.core.webhooks import fire_job_webhook
+
                 with self._lock:
                     job.status = JobStatus.error
                     job.error = exc.message
                     job.code = exc.code
                     job.progress = 1.0
                     job.finished_at = time.time()
-                save_job_snapshot(job.id, job.to_dict())
+                payload = job.to_dict()
+                save_job_snapshot(job.id, payload)
+                fire_job_webhook(payload, job.callback_url)
             except Exception as exc:
+                from app.core.webhooks import fire_job_webhook
+
                 with self._lock:
                     job.status = JobStatus.error
                     job.error = str(exc) if settings.debug else "转换失败"
                     job.code = "conversion_error"
                     job.progress = 1.0
                     job.finished_at = time.time()
-                save_job_snapshot(job.id, job.to_dict())
+                payload = job.to_dict()
+                save_job_snapshot(job.id, payload)
+                fire_job_webhook(payload, job.callback_url)
         finally:
             spill.release()
             self._sem.release()
@@ -292,6 +345,8 @@ class JobStore:
                 self._inflight_bytes = max(0, self._inflight_bytes - charge)
 
     def _prune_unlocked(self) -> None:
+        from app.core.job_results import delete_job_result
+
         ttl = settings.job_ttl_seconds
         now = time.time()
         expired = [
@@ -303,6 +358,8 @@ class JobStore:
             job = self._jobs.pop(jid, None)
             if job and job.result_spill:
                 job.result_spill.release()
+            if job:
+                delete_job_result(job.id)
         max_jobs = settings.job_max_entries
         if len(self._jobs) > max_jobs:
             finished = sorted(
@@ -313,6 +370,7 @@ class JobStore:
             for job in finished[:overflow]:
                 if job.result_spill:
                     job.result_spill.release()
+                delete_job_result(job.id)
                 self._jobs.pop(job.id, None)
 
     def stats(self) -> dict[str, int]:

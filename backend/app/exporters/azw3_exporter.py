@@ -8,7 +8,7 @@ import time
 from io import BytesIO
 
 from app.core.document_model import DocumentModel, Image
-from app.exporters.html_render import render_body_html
+from app.exporters.html_render import render_body_html, render_ebook_css
 
 
 def export_azw3(model: DocumentModel) -> bytes:
@@ -28,7 +28,7 @@ def export_azw3(model: DocumentModel) -> bytes:
         '<html xmlns="http://www.w3.org/1999/xhtml">'
         "<head><meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>"
         f"<title>{html_lib.escape(title)}</title>"
-        "<style>body{font-family:serif;line-height:1.5}img{max-width:100%}</style>"
+        f"<style>{render_ebook_css()} img{{max-width:100%}}</style>"
         "</head><body>\n"
         f"{body_html}\n</body></html>\n"
     )

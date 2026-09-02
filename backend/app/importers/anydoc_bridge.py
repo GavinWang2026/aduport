@@ -77,6 +77,12 @@ _FORMAT_MAP: dict[str, str] = {
 # exists. Because there is no native alternative, these formats MUST be handled
 # by anydoc whenever it is enabled, regardless of the per-format `anydoc_formats`
 # allow-list (which only governs formats that also have a native importer).
+#
+# Fast-path migration notes (shared formats → default allowlist):
+#   MOVE NOW  : doc, pptx  — Rust OLE/OOXML strong; unlocks to_markdown_bytes
+#   ALREADY   : docx, rtf, odt (+ anydoc-only siblings)
+#   KEEP OUT  : xlsx (native header-row), pdf (no anydoc model; OCR/docling)
+#   ENABLED   : epub, csv — default allowlist (P2-4); native fallback when anydoc declines
 ANYDOC_ONLY_SIBLINGS: dict[str, str | None] = {
     "ppt": None,
     "pps": None,

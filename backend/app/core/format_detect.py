@@ -33,6 +33,8 @@ def detect_source_format(filename: str | None, content: bytes | None = None) -> 
     Resolve source format from filename extension, with light magic-byte fallback.
 
     Returns a value in SUPPORTED_SOURCE_FORMATS, or None if unknown.
+    When ``MDBRIDGE_ANYDOC_SNIFF`` is on, anydoc's content sniff runs after the
+    lightweight path and can resolve OLE/RTF/ODS and mislabeled Office files.
     """
     ext = Path(filename or "").suffix.lower().lstrip(".")
     if ext in _EXT_MAP:
@@ -44,7 +46,23 @@ def detect_source_format(filename: str | None, content: bytes | None = None) -> 
         sniffed = _sniff_bytes(content)
         if sniffed and sniffed in SUPPORTED_SOURCE_FORMATS:
             return sniffed
+        sniffed = _sniff_via_anydoc(content)
+        if sniffed and sniffed in SUPPORTED_SOURCE_FORMATS:
+            return sniffed
     return None
+
+
+def _sniff_via_anydoc(data: bytes) -> str | None:
+    try:
+        from app.config import settings
+
+        if not settings.anydoc_enabled or not settings.anydoc_sniff:
+            return None
+        from app.importers.anydoc_bridge import sniff_format as anydoc_sniff
+
+        return anydoc_sniff(data)
+    except Exception:
+        return None
 
 
 def _sniff_bytes(data: bytes) -> str | None:

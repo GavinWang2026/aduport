@@ -16,6 +16,7 @@ from app.core.document_model import (
     ListItem,
     MathBlock,
     Paragraph,
+    Table,
 )
 from app.core.exceptions import InvalidDocumentError
 
@@ -98,6 +99,12 @@ def import_latex(source_bytes: bytes, filename: str = "input.tex") -> DocumentMo
                     )
             elif env in ("equation", "align", "displaymath"):
                 nodes.append(MathBlock(content=inner.strip(), display=True))
+            elif env == "tabular":
+                from app.exporters.table_span import parse_latex_tabular_block
+
+                table = parse_latex_tabular_block(inner)
+                if table:
+                    nodes.append(table)
             i = end + len(rf"\end{{{bm.group(1)}}}")
             continue
 

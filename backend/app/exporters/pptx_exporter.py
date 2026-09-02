@@ -1,4 +1,10 @@
-"""Export DocumentModel to PPTX using python-pptx."""
+"""Export DocumentModel to PPTX using python-pptx.
+
+Depth goals vs the previous title+bullet-only exporter:
+- Real PowerPoint tables for ``Table`` nodes
+- Embedded pictures when ``Image.data`` is present
+- Mixed body content (bullets + tables + images) on content slides
+"""
 
 from __future__ import annotations
 
@@ -6,12 +12,13 @@ from io import BytesIO
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
-from pptx.util import Inches, Pt
+from pptx.util import Emu, Inches, Pt
 
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
+    Comment,
+    ContentControl,
     DocumentModel,
     Footnote,
     Heading,
@@ -21,28 +28,41 @@ from app.core.document_model import (
     ListItem,
     MathBlock,
     Paragraph,
+    PivotTable,
+    Revision,
     Table,
+    TextBox,
     ensure_rich_text,
 )
+from app.exporters.table_span import table_flat_matrix, table_has_span_cells
 
-# ~ title slide + content slides; pack dense paragraphs per slide
 _MAX_CHARS_PER_SLIDE = 900
+_MAX_TABLE_ROWS = 16
+_MAX_TABLE_COLS = 10
+# Rendered on dedicated meta slides — excluded from content-slide buckets.
+_META_SLIDE_NODE_TYPES = (Comment, Footnote, Revision, ContentControl, PivotTable)
 
 
 def export_pptx(model: DocumentModel) -> bytes:
     prs = Presentation()
-    # Widescreen 16:9
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
 
     title = model.title or _first_heading(model) or "Document"
     _add_title_slide(prs, title)
 
-    # Bucket nodes into slides by size / heading breaks
     buckets: list[list] = []
     current: list = []
     chars = 0
     for node in model.nodes:
+        if isinstance(node, _META_SLIDE_NODE_TYPES):
+            continue
+        # Heavy visual nodes get their own slide when the bucket already has content
+        if isinstance(node, (Table, Image)) and current:
+            buckets.append(current)
+            current = [node]
+            chars = _estimate_chars(node)
+            continue
         if isinstance(node, Heading) and node.level <= 2 and current:
             buckets.append(current)
             current = [node]
@@ -63,8 +83,40 @@ def export_pptx(model: DocumentModel) -> bytes:
         slide_title = _bucket_title(bucket, i)
         _add_content_slide(prs, slide_title, bucket)
 
+    comments = [n for n in model.nodes if isinstance(n, Comment)]
+    if comments:
+        _add_comments_slide(prs, comments)
+
+    footnotes = [n for n in model.nodes if isinstance(n, Footnote)]
+    if footnotes:
+        _add_footnotes_slide(prs, footnotes)
+
+    revisions = [n for n in model.nodes if isinstance(n, Revision)]
+    if revisions:
+        _add_revisions_slide(prs, revisions)
+
+    controls = [n for n in model.nodes if isinstance(n, ContentControl)]
+    if controls:
+        _add_content_controls_slide(prs, controls)
+
+    text_boxes = [n for n in model.nodes if isinstance(n, TextBox)]
+    if text_boxes:
+        _add_text_boxes_slide(prs, text_boxes)
+
+    pivots = [n for n in model.nodes if isinstance(n, PivotTable)]
+    if pivots:
+        _add_pivot_tables_slide(prs, pivots)
+
+    anims = (model.metadata or {}).get("pptx_animations")
+    if isinstance(anims, list) and anims:
+        _add_animations_slide(prs, anims)
+
     buf = BytesIO()
     prs.save(buf)
+    layouts = [s.slide_layout.name for s in prs.slides]
+    if layouts:
+        model.metadata = dict(model.metadata or {})
+        model.metadata["pptx_slide_layouts"] = layouts[:50]
     return buf.getvalue()
 
 
@@ -85,13 +137,25 @@ def _estimate_chars(node) -> int:
     if isinstance(node, CodeBlock):
         return len(node.content) + 8
     if isinstance(node, Table):
-        return sum(len(str(c)) for row in node.rows for c in row) + 16
+        rows = node.rows or [[c.text for c in row] for row in (node.cells or [])]
+        return sum(len(str(c)) for row in rows for c in row) + 80
     if isinstance(node, MathBlock):
         return len(node.content) + 4
     if isinstance(node, Footnote):
         return len(node.text) + 8
+    if isinstance(node, Comment):
+        return len(node.text) + len(node.author) + len(node.anchor) + 12
+    if isinstance(node, Revision):
+        return len(node.text) + len(node.author) + 12
+    if isinstance(node, ContentControl):
+        return len(node.text) + len(node.alias) + len(node.tag) + 12
+    if isinstance(node, TextBox):
+        return len(node.text) + len(node.source) + 12
+    if isinstance(node, PivotTable):
+        fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+        return len(node.name) + len(fields) + len(node.source_range) + 20
     if isinstance(node, Image):
-        return 40
+        return 120
     return 10
 
 
@@ -102,8 +166,139 @@ def _bucket_title(bucket: list, index: int) -> str:
     return f"Slide {index}"
 
 
+def _add_comments_slide(prs: Presentation, comments: list[Comment]) -> None:
+    """Review slide: author + anchor + text (Word-style comment metadata)."""
+    layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(layout)
+    slide.shapes.title.text = "Review comments"
+    left = Inches(0.7)
+    top = Inches(1.55)
+    width = Inches(12.0)
+    for c in comments[:24]:
+        anchor = (c.anchor or "").strip()
+        head = c.author or "reviewer"
+        if anchor:
+            head = f"{head} → {anchor}"
+        line = f"{head}: {c.text}"
+        height = Inches(0.55)
+        box = slide.shapes.add_textbox(left, top, width, height)
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = line[:500]
+        p.font.size = Pt(13)
+        p.font.color.rgb = RGBColor(0x5B, 0x66, 0x75)
+        top += height + Inches(0.08)
+
+
+def _add_meta_textbox_slide(
+    prs: Presentation,
+    title: str,
+    lines: list[str],
+    *,
+    font_size: int = 13,
+    color: RGBColor | None = None,
+) -> None:
+    """Review-style slide: title + stacked text boxes (Comment/Footnote/meta parity)."""
+    if not lines:
+        return
+    layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(layout)
+    slide.shapes.title.text = title
+    left = Inches(0.7)
+    top = Inches(1.55)
+    width = Inches(12.0)
+    rgb = color or RGBColor(0x5B, 0x66, 0x75)
+    for line in lines[:24]:
+        height = Inches(0.55)
+        box = slide.shapes.add_textbox(left, top, width, height)
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = line[:500]
+        p.font.size = Pt(font_size)
+        p.font.color.rgb = rgb
+        top += height + Inches(0.08)
+
+
+def _add_revisions_slide(prs: Presentation, revisions: list[Revision]) -> None:
+    lines: list[str] = []
+    for rev in revisions:
+        tag = "ins" if rev.change == "insert" else "del"
+        author = rev.author or "editor"
+        lines.append(f"[{tag} {author}] {rev.text}")
+    _add_meta_textbox_slide(prs, "Track changes", lines, color=RGBColor(0x9A, 0x67, 0x00))
+
+
+def _add_content_controls_slide(prs: Presentation, controls: list[ContentControl]) -> None:
+    lines: list[str] = []
+    for cc in controls:
+        label = cc.alias or cc.tag or "control"
+        ctype = cc.control_type or "richText"
+        lines.append(f"{label} ({ctype}): {cc.text}")
+    _add_meta_textbox_slide(prs, "Content controls", lines, color=RGBColor(0x18, 0x5F, 0xA5))
+
+
+def _add_text_boxes_slide(prs: Presentation, boxes: list[TextBox]) -> None:
+    lines: list[str] = []
+    for box in boxes:
+        src = f" [{box.source}]" if box.source else ""
+        lines.append(f"Text box{src}: {box.text}")
+    _add_meta_textbox_slide(prs, "Text boxes", lines)
+
+
+def _add_pivot_tables_slide(prs: Presentation, pivots: list[PivotTable]) -> None:
+    lines: list[str] = []
+    for pt in pivots:
+        fields = " / ".join(pt.row_fields + pt.col_fields + pt.data_fields)
+        loc = f" @ {pt.location}" if pt.location else ""
+        src = f" ← {pt.source_range}" if pt.source_range else ""
+        lines.append(f"{pt.name or 'Pivot'}{loc}: {fields}{src}")
+    _add_meta_textbox_slide(prs, "Pivot tables", lines, font_size=12)
+
+
+def _add_footnotes_slide(prs: Presentation, footnotes: list[Footnote]) -> None:
+    layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(layout)
+    slide.shapes.title.text = "Footnotes"
+    left = Inches(0.7)
+    top = Inches(1.55)
+    width = Inches(12.0)
+    for fn in footnotes[:24]:
+        height = Inches(0.5)
+        box = slide.shapes.add_textbox(left, top, width, height)
+        tf = box.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.text = f"[^{fn.id}] {fn.text}"[:500]
+        p.font.size = Pt(12)
+        top += height + Inches(0.06)
+
+
+def _add_animations_slide(prs: Presentation, anims: list) -> None:
+    """Speaker-notes style summary of imported animation XML (no playback)."""
+    layout = prs.slide_layouts[1]
+    slide = prs.slides.add_slide(layout)
+    slide.shapes.title.text = "Animation metadata"
+    left = Inches(0.7)
+    top = Inches(1.55)
+    width = Inches(12.0)
+    for raw in anims[:20]:
+        if not isinstance(raw, dict):
+            continue
+        slide_n = raw.get("slide", "?")
+        effects = raw.get("effects") or []
+        eff = ", ".join(str(e) for e in effects[:5]) if effects else "timing nodes"
+        line = f"Slide {slide_n}: {raw.get('node_count', 0)} nodes — {eff}"
+        box = slide.shapes.add_textbox(left, top, width, Inches(0.45))
+        box.text_frame.text = line[:500]
+        for p in box.text_frame.paragraphs:
+            p.font.size = Pt(12)
+        top += Inches(0.5)
+
+
 def _add_title_slide(prs: Presentation, title: str) -> None:
-    layout = prs.slide_layouts[0]  # title
+    layout = prs.slide_layouts[0]
     slide = prs.slides.add_slide(layout)
     slide.shapes.title.text = title[:200]
     if slide.placeholders and len(slide.placeholders) > 1:
@@ -114,33 +309,164 @@ def _add_title_slide(prs: Presentation, title: str) -> None:
 
 
 def _add_content_slide(prs: Presentation, title: str, nodes: list) -> None:
-    layout = prs.slide_layouts[1]  # title and content
+    layout = prs.slide_layouts[1]
     slide = prs.slides.add_slide(layout)
     slide.shapes.title.text = title[:200]
-    body = slide.placeholders[1]
-    tf = body.text_frame
-    tf.clear()
 
-    first = True
+    # Prefer free textboxes for body so tables/images can interleave (multi-frame layout).
+    try:
+        body = slide.placeholders[1]
+        body.text_frame.clear()
+    except Exception:
+        pass
+
+    cursor_top = Inches(1.55)
+    left = Inches(0.7)
+    usable_width = Inches(12.0)
+    text_buf: list[tuple[str, int, object]] = []
+
+    def _flush_textboxes() -> None:
+        nonlocal cursor_top, text_buf
+        if not text_buf:
+            return
+        # One textbox per contiguous text run (max ~6 lines per box for readability)
+        chunk: list[tuple[str, int, object]] = []
+        for item in text_buf:
+            chunk.append(item)
+            if len(chunk) >= 6:
+                cursor_top = _add_textbox_block(slide, chunk, left, cursor_top, usable_width)
+                chunk = []
+        if chunk:
+            cursor_top = _add_textbox_block(slide, chunk, left, cursor_top, usable_width)
+        text_buf = []
+
     for node in nodes:
         if isinstance(node, Heading) and node.plain_text() == title:
             continue
-        lines = _node_lines(node)
-        for line, level in lines:
-            if first:
-                p = tf.paragraphs[0]
-                first = False
-            else:
-                p = tf.add_paragraph()
-            p.text = line[:500]
-            p.level = min(level, 4)
-            p.font.size = Pt(16 if level == 0 else 14)
-            if isinstance(node, Heading):
-                p.font.bold = True
-                p.font.color.rgb = RGBColor(0x1A, 0x56, 0xDB)
-            if isinstance(node, CodeBlock) or isinstance(node, MathBlock):
-                p.font.name = "Courier New"
-                p.font.size = Pt(12)
+
+        if isinstance(node, Table):
+            _flush_textboxes()
+            cursor_top = _add_table_shape(slide, node, left, cursor_top, usable_width)
+            continue
+
+        if isinstance(node, TextBox):
+            _flush_textboxes()
+            cursor_top = _add_inline_textbox_shape(slide, node, left, cursor_top, usable_width)
+            continue
+
+        if isinstance(node, Image) and node.data:
+            _flush_textboxes()
+            cursor_top = _add_image_shape(slide, node, left, cursor_top, usable_width)
+            continue
+
+        for line, level in _node_lines(node):
+            text_buf.append((line, level, node))
+
+    _flush_textboxes()
+
+
+def _add_textbox_block(slide, lines: list[tuple[str, int, object]], left, top, width) -> Emu:
+    height = Inches(min(2.8, 0.28 * max(1, len(lines)) + 0.15))
+    box = slide.shapes.add_textbox(left, top, width, height)
+    tf = box.text_frame
+    tf.word_wrap = True
+    first = True
+    for line, level, node in lines:
+        p = tf.paragraphs[0] if first else tf.add_paragraph()
+        first = False
+        p.text = line[:500]
+        p.level = min(level, 4)
+        p.font.size = Pt(16 if level == 0 else 14)
+        if isinstance(node, Heading):
+            p.font.bold = True
+            p.font.color.rgb = RGBColor(0x1A, 0x56, 0xDB)
+        if isinstance(node, (CodeBlock, MathBlock)):
+            p.font.name = "Courier New"
+            p.font.size = Pt(12)
+    return top + height + Inches(0.12)
+
+
+def _table_matrix(node: Table) -> list[list[str]]:
+    if node.cells and table_has_span_cells(node):
+        return table_flat_matrix(node)
+    if node.rows:
+        return [[str(c) for c in row] for row in node.rows]
+    if node.cells:
+        return [[(c.text if c is not None else "") for c in row] for row in node.cells]
+    return [["(empty table)"]]
+
+
+def _table_has_span_cells(node: Table) -> bool:
+    return table_has_span_cells(node)
+
+
+def _add_inline_textbox_shape(slide, box: TextBox, left, top, width) -> Emu:
+    height = Inches(min(1.2, 0.28 * max(1, len((box.text or "").splitlines())) + 0.35))
+    shape = slide.shapes.add_textbox(left + Inches(0.15), top, width - Inches(0.3), height)
+    tf = shape.text_frame
+    tf.word_wrap = True
+    tf.text = (box.text or "")[:500]
+    for p in tf.paragraphs:
+        p.font.size = Pt(11)
+        p.font.italic = True
+        if box.source:
+            p.font.color.rgb = RGBColor(0x5B, 0x66, 0x75)
+    return top + height + Inches(0.18)
+
+
+def _add_table_shape(slide, node: Table, left, top, width) -> Emu:
+    matrix = _table_matrix(node)[:_MAX_TABLE_ROWS]
+    if not matrix:
+        return top
+    cols = min(_MAX_TABLE_COLS, max(len(r) for r in matrix))
+    rows = len(matrix)
+    height = Inches(min(4.5, 0.35 * rows + 0.2))
+    table_shape = slide.shapes.add_table(rows, cols, left, top, width, height).table
+    header_end = max(0, int(node.header_rows or 0))
+    for r_i, row in enumerate(matrix):
+        for c_i in range(cols):
+            cell = table_shape.cell(r_i, c_i)
+            cell.text = (row[c_i] if c_i < len(row) else "")[:200]
+            for p in cell.text_frame.paragraphs:
+                for run in p.runs:
+                    run.font.size = Pt(11)
+                    if header_end > 0 and r_i < header_end:
+                        run.font.bold = True
+                    elif header_end == 0 and r_i == 0:
+                        run.font.bold = True
+
+    if node.cells and _table_has_span_cells(node):
+        for r_idx, row in enumerate(node.cells[:rows]):
+            for c_idx, meta in enumerate(row[:cols]):
+                if meta.covered:
+                    continue
+                if r_idx >= rows or c_idx >= cols:
+                    continue
+                cell = table_shape.cell(r_idx, c_idx)
+                if meta.col_span > 1:
+                    end_c = min(c_idx + meta.col_span - 1, cols - 1)
+                    if end_c > c_idx:
+                        cell.merge(table_shape.cell(r_idx, end_c))
+                if meta.row_span > 1:
+                    end_r = min(r_idx + meta.row_span - 1, rows - 1)
+                    if end_r > r_idx:
+                        cell.merge(table_shape.cell(end_r, c_idx))
+    return top + height + Inches(0.25)
+
+
+def _add_image_shape(slide, node: Image, left, top, width) -> Emu:
+    try:
+        stream = BytesIO(node.data)
+        # Keep aspect roughly within slide body
+        pic_width = min(width, Inches(8))
+        pic = slide.shapes.add_picture(stream, left, top, width=pic_width)
+        return top + pic.height + Inches(0.2)
+    except Exception:
+        # Fall back to alt text line via a tiny text box
+        box = slide.shapes.add_textbox(left, top, width, Inches(0.4))
+        alt = node.alt_text.split("|", 1)[0] if node.alt_text else "image"
+        box.text_frame.text = f"[Image: {alt}]"
+        return top + Inches(0.5)
 
 
 def _node_lines(node) -> list[tuple[str, int]]:
@@ -165,13 +491,31 @@ def _node_lines(node) -> list[tuple[str, int]]:
     if isinstance(node, CodeBlock):
         return [(node.content[:800], 0)]
     if isinstance(node, MathBlock):
-        return [(node.content, 0)]
+        if node.display:
+            return [("⟨math⟩", 0), (node.content, 0)]
+        return [(f"⟨math⟩ {node.content}", 0)]
     if isinstance(node, Footnote):
         return [(f"[^{node.id}] {node.text}", 0)]
+    if isinstance(node, Comment):
+        anchor = f" on {node.anchor}" if node.anchor else ""
+        return [(f"[{node.author}{anchor}] {node.text}", 0)]
+    if isinstance(node, Revision):
+        tag = "ins" if node.change == "insert" else "del"
+        return [(f"[{tag} {node.author}] {node.text}", 0)]
+    if isinstance(node, ContentControl):
+        label = node.alias or node.tag or "control"
+        return [(f"[{label}] {node.text}", 0)]
+    if isinstance(node, TextBox):
+        src = f" ({node.source})" if node.source else ""
+        return [(f"[Text box{src}] {node.text}", 0)]
+    if isinstance(node, PivotTable):
+        fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+        return [(f"[Pivot {node.name}] {fields}", 0)]
     if isinstance(node, Table):
+        # Fallback text path if shape placement is skipped
         out = []
-        for row in node.rows[:12]:
-            out.append((" | ".join(str(c) for c in row), 0))
+        for row in _table_matrix(node)[:12]:
+            out.append((" | ".join(row), 0))
         return out or [("(empty table)", 0)]
     if isinstance(node, Image):
         alt = node.alt_text.split("|", 1)[0] if node.alt_text else "image"

@@ -18,6 +18,7 @@ class TenantKey:
     tenant_id: str
     api_key: str
     rate_limit: int | None = None  # None → use global settings.rate_limit_per_minute
+    daily_quota: int | None = None  # conversions per UTC day; None = unlimited
 
 
 def _parse_compact(raw: str) -> list[TenantKey]:
@@ -47,7 +48,9 @@ def _parse_json_list(data: object) -> list[TenantKey]:
             continue
         rl = item.get("rate_limit")
         rate = int(rl) if rl is not None and str(rl).strip() != "" else None
-        out.append(TenantKey(tenant_id=tid, api_key=key, rate_limit=rate))
+        dq = item.get("daily_quota")
+        quota = int(dq) if dq is not None and str(dq).strip() != "" else None
+        out.append(TenantKey(tenant_id=tid, api_key=key, rate_limit=rate, daily_quota=quota))
     return out
 
 

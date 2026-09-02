@@ -25,6 +25,12 @@ jobs:
         run: ruff check app tests
       - name: Pytest + coverage
         run: pytest -q --tb=short --cov=app --cov-report=term-missing --cov-fail-under=70
+      - name: Golden xlsx / span regression (no native)
+        run: |
+          pytest -q tests/test_golden_ast_xlsx.py tests/test_golden_xlsx_pipeline.py \
+            tests/test_golden_odt_json_deep.py tests/test_exporter_spans.py \
+            tests/test_target_format_registry.py tests/test_target_format_span_meta.py \
+            tests/test_observability_pack.py --tb=short
       - name: pip-audit
         run: pip-audit --strict || pip-audit
         continue-on-error: true
@@ -43,3 +49,35 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci || npm install
       - run: npm run build
+
+  native-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native/anydoc -> native/anydoc/target
+      - name: Create venv + install backend
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install -U pip
+          backend/.venv/bin/pip install -e "backend/[dev]"
+      - name: Build mdbridge_native
+        run: bash scripts/build_native.sh
+      - name: Assert no firecrawl-anydoc
+        run: |
+          backend/.venv/bin/python - <<'PY'
+          import importlib.util as u
+          assert u.find_spec("anydoc") is None, "firecrawl-anydoc must not be installed"
+          import mdbridge_native._doc  # noqa: F401
+          print("OK mdbridge_native only")
+          PY
+      - name: Fixture tests (docx/rtf/…)
+        working-directory: backend
+        run: |
+          .venv/bin/pytest -q tests/test_anydoc_bridge.py tests/test_golden_matrix.py tests/test_golden_mobi_footnote.py tests/test_golden_ast_xlsx.py tests/test_golden_xlsx_pipeline.py tests/test_golden_odt_json_deep.py tests/test_exporter_spans.py --tb=short

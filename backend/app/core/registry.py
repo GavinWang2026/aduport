@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -40,18 +41,137 @@ def registered_export_formats() -> list[str]:
     return sorted(_EXPORTERS)
 
 
+def _call_native(
+    native: ImporterFn, source_bytes: bytes, args: tuple[Any, ...], kwargs: dict[str, Any]
+) -> DocumentModel:
+    """Invoke a native importer, matching its own arity."""
+    try:
+        params = inspect.signature(native).parameters
+    except (TypeError, ValueError):
+        return native(source_bytes, *args, **kwargs)
+    accepts_varargs = any(p.kind is p.VAR_POSITIONAL for p in params.values())
+    positional = [
+        p
+        for p in params.values()
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+    ]
+    if accepts_varargs or len(positional) > 1:
+        return native(source_bytes, *args, **kwargs)
+    return native(source_bytes)
+
+
+def _anydoc_first(fmt: str, native: ImporterFn | None) -> ImporterFn:
+    """Wrap an importer so anydoc parses first and the native one is the net."""
+
+    def _wrapped(source_bytes: bytes, *args: Any, **kwargs: Any) -> DocumentModel:
+        from app.config import settings
+        from app.importers.anydoc_bridge import (
+            AnydocFallback,
+            AnydocUnavailable,
+            import_via_anydoc,
+            should_handle,
+        )
+
+        filename = args[0] if args and isinstance(args[0], str) else ""
+        model: DocumentModel | None = None
+        if should_handle(fmt):
+            try:
+                model = import_via_anydoc(source_bytes, filename, fmt)
+            except AnydocUnavailable:
+                if native is None:
+                    raise
+            except AnydocFallback:
+                if native is None or not settings.anydoc_fallback:
+                    raise
+        if model is None:
+            if native is None:
+                from app.core.exceptions import UnsupportedFormatError
+
+                raise UnsupportedFormatError(
+                    f"格式 {fmt} 需要内置原生解析扩展：执行 scripts/build_native.sh 编译 "
+                    f"mdbridge_native._doc"
+                )
+            model = _call_native(native, source_bytes, args, kwargs)
+            if not model.metadata.get("importer"):
+                model.metadata["importer"] = (
+                    "native_fallback" if should_handle(fmt) else "native"
+                )
+        if fmt == "docx":
+            from app.importers.docx_ooxml import enrich_docx_model
+
+            model = enrich_docx_model(model, source_bytes)
+        return model
+
+    _wrapped.__name__ = f"anydoc_or_{getattr(native, '__name__', fmt)}"
+    return _wrapped
+
+
+def _wire_anydoc() -> None:
+    from app.importers.anydoc_bridge import (
+        ANYDOC_ONLY_SIBLINGS,
+        supports as anydoc_supports,
+    )
+
+    for fmt in ("doc", "docx", "odt", "rtf", "pptx", "epub", "csv", "xlsx"):
+        native = _IMPORTERS.get(fmt)
+        if native is not None and anydoc_supports(fmt):
+            register_importer(fmt, _anydoc_first(fmt, native))
+
+    for fmt, sibling in ANYDOC_ONLY_SIBLINGS.items():
+        if not anydoc_supports(fmt):
+            continue
+        native = _IMPORTERS.get(sibling) if sibling else None
+        register_importer(fmt, _anydoc_first(fmt, native))
+
+
 def ensure_builtin_plugins() -> None:
     """Lazy-load built-in plugins once."""
-    needed = {"md", "docx", "pdf", "html", "txt", "epub", "pptx", "mobi", "azw3", "kf8"}
-    if needed.issubset(_EXPORTERS) and _IMPORTERS:
+    needed_exporters = {
+        "md",
+        "docx",
+        "pdf",
+        "html",
+        "txt",
+        "epub",
+        "pptx",
+        "mobi",
+        "azw3",
+        "kf8",
+        "latex",
+        "csv",
+        "odt",
+        "json",
+        "xlsx",
+        "rtf",
+    }
+    needed_importers = {
+        "odt",
+        "rtf",
+        "doc",
+        "json",
+        "xlsx",
+        "csv",
+        "latex",
+        "azw3",
+        "kf8",
+    }
+    if needed_exporters.issubset(_EXPORTERS) and needed_importers.issubset(_IMPORTERS):
         return
+
+    from app.exporters.json_exporter import import_json
+    from app.exporters.xlsx_exporter import import_xlsx
+    from app.importers.csv_importer import import_csv
+    from app.importers.doc_importer import import_doc
     from app.importers.docx_importer import import_docx
     from app.importers.epub_importer import import_epub
     from app.importers.html_importer import import_html
+    from app.importers.latex_importer import import_latex
     from app.importers.md_importer import import_md
     from app.importers.mobi_importer import import_mobi
+    from app.importers.odt_importer import import_odt
     from app.importers.pdf_importer import import_pdf
     from app.importers.pptx_importer import import_pptx
+    from app.importers.rtf_importer import import_rtf
     from app.importers.txt_importer import import_txt
 
     register_importer("md", import_md)
@@ -62,22 +182,37 @@ def ensure_builtin_plugins() -> None:
     register_importer("pptx", import_pptx)
     register_importer("epub", import_epub)
     register_importer("mobi", import_mobi)
+    register_importer("azw3", import_mobi)
+    register_importer("kf8", import_mobi)
+    register_importer("latex", import_latex)
+    register_importer("odt", import_odt)
+    register_importer("rtf", import_rtf)
+    register_importer("doc", import_doc)
+    register_importer("json", import_json)
+    register_importer("xlsx", import_xlsx)
+    register_importer("csv", import_csv)
 
     from app.exporters.azw3_exporter import export_azw3, export_kf8
+    from app.exporters.csv_exporter import export_csv
     from app.exporters.docx_exporter import export_docx
     from app.exporters.epub_exporter import export_epub
     from app.exporters.html_exporter import export_html
+    from app.exporters.json_exporter import export_json
+    from app.exporters.latex_exporter import export_latex
     from app.exporters.md_exporter import export_md
     from app.exporters.mobi_exporter import export_mobi
+    from app.exporters.odt_exporter import export_odt
     from app.exporters.pdf_exporter import export_pdf
     from app.exporters.pptx_exporter import export_pptx
+    from app.exporters.rtf_exporter import export_rtf
     from app.exporters.txt_exporter import export_txt
+    from app.exporters.xlsx_exporter import export_xlsx
 
     def _export_md_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_md(model).encode("utf-8")
 
-    def _export_docx_bytes(model: DocumentModel, **_: Any) -> bytes:
-        return export_docx(model)
+    def _export_docx_bytes(model: DocumentModel, **kwargs: Any) -> bytes:
+        return export_docx(model, theme=kwargs.get("docx_theme"))
 
     def _export_pptx_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_pptx(model)
@@ -137,6 +272,24 @@ def ensure_builtin_plugins() -> None:
             toc=pdf_toc,
         )
 
+    def _export_latex_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_latex(model).encode("utf-8")
+
+    def _export_csv_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_csv(model).encode("utf-8")
+
+    def _export_odt_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_odt(model)
+
+    def _export_json_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_json(model).encode("utf-8")
+
+    def _export_xlsx_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_xlsx(model)
+
+    def _export_rtf_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_rtf(model)
+
     register_exporter("md", _export_md_bytes)
     register_exporter("docx", _export_docx_bytes)
     register_exporter("pdf", _export_pdf_bytes)
@@ -147,3 +300,11 @@ def ensure_builtin_plugins() -> None:
     register_exporter("mobi", _export_mobi_bytes)
     register_exporter("azw3", _export_azw3_bytes)
     register_exporter("kf8", _export_kf8_bytes)
+    register_exporter("latex", _export_latex_bytes)
+    register_exporter("csv", _export_csv_bytes)
+    register_exporter("odt", _export_odt_bytes)
+    register_exporter("json", _export_json_bytes)
+    register_exporter("xlsx", _export_xlsx_bytes)
+    register_exporter("rtf", _export_rtf_bytes)
+
+    _wire_anydoc()

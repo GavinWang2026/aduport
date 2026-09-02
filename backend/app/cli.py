@@ -32,18 +32,53 @@ def _detect_format(path: Path) -> str:
     )
 
 
+def _pdf_docx_opts(
+    pdf_font: Optional[str],
+    pdf_css: Optional[str],
+    pdf_page_size: Optional[str],
+    pdf_orientation: Optional[str],
+    pdf_header: Optional[str],
+    pdf_footer: Optional[str],
+    pdf_page_numbers: Optional[bool],
+    pdf_toc: Optional[bool],
+    docx_theme: Optional[str],
+) -> dict:
+    return {
+        "pdf_font_family": pdf_font,
+        "pdf_custom_css": pdf_css,
+        "pdf_page_size": pdf_page_size,
+        "pdf_orientation": pdf_orientation,
+        "pdf_header": pdf_header,
+        "pdf_footer": pdf_footer,
+        "pdf_page_numbers": pdf_page_numbers,
+        "pdf_toc": pdf_toc,
+        "docx_theme": docx_theme,
+    }
+
+
 @app.command("convert")
 def convert_cmd(
     input_path: Path = typer.Argument(..., exists=True, readable=True, help="输入文件路径"),
     output_path: Path = typer.Argument(..., help="输出文件路径"),
-    source_format: Optional[str] = typer.Option(None, "--from", "-f", help="源格式 (docx/pdf/md)"),
-    target_format: Optional[str] = typer.Option(None, "--to", "-t", help="目标格式 (docx/pdf/md)"),
+    source_format: Optional[str] = typer.Option(None, "--from", "-f", help="源格式"),
+    target_format: Optional[str] = typer.Option(None, "--to", "-t", help="目标格式"),
     pdf_font: Optional[str] = typer.Option(None, "--pdf-font", help="PDF 字体族 (CSS font-family)"),
     pdf_css: Optional[str] = typer.Option(None, "--pdf-css", help="PDF 额外 CSS 字符串"),
+    pdf_page_size: Optional[str] = typer.Option(None, "--pdf-page-size", help="PDF 纸张 A4/Letter/..."),
+    pdf_orientation: Optional[str] = typer.Option(None, "--pdf-orientation", help="portrait|landscape"),
+    pdf_header: Optional[str] = typer.Option(None, "--pdf-header", help="PDF 页眉"),
+    pdf_footer: Optional[str] = typer.Option(None, "--pdf-footer", help="PDF 页脚"),
+    pdf_page_numbers: Optional[bool] = typer.Option(None, "--pdf-page-numbers/--no-pdf-page-numbers"),
+    pdf_toc: Optional[bool] = typer.Option(None, "--pdf-toc/--no-pdf-toc", help="PDF 目录"),
+    docx_theme: Optional[str] = typer.Option(None, "--docx-theme", help="default|academic|minimal"),
 ) -> None:
     """转换单个文档文件。"""
     src_fmt = (source_format or _detect_format(input_path)).lower().lstrip(".")
     tgt_fmt = (target_format or _detect_format(output_path)).lower().lstrip(".")
+    opts = _pdf_docx_opts(
+        pdf_font, pdf_css, pdf_page_size, pdf_orientation,
+        pdf_header, pdf_footer, pdf_page_numbers, pdf_toc, docx_theme,
+    )
 
     try:
         source_bytes = input_path.read_bytes()
@@ -52,8 +87,7 @@ def convert_cmd(
             src_fmt,
             tgt_fmt,
             filename=input_path.name,
-            pdf_font_family=pdf_font,
-            pdf_custom_css=pdf_css,
+            **opts,
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(result)
@@ -70,11 +104,18 @@ def convert_cmd(
 def batch_cmd(
     input_dir: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, help="输入目录"),
     output_dir: Path = typer.Argument(..., help="输出目录"),
-    source_format: str = typer.Option(..., "--from", "-f", help="源格式 (docx/pdf/md)"),
-    target_format: str = typer.Option(..., "--to", "-t", help="目标格式 (docx/pdf/md)"),
+    source_format: str = typer.Option(..., "--from", "-f", help="源格式"),
+    target_format: str = typer.Option(..., "--to", "-t", help="目标格式"),
     recursive: bool = typer.Option(False, "--recursive", "-r", help="递归扫描子目录"),
     pdf_font: Optional[str] = typer.Option(None, "--pdf-font", help="PDF 字体族 (CSS font-family)"),
     pdf_css: Optional[str] = typer.Option(None, "--pdf-css", help="PDF 额外 CSS 字符串"),
+    pdf_page_size: Optional[str] = typer.Option(None, "--pdf-page-size", help="PDF 纸张"),
+    pdf_orientation: Optional[str] = typer.Option(None, "--pdf-orientation", help="portrait|landscape"),
+    pdf_header: Optional[str] = typer.Option(None, "--pdf-header", help="PDF 页眉"),
+    pdf_footer: Optional[str] = typer.Option(None, "--pdf-footer", help="PDF 页脚"),
+    pdf_page_numbers: Optional[bool] = typer.Option(None, "--pdf-page-numbers/--no-pdf-page-numbers"),
+    pdf_toc: Optional[bool] = typer.Option(None, "--pdf-toc/--no-pdf-toc"),
+    docx_theme: Optional[str] = typer.Option(None, "--docx-theme", help="default|academic|minimal"),
 ) -> None:
     """批量转换目录中的文档。"""
     src = source_format.lower().lstrip(".")
@@ -86,6 +127,10 @@ def batch_cmd(
         typer.secho(f"不支持的目标格式: {target_format}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+    opts = _pdf_docx_opts(
+        pdf_font, pdf_css, pdf_page_size, pdf_orientation,
+        pdf_header, pdf_footer, pdf_page_numbers, pdf_toc, docx_theme,
+    )
     try:
         result = convert_directory(
             input_dir,
@@ -93,8 +138,7 @@ def batch_cmd(
             src,
             tgt,
             recursive=recursive,
-            pdf_font_family=pdf_font,
-            pdf_custom_css=pdf_css,
+            **opts,
         )
     except MdBridgeError as exc:
         typer.secho(f"错误 [{exc.code}]: {exc.message}", fg=typer.colors.RED, err=True)
@@ -120,7 +164,11 @@ def batch_cmd(
 @app.command("formats")
 def formats_cmd() -> None:
     """列出支持的格式。"""
-    typer.echo("Supported formats: " + ", ".join(sorted(SUPPORTED_FORMATS)))
+    from app.core.converter import SUPPORTED_SOURCE_FORMATS, SUPPORTED_TARGET_FORMATS
+
+    typer.echo(f"source: {sorted(SUPPORTED_SOURCE_FORMATS)}")
+    typer.echo(f"target: {sorted(SUPPORTED_TARGET_FORMATS)}")
+    typer.echo("all: " + ", ".join(sorted(SUPPORTED_FORMATS)))
 
 
 @app.command("machine-id")
@@ -139,7 +187,6 @@ def license_issue_cmd(
     customer: str = typer.Option("", "--customer", "-c", help="客户名称"),
 ) -> None:
     """签发企业 License Key（需与部署侧 MDBRIDGE_LICENSE_SECRET 一致）。"""
-    from app.core.exceptions import MdBridgeError
     from app.core.license import issue_license
 
     try:
@@ -165,8 +212,6 @@ def license_check_cmd(
 
     token = (key or settings.license_key or "").strip()
     if not token and settings.license_file:
-        from pathlib import Path
-
         token = Path(settings.license_file).read_text(encoding="utf-8").strip()
     info = parse_and_verify(token)
     typer.echo(f"host_machine_id={machine_id()}")

@@ -1,0 +1,9 @@
+# OCR-enabled backend overlay (enterprise scan PDF).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.ocr.yml up --build
+services:
+  backend:
+    build:
+      args:
+        INSTALL_OCR: "1"
+    environment:
+      MDBRIDGE_OCR_ENABLED: "true"

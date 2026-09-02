@@ -54,6 +54,29 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         tenant_limit = getattr(request.state, "tenant_rate_limit", None)
         effective = int(tenant_limit) if tenant_limit else limit
 
+        # Daily conversion quota (tenant JSON daily_quota)
+        daily_quota = getattr(request.state, "tenant_daily_quota", None)
+        if tenant_id and daily_quota is not None:
+            try:
+                q = int(daily_quota)
+            except (TypeError, ValueError):
+                q = 0
+            if q > 0:
+                from app.core.metrics import metrics as _metrics
+
+                used = _metrics.tenant_daily_count(str(tenant_id))
+                if used >= q:
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "error": True,
+                            "code": "daily_quota_exceeded",
+                            "message": f"租户日配额已用尽：{used}/{q}",
+                            "status_code": 429,
+                            "tenant_id": tenant_id,
+                        },
+                    )
+
         redis_blocked = self._redis_check(bucket, effective)
         if redis_blocked is True:
             return JSONResponse(

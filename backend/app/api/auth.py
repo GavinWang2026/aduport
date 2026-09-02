@@ -89,6 +89,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             request.state.tenant_id = tenant.tenant_id
             request.state.api_key_id = tenant.tenant_id
             request.state.tenant_rate_limit = tenant.rate_limit
+            request.state.tenant_daily_quota = tenant.daily_quota
         else:
             request.state.tenant_id = None
             request.state.api_key_id = None

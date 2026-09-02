@@ -91,9 +91,9 @@ def test_ocr_no_engine_raises_clear_error(monkeypatch):
     monkeypatch.setitem(oe._ENGINES, "mineru", Dead())
     monkeypatch.setitem(oe._ENGINES, "paddleocr_vl", Dead())
     monkeypatch.setitem(oe._ENGINES, "docling", Dead())
-    from app.core.exceptions import InvalidDocumentError
+    from app.core.exceptions import OcrUnavailableError
 
-    with pytest.raises(InvalidDocumentError, match="无可用引擎"):
+    with pytest.raises(OcrUnavailableError, match="无可用引擎"):
         oe.import_pdf_with_ocr(b"%PDF", "x.pdf", force_engine="mineru")
 
 

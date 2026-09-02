@@ -1,6 +1,8 @@
 # Slim image: Markdown + DOCX/PDF *export* + vendored anydoc import (no docling/torch).
 # High-fidelity Office→MD via mdbridge_native; no ML stack.
 #
+# Non-ASCII checkout paths: prefer `bash scripts/docker_build_safe.sh`
+#
 # Build from repo root:
 #   docker build -f backend/Dockerfile.slim -t md-bridge-backend:slim .
 # Or:
@@ -62,11 +64,11 @@ COPY backend/main.py ./
 RUN pip install --upgrade pip && pip install .
 
 COPY --from=native-builder /wheels /wheels
-RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/*.whl >/dev/null 2>&1; then \
-      pip install --no-index --no-deps /wheels/*.whl \
+RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/mdbridge_native*.whl >/dev/null 2>&1; then \
+      pip install --no-index --no-deps /wheels/mdbridge_native*.whl \
       && python -c "import mdbridge_native._doc as d; print('mdbridge_native._doc OK')"; \
     else \
-      echo "WARN: mdbridge_native not installed"; \
+      echo "WARN: mdbridge_native wheel not found in /wheels:"; ls -la /wheels || true; \
     fi \
  && rm -rf /wheels
 

@@ -1,17 +1,12 @@
-"""Exporter span fidelity: tables with row/col spans render as real merges.
-
-anydoc populates Table.cells with row_span / col_span / covered; these tests
-prove the DOCX / HTML / ODT exporters consume that data instead of the flat
-grid, and that Markdown degrades gracefully (header rows honoured, flat).
-"""
+"""Exporter span fidelity: native colspan/rowspan across DOCX/HTML/ODT/PPTX/MD/LaTeX/RTF/TXT."""
 
 from __future__ import annotations
 
 import io
 import zipfile
 
-from app.core.document_model import DocumentModel, Table, TableCell
-from app.exporters import docx_exporter, html_render, odt_exporter
+from app.core.document_model import DocumentModel, Heading, Paragraph, Table, TableCell, TextBox
+from app.exporters import docx_exporter, html_render, md_exporter, odt_exporter, pptx_exporter, rtf_exporter
 
 
 def _col_span_table() -> Table:
@@ -107,3 +102,184 @@ def test_docx_header_rows_valid():
     model = DocumentModel(title="t", nodes=[_header_table()])
     blob = docx_exporter.export_docx(model)
     assert blob[:2] == b"PK"  # valid docx zip
+
+
+# --------------------------------------------------------------------------
+# MD — GFM flat grid + header_rows honour
+# --------------------------------------------------------------------------
+
+
+def test_md_col_span_native_html():
+    out = md_exporter.export_md(DocumentModel(nodes=[_col_span_table()]))
+    assert 'colspan="2"' in out
+    assert "Merged" in out
+
+
+def test_md_row_span_native_html():
+    out = md_exporter.export_md(DocumentModel(nodes=[_row_span_table()]))
+    assert 'rowspan="2"' in out
+    assert "Tall" in out and "Y" in out and "Z" in out
+
+
+def test_md_span_import_roundtrip():
+    from app.importers.md_importer import import_md
+
+    raw = md_exporter.export_md(DocumentModel(nodes=[_col_span_table()])).encode()
+    model = import_md(raw)
+    tbl = model.nodes[0]
+    assert tbl.cells[0][0].col_span == 2
+    assert tbl.cells[0][1].covered is True
+
+
+def test_md_header_rows():
+    out = md_exporter.export_md(DocumentModel(nodes=[_header_table()]))
+    lines = [ln.strip() for ln in out.strip().splitlines() if ln.strip()]
+    sep_idx = next(i for i, ln in enumerate(lines) if ln.startswith("|") and "---" in ln)
+    assert sep_idx == 2
+    assert "H1" in lines[0] and "H2" in lines[0]
+    assert "a" in lines[1] and "b" in lines[1]
+
+
+# --------------------------------------------------------------------------
+# PPTX — python-pptx cell merge
+# --------------------------------------------------------------------------
+
+
+def _pptx_slide_xml(blob: bytes) -> str:
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        parts: list[str] = []
+        for name in sorted(z.namelist()):
+            if name.startswith("ppt/slides/slide") and name.endswith(".xml"):
+                parts.append(z.read(name).decode("utf-8", "ignore"))
+        return "\n".join(parts)
+    return ""
+
+
+def test_pptx_col_span_merge():
+    model = DocumentModel(title="t", nodes=[_col_span_table()])
+    xml = _pptx_slide_xml(pptx_exporter.export_pptx(model))
+    assert "gridSpan" in xml
+
+
+def test_pptx_row_span_merge():
+    model = DocumentModel(title="t", nodes=[_row_span_table()])
+    xml = _pptx_slide_xml(pptx_exporter.export_pptx(model))
+    assert 'rowSpan="2"' in xml or 'vMerge="1"' in xml
+
+
+# --------------------------------------------------------------------------
+# LaTeX — multicolumn / multirow
+# --------------------------------------------------------------------------
+
+
+def test_latex_col_span():
+    from app.exporters.latex_exporter import export_latex
+
+    out = export_latex(DocumentModel(nodes=[_col_span_table()]))
+    assert r"\multicolumn{2}" in out
+    assert "Merged" in out
+
+
+def test_latex_row_span():
+    from app.exporters.latex_exporter import export_latex
+
+    out = export_latex(DocumentModel(nodes=[_row_span_table()]))
+    assert r"\multirow{2}" in out
+
+
+def test_latex_col_span_import_roundtrip():
+    from app.exporters.latex_exporter import export_latex
+    from app.importers.latex_importer import import_latex
+
+    raw = export_latex(DocumentModel(nodes=[_col_span_table()]))
+    model = import_latex(raw.encode(), "span.tex")
+    tbl = next(n for n in model.nodes if isinstance(n, Table))
+    assert tbl.cells[0][0].col_span == 2
+    assert tbl.cells[0][0].text == "Merged"
+    assert tbl.cells[0][1].covered is True
+
+
+def test_latex_row_span_import_roundtrip():
+    from app.exporters.latex_exporter import export_latex
+    from app.importers.latex_importer import import_latex
+
+    raw = export_latex(DocumentModel(nodes=[_row_span_table()]))
+    model = import_latex(raw.encode(), "span.tex")
+    tbl = next(n for n in model.nodes if isinstance(n, Table))
+    assert tbl.cells[0][0].row_span == 2
+    assert tbl.cells[0][0].text == "Tall"
+    assert tbl.cells[1][0].covered is True
+
+
+# --------------------------------------------------------------------------
+# TXT — HTML table for span
+# --------------------------------------------------------------------------
+
+
+def test_txt_col_span_native_html():
+    from app.exporters.txt_exporter import export_txt
+
+    out = export_txt(DocumentModel(nodes=[_col_span_table()]))
+    assert 'colspan="2"' in out
+
+
+# --------------------------------------------------------------------------
+# RTF — clmgf merge
+# --------------------------------------------------------------------------
+
+
+def test_rtf_col_span_native():
+    out = rtf_exporter.export_rtf(DocumentModel(nodes=[_col_span_table()])).decode(
+        "utf-8", errors="replace"
+    )
+    assert "clmgf" in out
+    assert "Merged" in out and "A" in out and "B" in out
+
+
+def test_rtf_col_span_import_roundtrip():
+    from app.importers.rtf_importer import import_rtf
+
+    raw = rtf_exporter.export_rtf(DocumentModel(nodes=[_col_span_table()]))
+    model = import_rtf(raw, "span.rtf")
+    tbl = next(n for n in model.nodes if isinstance(n, Table))
+    assert tbl.cells[0][0].col_span == 2
+    assert tbl.cells[0][0].text == "Merged"
+    assert tbl.cells[0][1].covered is True
+    assert tbl.cells[1][0].text == "A"
+    assert tbl.cells[1][1].text == "B"
+
+
+# --------------------------------------------------------------------------
+# PPTX — meta nodes only on dedicated slides
+# --------------------------------------------------------------------------
+
+
+def test_pptx_meta_nodes_not_duplicated_in_content():
+    from app.core.document_model import Comment, Footnote
+
+    model = DocumentModel(
+        title="Meta",
+        nodes=[
+            Heading(level=2, text="Body"),
+            Paragraph(text="Main content."),
+            Comment(author="reviewer", anchor="p1", text="check totals"),
+            Footnote(id="1", text="See appendix"),
+        ],
+    )
+    xml = _pptx_slide_xml(pptx_exporter.export_pptx(model))
+    assert xml.count("check totals") == 1
+    assert xml.count("See appendix") == 1
+    assert "Main content" in xml
+
+
+def test_pptx_textbox_inline_on_content_slide():
+    model = DocumentModel(
+        title="Deck",
+        nodes=[
+            Heading(level=2, text="Section"),
+            TextBox(text="Floating note", source="docx:txbx"),
+        ],
+    )
+    xml = _pptx_slide_xml(pptx_exporter.export_pptx(model))
+    assert xml.count("Floating note") >= 1
+    assert "Text boxes" in xml or "Floating note" in xml

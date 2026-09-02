@@ -18,8 +18,8 @@ def test_convert_isolated_md_roundtrip():
     assert b"world" in out
 
 
-def test_convert_isolated_reports_worker_crash(tmp_path: Path):
-    """Simulate child dying without writing status.json."""
+def test_convert_isolated_falls_back_when_worker_crash(tmp_path: Path):
+    """Worker crash without status.json → in-process fallback still succeeds."""
 
     def fake_run(cmd, **kwargs):
         class Proc:
@@ -33,9 +33,32 @@ def test_convert_isolated_reports_worker_crash(tmp_path: Path):
         s.convert_isolate = True
         s.convert_timeout_seconds = 60
         with patch("app.core.convert_isolate.subprocess.run", side_effect=fake_run):
-            with pytest.raises(ExportError) as ei:
-                convert_isolated(b"# x\n", "md", "txt", filename="x.md")
-            assert ei.value.code == "worker_crash"
+            out = convert_isolated(b"# x\n", "md", "txt", filename="x.md")
+            assert b"x" in out
+
+
+def test_convert_isolated_reports_worker_crash_when_fallback_fails(tmp_path: Path):
+    """If worker dies and in-process fallback fails, surface worker_crash."""
+
+    def fake_run(cmd, **kwargs):
+        class Proc:
+            returncode = -6
+            stderr = b"abort: fake native crash"
+            stdout = b""
+
+        return Proc()
+
+    with patch("app.core.convert_isolate.settings") as s:
+        s.convert_isolate = True
+        s.convert_timeout_seconds = 60
+        with patch("app.core.convert_isolate.subprocess.run", side_effect=fake_run):
+            with patch(
+                "app.core.convert_isolate.convert",
+                side_effect=RuntimeError("boom"),
+            ):
+                with pytest.raises(ExportError) as ei:
+                    convert_isolated(b"# x\n", "md", "txt", filename="x.md")
+                assert ei.value.code == "worker_crash"
 
 
 def test_convert_isolated_passthrough_when_disabled():

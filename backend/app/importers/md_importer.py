@@ -89,6 +89,7 @@ def import_md(source_bytes: bytes) -> DocumentModel:
     )
     tokens = md.parse(text)
     model = DocumentModel(nodes=[])
+    pending_table_meta: dict | None = None
     i = 0
     while i < len(tokens):
         token = tokens[i]
@@ -132,6 +133,11 @@ def import_md(source_bytes: bytes) -> DocumentModel:
         if token.type == "table_open":
             table, consumed = _parse_table(tokens, i)
             if table:
+                if pending_table_meta:
+                    from app.exporters.table_span import apply_table_span_metadata
+
+                    apply_table_span_metadata(table, pending_table_meta)
+                    pending_table_meta = None
                 model.nodes.append(table)
             i += consumed
             continue
@@ -140,6 +146,13 @@ def import_md(source_bytes: bytes) -> DocumentModel:
             i += 1
             continue
         if token.type in ("html_block", "html_inline"):
+            from app.exporters.table_span import parse_table_span_comment
+
+            meta = parse_table_span_comment(token.content or "")
+            if meta:
+                pending_table_meta = meta
+                i += 1
+                continue
             nodes = _nodes_from_html(token.content or "")
             model.nodes.extend(nodes)
             i += 1
@@ -278,6 +291,15 @@ def _nodes_from_html(raw: str) -> list:
     raw = (raw or "").strip()
     if not raw:
         return []
+    if re.search(r"<\s*table\b", raw, re.I):
+        from app.importers.html_importer import import_html
+
+        try:
+            doc = import_html(raw.encode("utf-8"), "inline.html")
+            if doc.nodes:
+                return doc.nodes
+        except Exception:
+            pass
     # Reject dangerous constructs; keep a sanitized fragment for round-trip
     lower = raw.lower()
     if "<script" in lower or "<iframe" in lower or "javascript:" in lower:

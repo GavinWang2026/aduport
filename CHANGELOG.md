@@ -1,6 +1,41 @@
 # Changelog
 
+## [0.16.0] - 2026-09-01
+
+anydoc 源码级融入 + 自有 PDF 文本层依赖（相对 0.11 线累计至当前包版本）。
+
+### Added
+- **Vendored anydoc (Firecrawl) as `mdbridge_native._doc`**: Rust sources under `native/anydoc/`; maturin builds an in-process abi3 extension (**not** shipped on PyPI — use Docker `INSTALL_NATIVE=1` or `scripts/build_native.sh`)
+- **Importer bridge**: fast path (`to_markdown_bytes`) and model path (`to_document` → `DocumentModel`); hosted OCR removed
+- **Ops**: `MDBRIDGE_ANYDOC_*` (incl. `FALLBACK` / `SNIFF`); `/health` `anydoc_available` / `anydoc_version`; `/formats` only/led lists
+- **Docker multi-stage**: install only `mdbridge_native*.whl` when `INSTALL_NATIVE=1`
+- **Scripts**: `build_native.sh`, `sync_anydoc.sh` (pinned via `UPSTREAM_PIN`), `docker_build_safe.sh` (ASCII-safe context)
+- **Core PDF text-layer**: `pypdfium2>=4.30` first-class (fixes digital PDF 0-char in slim/dev)
+- **Telemetry**: `mdbridge_anydoc_hit_rate`, `mdbridge_anydoc_channel_share`, `mdbridge_anydoc_hits_by_channel{channel=}`
+- **DOCX product switches**: Form `docx_theme`; `MDBRIDGE_DOCX_EXPORT_COMMENTS` / `MDBRIDGE_HEADING_NUMBERING`; `/health` exposes theme/comments/numbering
+- **XLSX value export**: `Table.cells` fallback; import metadata `export_policy=values_only`
+- **OCR readiness**: `/health` `ocr_ready` + `ocr.install_hint` when engines missing
+- **Product surface**: Web PDF/DOCX advanced options; job `callback_url` webhook; `MDBRIDGE_JOB_RESULT_DIR` result blobs; CLI PDF/DOCX parity; `docs/document-model.md` + `ENTERPRISE.md`
+- **Vertical depth (v1.5)**: RTF export target; PDF two-column heuristic (`MDBRIDGE_PDF_TEXT_MULTICOLUMN`); xlsx sheet names + header bold styles; PPTX multi-textbox layout; tenant `daily_quota` + `metrics.alerts`; Docker `INSTALL_OCR=1` build-arg
+- **Ops & quality (v1.6)**: `docs/ops/prometheus/` Grafana dashboard + alert rules; metrics `mdbridge_ocr_ready`, `mdbridge_conversions_failed_by_code`; golden matrix CI `test_golden_matrix.py`
+- **P2-4 breadth**: default `MDBRIDGE_ANYDOC_FORMATS` adds **epub** + **csv** (anydoc-first, native fallback); fixture tests in `test_anydoc_bridge.py`
+- **Comment export**: `html_render` renders `<aside class="comment">` for HTML/EPUB/MOBI/AZW3 (`test_html_comment_export.py`)
+- **§2 vertical (v1.8)**: enterprise `INSTALL_OCR=1` + `MDBRIDGE_OCR_ENABLED` default; PDF/PPTX Comment; Prometheus templates
+- **AST depth (v1.9)**: `Revision`; DOCX `section_props`; `Image.wrap`; xlsx formulas + pivot metadata; PDF layout meta; PPTX layouts; EPUB DRM detect (`test_accepted_depth.py`)
+- **Registry fix**: restore full exporter/importer registration (xlsx/odt/csv/json/latex/rtf + anydoc wiring)
+
+### Changed
+- Default `MDBRIDGE_ANYDOC_FORMATS` includes **doc** + **pptx** + **epub** + **csv** (Rust fast→md); **xlsx** stays native (header-row); **pdf** stays md-bridge engines
+- Frontend source formats expose ppt / xls / ods / odp / xlsb siblings
+- `/formats` notes document docx / xlsx / ocr / jobs contracts
+- `SUPPORTED_TARGET_FORMATS` includes **rtf**; Web target dropdown aligned
+
+### Notes
+- PyPI/SDK: Python package only — compile native separately for high-fidelity Office import
+- Colima: prefer `scripts/docker_build_safe.sh` when the checkout path is non-ASCII
+
 ## [0.11.0] - 2026-08-31
+
 
 ### Added
 - **DOCX OOXML enrich**: import post-pass for `comments.xml` / headers / theme → AST + metadata

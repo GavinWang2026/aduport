@@ -1,4 +1,8 @@
-"""Unified intermediate document model (AST) for md-bridge."""
+"""Unified intermediate document model (AST) for md-bridge.
+
+All importers produce a ``DocumentModel``; all exporters consume one.
+See ``docs/document-model.md`` and ``examples/sdk_demo.py`` (``demo_document_model``).
+"""
 
 from __future__ import annotations
 
@@ -88,6 +92,8 @@ class Table(BaseModel):
     cells: list[list["TableCell"]] = Field(default_factory=list)
     header_rows: int = 0
     kind: str = "data"
+    # Spreadsheet sheet / table caption (xlsx round-trip)
+    name: str = ""
 
 
 class TableCell(BaseModel):
@@ -99,6 +105,9 @@ class TableCell(BaseModel):
     covered: bool = False
     origin_row: int = 0
     origin_col: int = 0
+    # Spreadsheet semantics (values + formula text; pivot/chart as metadata kind).
+    formula: str = ""
+    cell_kind: Literal["value", "formula", "pivot", "chart"] = "value"
 
 
 class Image(BaseModel):
@@ -108,6 +117,8 @@ class Image(BaseModel):
     mime_type: str = "image/png"
     url: str | None = None
     origin_part: str | None = None
+    # Floating layout hint (export to HTML/PDF CSS; not full Word anchoring).
+    wrap: Literal["inline", "left", "right"] = "inline"
 
 
 class CodeBlock(BaseModel):
@@ -154,6 +165,51 @@ class Comment(BaseModel):
     anchor: str = ""
 
 
+class Revision(BaseModel):
+    """Track-changes trace (insert/delete) from Word OOXML w:ins / w:del."""
+
+    type: Literal["revision"] = "revision"
+    change: Literal["insert", "delete"] = "insert"
+    author: str = ""
+    text: str = ""
+    anchor: str = ""
+
+
+class ContentControl(BaseModel):
+    """Word structured document tag (w:sdt) — dropdown, date, plain/rich text."""
+
+    type: Literal["content_control"] = "content_control"
+    tag: str = ""
+    alias: str = ""
+    control_type: str = ""
+    text: str = ""
+
+
+class PivotTable(BaseModel):
+    """Spreadsheet pivot table object (xl/pivotTables/*.xml)."""
+
+    type: Literal["pivot_table"] = "pivot_table"
+    name: str = ""
+    cache_id: str = ""
+    source_range: str = ""
+    location: str = ""
+    row_fields: list[str] = Field(default_factory=list)
+    col_fields: list[str] = Field(default_factory=list)
+    data_fields: list[str] = Field(default_factory=list)
+
+
+class TextBox(BaseModel):
+    """Floating text frame (PPTX shape / DOCX txbx)."""
+
+    type: Literal["text_box"] = "text_box"
+    text: str = ""
+    source: str = ""  # e.g. pptx:slide2, docx:body
+    x_mm: float | None = None
+    y_mm: float | None = None
+    width_mm: float | None = None
+    height_mm: float | None = None
+
+
 DocumentNode = Annotated[
     Union[
         Heading,
@@ -168,6 +224,10 @@ DocumentNode = Annotated[
         Footnote,
         HtmlBlock,
         Comment,
+        Revision,
+        ContentControl,
+        PivotTable,
+        TextBox,
     ],
     Field(discriminator="type"),
 ]

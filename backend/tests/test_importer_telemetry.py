@@ -15,6 +15,39 @@ def test_metrics_track_importer_bucket():
     assert 'mdbridge_conversions_by_importer{importer="anydoc_fast_md"}' in text
 
 
+def test_metrics_failure_by_code_and_ocr_gauges():
+    before = metrics.conversions_failed_by_code.get("ocr_unavailable", 0)
+    metrics.record_failure("pdf", "md", code="ocr_unavailable")
+    snap = metrics.snapshot()
+    assert snap["conversions_failed_by_code"].get("ocr_unavailable", 0) == before + 1
+    text = metrics.prometheus_text()
+    assert "mdbridge_conversions_failed_by_code{code=\"ocr_unavailable\"}" in text
+    assert "mdbridge_ocr_enabled" in text
+    assert "mdbridge_ocr_ready" in text
+
+
+def test_metrics_anydoc_share_and_channels():
+    before_hits = metrics.anydoc_hits
+    before_deg = metrics.anydoc_degrades
+    metrics.record_anydoc_hit(channel="fast_md")
+    metrics.record_anydoc_hit(channel="model")
+    metrics.record_anydoc_degrade()
+    metrics.record_success("docx", "md", 0.01, importer="anydoc_fast_md")
+    metrics.record_success("pdf", "md", 0.02, importer="native")
+    snap = metrics.snapshot()
+    assert snap["anydoc_hits"] >= before_hits + 2
+    assert snap["anydoc_degrades"] >= before_deg + 1
+    assert snap["anydoc_hits_by_channel"].get("fast_md", 0) >= 1
+    assert snap["anydoc_hits_by_channel"].get("model", 0) >= 1
+    assert snap["anydoc_hit_rate"] is not None
+    assert 0.0 <= snap["anydoc_hit_rate"] <= 1.0
+    assert snap["anydoc_channel_share"] is not None
+    text = metrics.prometheus_text()
+    assert "mdbridge_anydoc_hit_rate" in text
+    assert "mdbridge_anydoc_channel_share" in text
+    assert 'mdbridge_anydoc_hits_by_channel{channel="fast_md"}' in text
+
+
 def test_audit_event_accepts_importer(tmp_path, monkeypatch):
     from app.config import settings
     from app.core import audit as audit_mod
@@ -55,3 +88,32 @@ def test_registry_marks_native_fallback(monkeypatch):
     wrapped = _anydoc_first("docx", native_imp)
     model = wrapped(b"x", "a.docx")
     assert model.metadata.get("importer") == "native_fallback"
+
+
+def test_anydoc_fallback_and_sniff_settings_exist():
+    from app.config import settings
+
+    assert hasattr(settings, "anydoc_fallback")
+    assert hasattr(settings, "anydoc_sniff")
+    assert isinstance(settings.anydoc_fallback, bool)
+    assert isinstance(settings.anydoc_sniff, bool)
+
+
+def test_format_detect_respects_anydoc_sniff_off(monkeypatch):
+    from app.config import settings
+    from app.core import format_detect as fd
+
+    monkeypatch.setattr(settings, "anydoc_sniff", False)
+    monkeypatch.setattr(settings, "anydoc_enabled", True)
+    called = {"n": 0}
+
+    def boom(_data: bytes):
+        called["n"] += 1
+        return "ppt"
+
+    monkeypatch.setattr(
+        "app.importers.anydoc_bridge.sniff_format", boom, raising=False
+    )
+    # No extension + unknown light magic → would consult anydoc when sniff on
+    assert fd.detect_source_format("blob.bin", b"\x00\x01\x02\x03") is None
+    assert called["n"] == 0

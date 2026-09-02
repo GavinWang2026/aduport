@@ -451,6 +451,56 @@
   align-items: end;
 }
 
+.md-adv {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated, transparent);
+}
+.md-adv__toggle {
+  background: none;
+  border: 0;
+  color: var(--accent, #185FA5);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.md-adv__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin-top: 12px;
+}
+.md-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--t-low);
+}
+.md-field--wide {
+  grid-column: 1 / -1;
+}
+.md-field input,
+.md-field select,
+.md-field textarea {
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg-card-solid, #fff);
+  color: var(--ink, inherit);
+  padding: 7px 9px;
+  font-size: 13px;
+}
+.md-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink, inherit);
+}
+
 .md-fmt-label {
   font-size: 11px;
   color: var(--t-low);

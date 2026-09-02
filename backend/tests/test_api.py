@@ -75,9 +75,12 @@ def test_cors_whitelist(client):
 
 def test_api_key_required(monkeypatch):
     from app.config import settings
+    from app.core.tenants import clear_tenant_cache
 
     monkeypatch.setattr(settings, "api_key", "secret-key")
+    monkeypatch.setattr(settings, "api_keys", "")
     monkeypatch.setattr(settings, "basic_auth", "")
+    clear_tenant_cache()
     c = TestClient(app)
     r = c.post(
         "/api/convert",
@@ -93,3 +96,5 @@ def test_api_key_required(monkeypatch):
     )
     assert r2.status_code == 200
     monkeypatch.setattr(settings, "api_key", "")
+    monkeypatch.setattr(settings, "api_keys", "")
+    clear_tenant_cache()

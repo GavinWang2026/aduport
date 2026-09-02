@@ -1,5 +1,6 @@
 # Enterprise private deployment — persistent volumes + offline-friendly defaults.
 # Build from repo root: docker compose -f enterprise/docker-compose.yml build
+# Observability: docker compose -f enterprise/docker-compose.yml --profile observability up -d
 
 services:
   backend:
@@ -8,6 +9,7 @@ services:
       dockerfile: backend/Dockerfile
       args:
         INSTALL_OFFICE: "1"
+        INSTALL_OCR: "${INSTALL_OCR:-1}"
         # Set "0" to skip Hub bake when mirrors/Xet fail; mount models at runtime instead
         BAKE_DOCLING_MODELS: "${BAKE_DOCLING_MODELS:-1}"
     image: md-bridge-backend:enterprise
@@ -20,7 +22,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       MDBRIDGE_DOCLING_OFFLINE: "true"
-      MDBRIDGE_OCR_ENABLED: "false"
+      MDBRIDGE_OCR_ENABLED: "${MDBRIDGE_OCR_ENABLED:-true}"
       MDBRIDGE_JOB_DB_PATH: /data/jobs.sqlite3
       MDBRIDGE_AUDIT_LOG_PATH: /data/logs/audit.jsonl
       MDBRIDGE_VIRUS_SCAN_FAIL_CLOSED: "true"
@@ -38,6 +40,29 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.54.1
+    container_name: md-bridge-prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../docs/ops/prometheus/alert_rules.yml:/etc/prometheus/rules/mdbridge.yml:ro
+    depends_on:
+      - backend
+
+  alertmanager:
+    profiles: ["observability"]
+    image: prom/alertmanager:v0.27.0
+    container_name: md-bridge-alertmanager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
 volumes:
   mdbridge-data:

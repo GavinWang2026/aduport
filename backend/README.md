@@ -12,6 +12,20 @@ pip install 'md-bridge[images]'    # Pillow image compress
 pip install 'md-bridge[all]'
 ```
 
+### High-fidelity Office import (anydoc / `mdbridge_native`)
+
+The PyPI wheel is **Python-only** and does **not** ship the Rust extension.
+Enterprise / Docker images compile it in multi-stage builds (`INSTALL_NATIVE=1`).
+From a source checkout:
+
+```bash
+# requires Rust + maturin (script can pip-install maturin)
+bash scripts/build_native.sh
+```
+
+Without the extension, anydoc-only formats (`xlsb`, `ods`, binary `ppt`, …) raise
+`unsupported_format`; shared formats keep using native importers.
+
 ## CLI
 
 ```bash

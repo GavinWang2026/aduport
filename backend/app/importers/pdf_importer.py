@@ -11,7 +11,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.core.document_model import DocumentModel
-from app.core.exceptions import CorruptedFileError, InvalidDocumentError
+from app.core.exceptions import CorruptedFileError, InvalidDocumentError, OcrUnavailableError
 from app.importers._docling_utils import docling_document_to_model
 from app.importers.docling_ready import docling_models_ready
 from app.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
@@ -123,6 +123,9 @@ def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentMode
                 from app.importers.ocr_engine import import_pdf_with_ocr
 
                 return import_pdf_with_ocr(source_bytes, filename)
+            except OcrUnavailableError:
+                # No engine installed — fall through to text/docling with clear terminal error
+                _log.warning("OCR unavailable for %s; trying text/docling fallback", filename)
             except Exception as exc:
                 _log.warning("OCR chain failed, falling back to docling/text: %s", exc)
 
@@ -135,6 +138,13 @@ def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentMode
         try:
             return extract_pdf_text_model(source_bytes, filename)
         except InvalidDocumentError as exc:
+            if settings.ocr_enabled:
+                raise OcrUnavailableError(
+                    f"PDF 无可用文本层且扫描 OCR/docling 均不可用: {filename}。"
+                    "请安装 pip install 'md-bridge[ocr-mineru]' 或 'md-bridge[ocr-paddle]'，"
+                    "或运行 scripts/download_docling_models.sh；"
+                    "纯文本 PDF 可设 MDBRIDGE_PDF_ENGINE=text。"
+                ) from exc
             raise CorruptedFileError(
                 f"PDF 解析失败：本地无 docling 模型且无可提取文本层: {filename}。"
                 f"请运行 scripts/download_docling_models.sh 或设置 "

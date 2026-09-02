@@ -26,7 +26,7 @@ from typing import Callable
 
 from app.config import settings
 from app.core.document_model import DocumentModel
-from app.core.exceptions import CorruptedFileError, InvalidDocumentError
+from app.core.exceptions import CorruptedFileError, InvalidDocumentError, OcrUnavailableError
 
 _log = logging.getLogger("mdbridge.ocr")
 _pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ocr-cvt")
@@ -382,17 +382,37 @@ _ENGINES: dict[str, OcrEngine] = {
 
 
 def list_ocr_engines() -> dict[str, object]:
+    available = {name: eng.available() for name, eng in _ENGINES.items()}
+    any_ready = any(available.values())
+    enabled = bool(settings.ocr_enabled)
+    ready = enabled and any_ready
+    if not enabled:
+        install_hint = (
+            "OCR 未开启：设置 MDBRIDGE_OCR_ENABLED=true，并安装 "
+            "pip install 'md-bridge[ocr-mineru]' 或 'md-bridge[ocr-paddle]'"
+        )
+    elif not any_ready:
+        install_hint = (
+            "OCR 已开启但无可用引擎：安装可选依赖 "
+            "pip install 'md-bridge[ocr-mineru]'（balanced）或 "
+            "'md-bridge[ocr-paddle]'（accurate）；Docker 使用 full/ocr 镜像"
+        )
+    else:
+        install_hint = "OCR 就绪；扫描 PDF 将按 ocr_mode/ocr_engine 自动选用引擎"
     return {
-        "enabled": bool(settings.ocr_enabled),
+        "enabled": enabled,
+        "ready": ready,
+        "feature": "scanned_pdf_to_structured_markdown",
         "engine": (settings.ocr_engine or "auto").lower(),
         "mode": (settings.ocr_mode or "balanced").lower(),
         "fallback": (settings.ocr_fallback or "paddleocr_vl").lower(),
-        "available": {name: eng.available() for name, eng in _ENGINES.items()},
+        "available": available,
         "hint": (
             "扫描件：MDBRIDGE_OCR_ENABLED=true；"
             "balanced→MinerU，accurate→PaddleOCR-VL；"
             "可选依赖 md-bridge[ocr-mineru] / [ocr-paddle]"
         ),
+        "install_hint": install_hint,
     }
 
 
@@ -464,9 +484,10 @@ def import_pdf_with_ocr(
 
     available_any = any(_ENGINES[n].available() for n in chain if n in _ENGINES)
     if not available_any:
-        raise InvalidDocumentError(
-            "扫描 OCR 无可用引擎。请安装: pip install 'md-bridge[ocr-mineru]' "
-            "和/或 'md-bridge[ocr-paddle]'，或预置 docling 模型；"
+        raise OcrUnavailableError(
+            "扫描 OCR 无可用引擎（code=ocr_unavailable）。请安装: "
+            "pip install 'md-bridge[ocr-mineru]' 和/或 'md-bridge[ocr-paddle]'，"
+            "或预置 docling 模型后重试；"
             f"当前链={chain}，探测={list_ocr_engines()['available']}"
         )
 

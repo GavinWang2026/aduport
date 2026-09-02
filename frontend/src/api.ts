@@ -1,10 +1,34 @@
 import axios, { AxiosError } from 'axios'
-import type { ConvertResult, SourceFormatOption, TargetFormat } from './types'
+import type { ConvertOptions, ConvertResult, SourceFormatOption, TargetFormat } from './types'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '',
   timeout: 300000,
 })
+
+function appendConvertOptions(form: FormData, opts?: ConvertOptions) {
+  if (!opts) return
+  const entries: [keyof ConvertOptions, string | boolean | undefined][] = [
+    ['pdf_font_family', opts.pdf_font_family],
+    ['pdf_custom_css', opts.pdf_custom_css],
+    ['pdf_page_size', opts.pdf_page_size],
+    ['pdf_orientation', opts.pdf_orientation],
+    ['pdf_header', opts.pdf_header],
+    ['pdf_footer', opts.pdf_footer],
+    ['docx_theme', opts.docx_theme],
+  ]
+  for (const [k, v] of entries) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      form.append(k, String(v))
+    }
+  }
+  if (opts.pdf_page_numbers !== undefined) {
+    form.append('pdf_page_numbers', opts.pdf_page_numbers ? 'true' : 'false')
+  }
+  if (opts.pdf_toc !== undefined) {
+    form.append('pdf_toc', opts.pdf_toc ? 'true' : 'false')
+  }
+}
 
 function parseFilename(disposition: string | undefined, fallback: string): string {
   if (!disposition) return fallback
@@ -71,11 +95,13 @@ export async function convertDocumentAsync(
   sourceFormat: SourceFormatOption,
   targetFormat: TargetFormat,
   onProgress?: (p: number, status: string) => void,
+  options?: ConvertOptions,
 ): Promise<ConvertResult> {
   const form = new FormData()
   form.append('file', file)
   form.append('source_format', sourceFormat)
   form.append('target_format', targetFormat)
+  appendConvertOptions(form, options)
 
   try {
     const { data: created } = await api.post<JobStatusPayload>('/api/jobs', form)
@@ -98,7 +124,7 @@ export async function convertDocumentAsync(
         )
         const blob = response.data as Blob
         let preview: string | undefined
-        if (targetFormat === 'md') {
+        if (targetFormat === 'md' || targetFormat === 'html') {
           preview = await blob.text()
         }
         return { filename, blob, preview }
@@ -115,8 +141,9 @@ export async function convertDocument(
   sourceFormat: SourceFormatOption,
   targetFormat: TargetFormat,
   onProgress?: (p: number, status: string) => void,
+  options?: ConvertOptions,
 ): Promise<ConvertResult> {
-  return convertDocumentAsync(file, sourceFormat, targetFormat, onProgress)
+  return convertDocumentAsync(file, sourceFormat, targetFormat, onProgress, options)
 }
 
 /** Multi-file ZIP via POST /api/convert/batch (source_format=auto per file when requested). */
@@ -124,6 +151,7 @@ export async function convertBatchZip(
   files: File[],
   sourceFormat: SourceFormatOption,
   targetFormat: TargetFormat,
+  options?: ConvertOptions,
 ): Promise<{ filename: string; blob: Blob }> {
   const form = new FormData()
   for (const f of files) {
@@ -131,6 +159,7 @@ export async function convertBatchZip(
   }
   form.append('source_format', sourceFormat)
   form.append('target_format', targetFormat)
+  appendConvertOptions(form, options)
   try {
     const response = await api.post('/api/convert/batch', form, { responseType: 'blob' })
     const disposition = response.headers['content-disposition'] as string | undefined

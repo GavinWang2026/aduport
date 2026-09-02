@@ -6,7 +6,7 @@ import struct
 import time
 
 from app.core.document_model import DocumentModel
-from app.exporters.html_render import render_body_html
+from app.exporters.html_render import render_body_html, render_ebook_css
 
 
 def export_mobi(model: DocumentModel) -> bytes:
@@ -19,7 +19,8 @@ def export_mobi(model: DocumentModel) -> bytes:
     body = render_body_html(model, include_title=True)
     html = (
         "<html><head><meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>"
-        f"<title>{_esc(title)}</title></head><body>\n{body}\n</body></html>\n"
+        f"<title>{_esc(title)}</title>"
+        f"<style>{render_ebook_css()}</style></head><body>\n{body}\n</body></html>\n"
     )
     payload = html.encode("utf-8")
 

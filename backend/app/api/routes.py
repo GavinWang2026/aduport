@@ -80,8 +80,9 @@ def _pdf_form_opts(
     pdf_footer: str | None = None,
     pdf_page_numbers: str | None = None,
     pdf_toc: str | None = None,
+    docx_theme: str | None = None,
 ) -> dict:
-    return {
+    opts: dict = {
         "pdf_font_family": sanitize_font_family(pdf_font_family, settings.pdf_font_family),
         "pdf_custom_css": sanitize_custom_css(pdf_custom_css),
         "pdf_page_size": pdf_page_size,
@@ -91,14 +92,19 @@ def _pdf_form_opts(
         "pdf_page_numbers": _parse_bool(pdf_page_numbers),
         "pdf_toc": _parse_bool(pdf_toc),
     }
+    if docx_theme is not None and str(docx_theme).strip():
+        opts["docx_theme"] = str(docx_theme).strip().lower()
+    return opts
 
 
 
 @router.get("/health")
 async def health() -> dict[str, object]:
+    from app.core.object_storage import storage_info
     from app.importers.anydoc_bridge import anydoc_available, anydoc_version
 
     native_ready = anydoc_available()
+    ocr_info = list_ocr_engines()
     return {
         "status": "ok",
         "service": settings.app_name,
@@ -116,12 +122,38 @@ async def health() -> dict[str, object]:
         "rate_limit_per_minute": settings.rate_limit_per_minute,
         "memory_budget_mb": settings.memory_budget_mb,
         "virus_scan": settings.virus_scan,
-        "ocr": list_ocr_engines(),
+        "ocr": ocr_info,
+        "ocr_ready": bool(ocr_info.get("ready")),
         "license_required": bool(settings.license_required),
         # Vendored anydoc → mdbridge_native._doc
         "anydoc_enabled": bool(settings.anydoc_enabled),
         "anydoc_available": native_ready,
         "anydoc_version": anydoc_version() if native_ready else None,
+        "docx_theme": settings.docx_theme,
+        "docx_export_comments": bool(settings.docx_export_comments),
+        "heading_numbering": bool(settings.heading_numbering),
+        "job_result_dir": bool((settings.job_result_dir or "").strip()),
+        "object_storage": storage_info(),
+        "webhook_enabled": bool(settings.webhook_enabled),
+    }
+
+
+@router.get("/usage")
+async def usage(request: Request) -> dict[str, object]:
+    """Tenant usage meter for enterprise billing integrations (read-only)."""
+    from app.core.request_context import current_tenant_id
+
+    snap = metrics.snapshot()
+    tid = current_tenant_id() or "default"
+    daily = snap.get("tenant_daily") or {}
+    today = __import__("time").strftime("%Y-%m-%d", __import__("time").gmtime())
+    today_key = f"{tid}:{today}"
+    return {
+        "tenant_id": tid,
+        "conversions_today": int(daily.get(today_key, 0)),
+        "conversions_total": int((snap.get("conversions_by_tenant") or {}).get(tid, 0)),
+        "conversions_failed": int((snap.get("conversions_by_tenant") or {}).get(f"{tid}:failed", 0)),
+        "metrics": snap,
     }
 
 
@@ -172,6 +204,23 @@ async def list_formats() -> dict[str, object]:
                 "anydoc_only_formats 需编译 mdbridge_native（scripts/build_native.sh / Docker INSTALL_NATIVE=1）；"
                 "anydoc_led_formats 为 anydoc 优先、原生兜底的共享格式"
             ),
+            "docx": (
+                "导出主题：Form docx_theme 或 MDBRIDGE_DOCX_THEME=default|academic|minimal；"
+                "批注：AST Comment → Word comments（MDBRIDGE_DOCX_EXPORT_COMMENTS）；"
+                "标题编号：MDBRIDGE_HEADING_NUMBERING=true"
+            ),
+            "xlsx": (
+                "表格值导出：仅单元格显示值，不含公式/宏；"
+                "Table.cells 在 rows 为空时仍可导出；xlsb/ods 经导入后可落到 xlsx"
+            ),
+            "ocr": (
+                "扫描 PDF：MDBRIDGE_OCR_ENABLED=true + 可选依赖 md-bridge[ocr-mineru]/[ocr-paddle]；"
+                "GET /api/health 的 ocr.ready / ocr.install_hint 可探测"
+            ),
+            "jobs": (
+                "异步：POST /api/jobs；可选 callback_url Webhook；"
+                "元数据 MDBRIDGE_JOB_DB_PATH；结果字节 MDBRIDGE_JOB_RESULT_DIR（TTL 内可重启后下载）"
+            ),
         },
     }
 
@@ -195,6 +244,8 @@ async def create_job(
     pdf_footer: Optional[str] = Form(None),
     pdf_page_numbers: Optional[str] = Form(None),
     pdf_toc: Optional[str] = Form(None),
+    docx_theme: Optional[str] = Form(None),
+    callback_url: Optional[str] = Form(None),
 ) -> JSONResponse:
     """Enqueue an async conversion job; poll GET /api/jobs/{id} then download result."""
     spill = await read_upload_streaming(file, prefix="mdbridge-job-up-")
@@ -208,12 +259,19 @@ async def create_job(
 
         pdf_opts = _pdf_form_opts(
             pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
-            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc, docx_theme,
         )
         client = request.client.host if request.client else ""
         if not file.filename:
             filename = f"input.{src}"
         out_name = _safe_output_filename(filename, tgt)
+
+        try:
+            from app.core.webhooks import validate_callback_url
+
+            cb = validate_callback_url(callback_url)
+        except ValueError as exc:
+            raise InvalidDocumentError(str(exc)) from exc
 
         job = job_store.submit(
             content=content,
@@ -223,6 +281,7 @@ async def create_job(
             client=client,
             result_filename=out_name,
             tenant_id=current_tenant_id(),
+            callback_url=cb,
             **pdf_opts,
         )
         return JSONResponse(status_code=202, content=job.to_dict())
@@ -299,6 +358,7 @@ async def convert_file(
     pdf_footer: Optional[str] = Form(None),
     pdf_page_numbers: Optional[str] = Form(None),
     pdf_toc: Optional[str] = Form(None),
+    docx_theme: Optional[str] = Form(None),
 ) -> Response:
     spill = await read_upload_streaming(file, prefix="mdbridge-cvt-up-")
     try:
@@ -311,7 +371,7 @@ async def convert_file(
 
         pdf_opts = _pdf_form_opts(
             pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
-            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+            pdf_header, pdf_footer, pdf_page_numbers, pdf_toc, docx_theme,
         )
         client = request.client.host if request.client else ""
 
@@ -354,6 +414,7 @@ async def convert_batch(
     pdf_footer: Optional[str] = Form(None),
     pdf_page_numbers: Optional[str] = Form(None),
     pdf_toc: Optional[str] = Form(None),
+    docx_theme: Optional[str] = Form(None),
 ) -> Response:
     """
     Batch convert multiple uploaded files (bounded concurrency).
@@ -374,7 +435,7 @@ async def convert_batch(
 
     pdf_opts = _pdf_form_opts(
         pdf_font_family, pdf_custom_css, pdf_page_size, pdf_orientation,
-        pdf_header, pdf_footer, pdf_page_numbers, pdf_toc,
+        pdf_header, pdf_footer, pdf_page_numbers, pdf_toc, docx_theme,
     )
 
     payloads: list[tuple[str, bytes]] = []

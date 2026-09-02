@@ -2,10 +2,15 @@
 # then assemble the Python runtime image. Build from repo root:
 #   docker build -f backend/Dockerfile -t md-bridge-backend .
 #
+# Non-ASCII checkout paths (e.g. macOS U+2011 hyphen): use
+#   bash scripts/docker_build_safe.sh
+# which rsyncs to /tmp/md-bridge-build before docker build.
+#
 # Flags:
 #   --build-arg INSTALL_OFFICE=1|0          docling / office import extras
 #   --build-arg BAKE_DOCLING_MODELS=1|0    bake models into the image
 #   --build-arg INSTALL_NATIVE=1|0         compile mdbridge_native (default on)
+#   --build-arg INSTALL_OCR=1|0            pip install .[ocr-mineru] + runtime OCR default on
 
 ARG INSTALL_OFFICE=1
 ARG BAKE_DOCLING_MODELS=1
@@ -46,6 +51,7 @@ FROM python:3.11-slim-bookworm
 ARG INSTALL_OFFICE=1
 ARG BAKE_DOCLING_MODELS=1
 ARG INSTALL_NATIVE=1
+ARG INSTALL_OCR=0
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -54,7 +60,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HF_HUB_DISABLE_XET=1 \
     HF_HUB_ENABLE_HF_TRANSFER=0 \
     MDBRIDGE_DOCLING_OFFLINE=true \
-    MDBRIDGE_OCR_ENABLED=false \
     MDBRIDGE_ANYDOC_ENABLED=true \
     MDBRIDGE_DOCLING_ARTIFACTS_PATH=/opt/docling/models \
     DOCLING_ARTIFACTS_PATH=/opt/docling/models
@@ -83,15 +88,22 @@ COPY scripts/download_docling_models.sh /tmp/download_docling_models.sh
 
 # Layer 1: Python deps (cached independently of model bake / native wheel)
 RUN pip install --upgrade pip \
-    && if [ "$INSTALL_OFFICE" = "1" ]; then pip install ".[office]"; else pip install .; fi
+    && if [ "$INSTALL_OFFICE" = "1" ]; then pip install ".[office]"; else pip install .; fi \
+    && if [ "$INSTALL_OCR" = "1" ]; then \
+         pip install ".[ocr-mineru]" \
+         && echo "OCR extras installed — MDBRIDGE_OCR_ENABLED=true recommended at runtime"; \
+       fi
+
+# When OCR is baked in (INSTALL_OCR=1), default-enable unless overridden at runtime.
+ENV MDBRIDGE_OCR_ENABLED=${INSTALL_OCR}
 
 # Layer 1b: install the vendored Rust extension (offline, no PyPI)
 COPY --from=native-builder /wheels /wheels
-RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/*.whl >/dev/null 2>&1; then \
-      pip install --no-index --no-deps /wheels/*.whl \
+RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/mdbridge_native*.whl >/dev/null 2>&1; then \
+      pip install --no-index --no-deps /wheels/mdbridge_native*.whl \
       && python -c "import mdbridge_native._doc as d; print('mdbridge_native._doc OK')"; \
     else \
-      echo "WARN: mdbridge_native not installed — high-fidelity Office import disabled"; \
+      echo "WARN: mdbridge_native wheel not found in /wheels:"; ls -la /wheels || true; \
     fi \
  && rm -rf /wheels
 

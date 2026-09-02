@@ -25,6 +25,8 @@ from app.config import settings
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
+    Comment,
+    ContentControl,
     DocumentModel,
     Footnote,
     Heading,
@@ -32,7 +34,10 @@ from app.core.document_model import (
     ListItem,
     MathBlock,
     Paragraph,
+    PivotTable,
+    Revision,
     Table,
+    TextBox,
 )
 from app.core.exceptions import ExportError
 
@@ -583,6 +588,7 @@ def _assemble(objects: list[bytes]) -> bytes:
 
 def _model_lines(model: DocumentModel) -> list[str]:
     lines: list[str] = []
+    footnotes: list[Footnote] = []
     if model.title:
         lines.append(model.title)
         lines.append("")
@@ -613,7 +619,24 @@ def _model_lines(model: DocumentModel) -> list[str]:
         elif isinstance(node, MathBlock):
             lines.append("$$ " + (node.content or "") + " $$")
         elif isinstance(node, Footnote):
-            lines.append(f"[^{node.id}]: {node.text}")
+            footnotes.append(node)
+        elif isinstance(node, Comment):
+            anchor = f" ({node.anchor})" if node.anchor else ""
+            lines.append(f"[Comment {node.author}{anchor}] {node.text}")
+        elif isinstance(node, Revision):
+            if node.change == "delete":
+                lines.append(f"[-del {node.author}] {node.text}")
+            else:
+                lines.append(f"[+ins {node.author}] {node.text}")
+        elif isinstance(node, ContentControl):
+            label = node.alias or node.tag or "control"
+            lines.append(f"[控件:{label}] {node.text}")
+        elif isinstance(node, TextBox):
+            src = f" ({node.source})" if node.source else ""
+            lines.append(f"[文本框{src}] {node.text}")
+        elif isinstance(node, PivotTable):
+            fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+            lines.append(f"[PivotTable {node.name}] {fields}")
         elif isinstance(node, Table):
             for row in node.rows:
                 lines.append(" | ".join(str(c) for c in row))
@@ -621,4 +644,9 @@ def _model_lines(model: DocumentModel) -> list[str]:
             plain = getattr(node, "plain_text", None)
             if callable(plain):
                 lines.append(plain())
+    if footnotes:
+        lines.append("")
+        lines.append("--- Footnotes ---")
+        for fn in footnotes:
+            lines.append(f"[^{fn.id}]: {fn.text}")
     return lines

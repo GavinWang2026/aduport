@@ -9,6 +9,7 @@ ERROR_CODES: dict[str, int] = {
     "file_too_large": 413,
     "corrupted_file": 422,
     "invalid_document": 422,
+    "ocr_unavailable": 503,
     "export_error": 500,
     "memory_budget_exceeded": 429,
     "docx_too_large": 422,
@@ -78,6 +79,13 @@ class CorruptedFileError(MdBridgeError):
 class InvalidDocumentError(MdBridgeError):
     code = "invalid_document"
     status_code = 422
+
+
+class OcrUnavailableError(MdBridgeError):
+    """Scanned PDF needs OCR but no engine/models are installed."""
+
+    code = "ocr_unavailable"
+    status_code = 503
 
 
 class ExportError(MdBridgeError):

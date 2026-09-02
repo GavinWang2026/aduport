@@ -1,0 +1,6 @@
+REF=v0.2.4
+SHA=vendored-at-fuse-unverified
+UPSTREAM_VERSION=0.2.4
+SYNCED_AT=2026-09-01T00:00:00Z
+UPSTREAM=https://github.com/firecrawl/anydoc.git
+NOTE=Placeholder until the next successful sync_anydoc.sh run records a full git SHA.

@@ -83,6 +83,7 @@ SUPPORTED_TARGET_FORMATS = frozenset(
         "odt",
         "json",
         "xlsx",
+        "rtf",
     }
 )
 SUPPORTED_FORMATS = SUPPORTED_SOURCE_FORMATS | SUPPORTED_TARGET_FORMATS
@@ -243,6 +244,7 @@ def _export(
     pdf_footer: str | None = None,
     pdf_page_numbers: bool | None = None,
     pdf_toc: bool | None = None,
+    docx_theme: str | None = None,
 ) -> bytes:
     ensure_builtin_plugins()
     fmt = _normalize_format(target_format)
@@ -268,6 +270,7 @@ def _export(
             pdf_footer=pdf_footer,
             pdf_page_numbers=pdf_page_numbers,
             pdf_toc=pdf_toc,
+            docx_theme=docx_theme,
         )
         return result if isinstance(result, bytes) else str(result).encode("utf-8")
     except MdBridgeError:
@@ -327,6 +330,7 @@ def convert(
     pdf_footer: str | None = None,
     pdf_page_numbers: bool | None = None,
     pdf_toc: bool | None = None,
+    docx_theme: str | None = None,
     fetch_images: bool | None = None,
     client: str = "",
     skip_magic: bool = False,
@@ -352,8 +356,10 @@ def convert(
             pdf_footer or "",
             str(pdf_page_numbers),
             str(pdf_toc),
+            docx_theme or settings.docx_theme or "",
             str(fetch_images),
             f"hn={settings.heading_numbering}",
+            f"dc={settings.docx_export_comments}",
             f"ic={settings.image_compress}:{settings.image_max_edge}:{settings.image_jpeg_quality}",
         ]
     )
@@ -388,7 +394,7 @@ def convert(
         out = _try_anydoc_fast_markdown(source_bytes, src, tgt, filename)
         if out is not None:
             importer = "anydoc_fast_md"
-            metrics.record_anydoc_hit()
+            metrics.record_anydoc_hit(channel="fast_md")
             elapsed = time.perf_counter() - started
             result_cache.put(cache_key, out)
             metrics.record_success(src, tgt, elapsed, importer=importer)
@@ -422,7 +428,7 @@ def convert(
 
                 if _anydoc_designated(src):
                     if importer == "anydoc":
-                        metrics.record_anydoc_hit()
+                        metrics.record_anydoc_hit(channel="model")
                     else:
                         metrics.record_anydoc_degrade()
             except Exception:
@@ -443,6 +449,7 @@ def convert(
                 pdf_footer=pdf_footer,
                 pdf_page_numbers=pdf_page_numbers,
                 pdf_toc=pdf_toc,
+                docx_theme=docx_theme,
             )
         elapsed = time.perf_counter() - started
         result_cache.put(cache_key, out)
@@ -461,7 +468,8 @@ def convert(
         )
         return out
     except Exception as exc:
-        metrics.record_failure(src, tgt)
+        fail_code = exc.code if isinstance(exc, MdBridgeError) else "conversion_error"
+        metrics.record_failure(src, tgt, code=fail_code)
         audit_event(
             action="convert",
             source_format=src,
@@ -486,6 +494,13 @@ def convert_directory(
     recursive: bool = False,
     pdf_font_family: str | None = None,
     pdf_custom_css: str | None = None,
+    pdf_page_size: str | None = None,
+    pdf_orientation: str | None = None,
+    pdf_header: str | None = None,
+    pdf_footer: str | None = None,
+    pdf_page_numbers: bool | None = None,
+    pdf_toc: bool | None = None,
+    docx_theme: str | None = None,
     workers: int | None = None,
     cancel_event: Any | None = None,
     progress_cb: Any | None = None,
@@ -539,6 +554,13 @@ def convert_directory(
                 filename=file_path.name,
                 pdf_font_family=pdf_font_family,
                 pdf_custom_css=pdf_custom_css,
+                pdf_page_size=pdf_page_size,
+                pdf_orientation=pdf_orientation,
+                pdf_header=pdf_header,
+                pdf_footer=pdf_footer,
+                pdf_page_numbers=pdf_page_numbers,
+                pdf_toc=pdf_toc,
+                docx_theme=docx_theme,
             )
             target_file.write_bytes(converted)
             item.success = True

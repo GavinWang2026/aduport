@@ -1,0 +1,106 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "anydoc hit rate",
+      "type": "gauge",
+      "targets": [
+        { "expr": "mdbridge_anydoc_hit_rate", "legendFormat": "hit_rate" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "anydoc channel share",
+      "type": "gauge",
+      "targets": [
+        { "expr": "mdbridge_anydoc_channel_share", "legendFormat": "share" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "id": 3,
+      "title": "OCR enabled / ready",
+      "type": "stat",
+      "targets": [
+        { "expr": "mdbridge_ocr_enabled", "legendFormat": "enabled" },
+        { "expr": "mdbridge_ocr_ready", "legendFormat": "ready" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 4,
+      "title": "anydoc hits by channel",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum by (channel) (rate(mdbridge_anydoc_hits_by_channel[5m]))",
+          "legendFormat": "{{channel}}"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 5,
+      "title": "ocr_unavailable failures",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "increase(mdbridge_conversions_failed_by_code{code=\"ocr_unavailable\"}[5m])",
+          "legendFormat": "ocr_unavailable"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 6,
+      "title": "conversion success vs failed (rate)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(rate(mdbridge_conversions_total[5m]))", "legendFormat": "ok" },
+        { "expr": "sum(rate(mdbridge_conversions_failed[5m]))", "legendFormat": "failed" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 7,
+      "title": "p95 latency",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "mdbridge_conversion_latency_p95_seconds", "legendFormat": "p95" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["md-bridge", "anydoc", "ocr"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "md-bridge Overview",
+  "uid": "mdbridge-overview",
+  "version": 1
+}

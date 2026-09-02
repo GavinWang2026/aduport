@@ -1,0 +1,5 @@
+# Default sync target for scripts/sync_anydoc.sh (do not float on main).
+# Must match native/anydoc/Cargo.toml version (tag form vX.Y.Z) or set ANYDOC_SHA.
+REF=v0.2.4
+# Optional exact commit (preferred when the tag moves): set ANYDOC_SHA=<40hex>
+# SHA=

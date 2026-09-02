@@ -72,20 +72,25 @@ docker compose up --build
 - Web UI：http://localhost:8080
 - API 文档：http://localhost:8080/docs
 - 后端直连：http://localhost:8000
+- 默认 `INSTALL_NATIVE=1`：多阶段构建会编译并安装 `mdbridge_native`（高保真 Office 导入）
+- 若宿主机路径含非 ASCII 字符（例如 U+2011 特殊连字符），Colima/Docker Desktop 偶发上下文陈旧；推荐：
+  - `bash scripts/docker_build_safe.sh`（rsync 到 `/tmp/md-bridge-build` 再构建），或
+  - `ln -s "$(pwd)" /tmp/md-bridge && cd /tmp/md-bridge && docker compose build`
 
 ### 方式二：pip（PyPI / 本地包）
 
 ```bash
-pip install md-bridge                 # 发布后
+pip install md-bridge                 # 发布后（纯 Python，不含 Rust 扩展）
 # 或从源码：
 cd backend && pip install -e ".[dev]"
 # 可选：pip install 'md-bridge[office,images]'
 # 高保真 Office/EPUB/表格导入（anydoc 源码已 vendored，Rust/MIT，无外部依赖）：
-#   编译内置 Rust 扩展（首次或更新源码后执行一次）：
+#   PyPI 包刻意不带 mdbridge_native；企业镜像走 Docker 多阶段编译。
+#   源码/SDK 路径需自行编译一次：
 bash scripts/build_native.sh
 ```
 
-发布脚手架：`scripts/publish_dry_run.sh` 本地打 wheel；GitHub Release 触发 `.github/workflows/publish.yml`（Trusted Publishing）。
+发布脚手架：`scripts/publish_dry_run.sh` 本地打 wheel；GitHub Release 触发 `.github/workflows/publish.yml`（Trusted Publishing）。**发布物不含** `native/anydoc` 编译产物。
 
 ### 方式三：本地开发运行
 
@@ -156,7 +161,7 @@ cp .env.example .env
 | `MDBRIDGE_PDF_FONT_FAMILY` | PDF 默认字体族 | Noto Sans CJK SC ... |
 | `MDBRIDGE_PDF_CUSTOM_CSS` | PDF 追加 CSS（自动过滤 url/@import） | 空 |
 | `MDBRIDGE_ANYDOC_ENABLED` | anydoc 高保真导入总开关（关闭则完全退回原生，零行为变化） | `true` |
-| `MDBRIDGE_ANYDOC_FORMATS` | anydoc 接管的**共享**格式（逗号分隔，`*`=全接管；独占格式不受此限） | `doc,docx,odt,rtf,ppt,pptx,epub,ods,odp,csv` |
+| `MDBRIDGE_ANYDOC_FORMATS` | anydoc 接管的**共享**格式（逗号分隔，`*`=全接管；独占格式不受此限） | `doc,docx,rtf,odt,pptx,…,epub,csv`（默认不含 xlsx） |
 | `MDBRIDGE_ANYDOC_FAST_MARKDOWN` | 目标=Markdown 时走 anydoc 直出快通道（零保真损失） | `true` |
 | `MDBRIDGE_ANYDOC_FALLBACK` | anydoc 可恢复拒绝时回退原生 importer（关=直接报错） | `true` |
 | `MDBRIDGE_ANYDOC_SNIFF` | 用 anydoc 内容嗅探修正无扩展名/错扩展名上传的格式识别 | `true` |
@@ -168,20 +173,22 @@ Docker Compose 会通过 `env_file: .env` 注入这些变量。
 ```bash
 # 单文件转换
 mdbridge convert input.docx output.md
-mdbridge convert input.pdf output.md
-mdbridge convert input.md output.docx
-mdbridge convert input.md output.pdf --pdf-font "Georgia, serif"
+mdbridge convert input.md output.pdf --pdf-font "Georgia, serif" --pdf-page-size A4 --pdf-toc
+mdbridge convert input.md output.docx --docx-theme academic
 
 # 显式指定格式
 mdbridge convert input.bin output.md --from docx --to md
 
 # 批量目录转换（输出到目标目录，可 -r 递归）
 mdbridge batch ./inbox ./outbox --from docx --to md
-mdbridge batch ./inbox ./outbox --from pdf --to md -r
+mdbridge batch ./inbox ./outbox --from md --to pdf -r --pdf-orientation landscape
 
-# 查看支持格式
+# 查看支持格式 / 企业一机一码
 mdbridge formats
+mdbridge machine-id
 ```
+
+PDF/DOCX 选项与 HTTP API 对齐：`--pdf-font`、`--pdf-css`、`--pdf-page-size`、`--pdf-orientation`、`--pdf-header`、`--pdf-footer`、`--pdf-page-numbers`、`--pdf-toc`、`--docx-theme`。
 
 ## Python SDK
 
@@ -197,19 +204,23 @@ with open("report.md", "wb") as f:
     f.write(md_bytes)
 ```
 
-完整示例见 [`examples/sdk_demo.py`](examples/sdk_demo.py)：
+手写 / 操作中间 AST 见 [`docs/document-model.md`](docs/document-model.md)；完整示例 [`examples/sdk_demo.py`](examples/sdk_demo.py)（含 `demo_document_model`）：
 
 ```bash
 cd backend && pip install -e .
 python ../examples/sdk_demo.py
 ```
 
+企业交付边界见 [`ENTERPRISE.md`](ENTERPRISE.md)。
+
 ## HTTP API
 
 ### POST `/api/convert`（单文件）
 
 - Content-Type: `multipart/form-data`
-- 字段：`file`、`source_format`、`target_format`；可选 `pdf_font_family`、`pdf_custom_css`
+- 字段：`file`、`source_format`、`target_format`
+- 可选 PDF：`pdf_font_family`、`pdf_custom_css`、`pdf_page_size`、`pdf_orientation`、`pdf_header`、`pdf_footer`、`pdf_page_numbers`、`pdf_toc`
+- 可选 DOCX：`docx_theme`（`default` / `academic` / `minimal`）
 - 成功：文件流下载
 - 失败：标准化 JSON
 
@@ -223,7 +234,7 @@ curl -X POST http://localhost:8000/api/convert \
 
 ### POST `/api/convert/batch`（批量）
 
-- 字段：`files`（多文件）、`source_format`、`target_format`；可选 PDF CSS 参数
+- 字段：`files`（多文件）、`source_format`、`target_format`；可选同上 PDF/DOCX 参数
 - 成功（至少一个）：返回 ZIP；部分失败时 ZIP 内含 `errors.json`
 - 全部失败：标准化 JSON（含每项错误）
 
@@ -235,6 +246,12 @@ curl -X POST http://localhost:8000/api/convert/batch \
   -F "target_format=md" \
   -o converted_batch.zip
 ```
+
+### POST `/api/jobs`（异步 + Webhook）
+
+- 同上转换字段，另可选 `callback_url`（http/https）：任务结束 POST JSON `{event, job, download_hint}`
+- 元数据：`MDBRIDGE_JOB_DB_PATH`；结果字节：`MDBRIDGE_JOB_RESULT_DIR`（进程重启后仍可 `GET /api/jobs/{id}/result`，直至 TTL）
+- 轮询 `GET /api/jobs/{id}` → 下载 `GET /api/jobs/{id}/result`
 
 ### 错误响应格式
 
@@ -251,9 +268,36 @@ curl -X POST http://localhost:8000/api/convert/batch \
 
 OpenAPI 文档：http://localhost:8000/docs
 
+### 监控（anydoc 通道占比）
+
+Prometheus 文本：`GET /api/metrics`（`/health` 的 `metrics` 字段含同一快照）。
+
+| 指标 | 含义 |
+|------|------|
+| `mdbridge_anydoc_hits` / `mdbridge_anydoc_degrades` | Rust 命中 vs 指定引擎后回退原生 |
+| `metrics.alerts` | 轻量告警钩子（高失败率 / p95 延迟），供 Prometheus/运维对接 |
+| `mdbridge_anydoc_hits_by_channel{channel=fast_md\|model}` | 快通道 vs 模型通道命中 |
+| `mdbridge_anydoc_hit_rate` | `hits / (hits + degrades)` |
+| `mdbridge_anydoc_channel_share` | `importer=~"anydoc.*"` 占 `conversions_by_importer` 比例 |
+| `mdbridge_ocr_enabled` / `mdbridge_ocr_ready` | OCR 开关与引擎就绪（gauge） |
+| `mdbridge_conversions_failed_by_code{code=…}` | 按错误码统计失败（含 `ocr_unavailable`） |
+| `mdbridge_conversions_by_importer{importer=…}` | `anydoc_fast_md` / `anydoc` / `native` / … |
+
+Grafana 看板与 Prometheus 告警规则：`docs/ops/prometheus/`（`grafana_mdbridge.json`、`alert_rules.yml`）。
+
+示例 PromQL：`mdbridge_anydoc_channel_share` 或  
+`sum(mdbridge_conversions_by_importer{importer=~"anydoc.*"}) / sum(mdbridge_conversions_by_importer)`。
+
+企业多租户可在 `MDBRIDGE_API_KEYS` JSON 中配置 `daily_quota`（UTC 日转换次数上限）。
+
+**OCR 镜像分层：**
+- 企业默认：`enterprise/docker-compose.yml`（`INSTALL_OCR=1`，`MDBRIDGE_OCR_ENABLED=true`）
+- 开发可选：`docker compose -f docker-compose.yml -f docker-compose.ocr.yml up --build`
+- 本地构建：`bash scripts/docker_build_ocr.sh`（full + OCR）
+- 轻量无 OCR：`docker build -f backend/Dockerfile.slim .`
+
 ## Web UI
 
-- 拖拽/点击上传文件，支持批量
 - 选择源格式与目标格式
 - 转换完成后下载输出文件
 - 目标格式为 Markdown 时右侧预览文本

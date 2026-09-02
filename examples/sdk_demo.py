@@ -58,8 +58,31 @@ def demo_in_memory():
     print(roundtrip_md.decode("utf-8")[:200])
 
 
+def demo_document_model():
+    """First-class DocumentModel: build AST → export without going through convert()."""
+    from app.core.document_model import DocumentModel, Heading, Paragraph, Table
+    from app.exporters.docx_exporter import export_docx
+    from app.exporters.md_exporter import export_md
+
+    model = DocumentModel(
+        title="SDK AST demo",
+        nodes=[
+            Heading(level=1, text="Hand-built DocumentModel"),
+            Paragraph(text="Importers and exporters share this intermediate AST."),
+            Table(rows=[["Format", "Depth"], ["docx", "high"], ["xlsx", "values"]]),
+        ],
+        metadata={"demo": "document_model"},
+    )
+    md = export_md(model)
+    docx = export_docx(model, theme="minimal")
+    print(f"DocumentModel → MD ({len(md)} chars), DOCX ({len(docx)} bytes)")
+    print(md[:160].replace("\n", "\\n"))
+
+
 if __name__ == "__main__":
     print("=== md-bridge SDK Demo ===\n")
+    demo_document_model()
+    print()
     demo_in_memory()
     print()
     demo_docx_to_md()

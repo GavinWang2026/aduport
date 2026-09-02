@@ -72,9 +72,32 @@ if [ -z "$WHEEL" ]; then echo "wheel not produced" >&2; exit 1; fi
 echo "==> installing $WHEEL (local, offline)"
 "$PY" -m pip install --no-index --force-reinstall --no-deps "$WHEEL"
 
-# Verify from a neutral cwd (NOT native/anydoc/python) so the source tree's
-# empty mdbridge_native/ package is not mistaken for the compiled extension.
-echo "==> verifying import"
+echo "==> verifying import + abi3 contract"
 cd "$ROOT/backend"
-"$PY" -c "import mdbridge_native._doc as d; print('OK mdbridge_native._doc:', [x for x in dir(d) if not x.startswith('_')][:5])"
+"$PY" - <<PY
+import importlib.metadata as md
+import sys
+from pathlib import Path
+
+import mdbridge_native._doc as d
+
+required = ("to_markdown_bytes", "to_document", "format_from_bytes")
+missing = [n for n in required if not hasattr(d, n)]
+if missing:
+    print("FAIL missing exports:", missing, file=sys.stderr)
+    sys.exit(1)
+
+dist = md.distribution("mdbridge-native")
+ver = dist.version
+abi_ok = any("abi3" in str(f) for f in (dist.files or []))
+if not abi_ok:
+    wheels = list(Path("$ROOT/native/anydoc/target/wheels").glob("mdbridge_native*.whl"))
+    abi_ok = any("abi3" in w.name for w in wheels)
+if not abi_ok:
+    print("FAIL: abi3 tag not found on installed mdbridge-native / wheels", file=sys.stderr)
+    sys.exit(1)
+print(f"OK abi3 contract · mdbridge-native {ver}")
+print("OK exports:", ", ".join(required))
+print("OK mdbridge_native._doc sample:", [x for x in dir(d) if not x.startswith("_")][:5])
+PY
 echo "==> done. md-bridge now ships its own Rust document parser."

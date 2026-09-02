@@ -8,13 +8,14 @@ from docx import Document
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches, Mm, Pt, RGBColor
 
 from app.config import settings
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
     Comment,
+    ContentControl,
     DocumentModel,
     Footnote,
     Heading,
@@ -25,8 +26,12 @@ from app.core.document_model import (
     InlineMarkType,
     ListItem,
     MathBlock,
+    PivotTable,
     Paragraph,
+    Revision,
     Table,
+    TableCell,
+    TextBox,
     ensure_rich_text,
 )
 
@@ -52,8 +57,10 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
     theme_cfg = _THEMES.get(theme_key, _THEMES["default"])
     _apply_theme(doc, theme_cfg)
     _setup_header_footer(doc, model.title or "md-bridge")
+    _apply_section_props(doc, model)
 
     comments: list[Comment] = []
+    footnotes: list[Footnote] = []
     if model.title:
         doc.add_heading(model.title, level=0)
 
@@ -121,9 +128,21 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
                 run.font.name = "Courier New"
                 run.italic = True
             elif isinstance(node, Footnote):
-                fast.plain(f"[^{node.id}]: {node.text}")
+                footnotes.append(node)
             elif isinstance(node, Comment):
                 comments.append(node)
+            elif isinstance(node, Revision):
+                fast.flush()
+                _add_revision_paragraph(doc, node)
+            elif isinstance(node, ContentControl):
+                fast.flush()
+                _add_content_control_sdt(doc, node)
+            elif isinstance(node, TextBox):
+                fast.flush()
+                _add_textbox_paragraph(doc, node)
+            elif isinstance(node, PivotTable):
+                fast.flush()
+                _add_pivot_table(doc, node)
             elif isinstance(node, HtmlBlock):
                 import re
 
@@ -139,10 +158,18 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
     finally:
         fast.finish()
 
+    if footnotes:
+        doc.add_heading("Footnotes", level=2)
+        for fn in footnotes:
+            p = doc.add_paragraph()
+            ref = p.add_run(f"[{fn.id}] ")
+            ref.font.superscript = True
+            p.add_run(fn.text)
+
     buf = BytesIO()
     doc.save(buf)
     data = buf.getvalue()
-    if comments:
+    if comments and settings.docx_export_comments:
         from app.exporters.docx_comments import inject_word_comments
 
         data = inject_word_comments(data, comments)
@@ -268,12 +295,16 @@ def _split_by_marks(rich) -> list[tuple[str, list[InlineMark]]]:
 
 
 def _add_table(doc: Document, table: Table) -> None:
-    if not table.rows:
+    rows = table.rows or (
+        [[(c.text if c is not None else "") for c in row] for row in table.cells]
+        if table.cells
+        else []
+    )
+    if not rows:
         return
-    cols = max(len(r) for r in table.rows)
-    tbl = doc.add_table(rows=len(table.rows), cols=cols)
+    cols = max(len(r) for r in rows)
+    tbl = doc.add_table(rows=len(rows), cols=cols)
     tbl.style = "Table Grid"
-    # Even column widths (~6.5" usable)
     try:
         from docx.shared import Twips
 
@@ -284,16 +315,20 @@ def _add_table(doc: Document, table: Table) -> None:
     except Exception:
         pass
 
-    for r_idx, row in enumerate(table.rows):
+    for r_idx, row in enumerate(rows):
         for c_idx in range(cols):
             cell_text = row[c_idx] if c_idx < len(row) else ""
             cell = tbl.rows[r_idx].cells[c_idx]
             cell.text = str(cell_text)
-            if r_idx == 0 and settings.table_first_row_header:
+            header_end = (
+                table.header_rows
+                if table.header_rows
+                else (1 if settings.table_first_row_header else 0)
+            )
+            if r_idx < header_end:
                 for paragraph in cell.paragraphs:
                     for run in paragraph.runs:
                         run.bold = True
-                # light header shading
                 try:
                     tc = cell._tc
                     tcPr = tc.get_or_add_tcPr()
@@ -304,8 +339,29 @@ def _add_table(doc: Document, table: Table) -> None:
                 except Exception:
                     pass
 
-    # Repeat header row on each page
-    if settings.table_first_row_header and len(table.rows) > 1:
+    if table.cells:
+        for r_idx, row in enumerate(table.cells):
+            for c_idx, meta in enumerate(row):
+                if meta.covered:
+                    continue
+                if r_idx >= len(tbl.rows) or c_idx >= len(tbl.rows[r_idx].cells):
+                    continue
+                cell = tbl.rows[r_idx].cells[c_idx]
+                if meta.col_span > 1:
+                    end_c = min(c_idx + meta.col_span - 1, cols - 1)
+                    if end_c > c_idx:
+                        cell.merge(tbl.rows[r_idx].cells[end_c])
+                if meta.row_span > 1:
+                    end_r = min(r_idx + meta.row_span - 1, len(tbl.rows) - 1)
+                    if end_r > r_idx:
+                        cell.merge(tbl.rows[end_r].cells[c_idx])
+
+    header_end = (
+        table.header_rows
+        if table.header_rows
+        else (1 if settings.table_first_row_header else 0)
+    )
+    if header_end and len(rows) > header_end:
         try:
             tr = tbl.rows[0]._tr
             trPr = tr.get_or_add_trPr()
@@ -313,6 +369,134 @@ def _add_table(doc: Document, table: Table) -> None:
             trPr.append(tblHeader)
         except Exception:
             pass
+
+
+def _add_pivot_table(doc: Document, pivot: PivotTable) -> None:
+    """Shallow pivot summary table (not a native Excel pivot rebuild)."""
+    title = doc.add_paragraph()
+    run = title.add_run(f"Pivot Table: {pivot.name or 'Pivot'}")
+    run.bold = True
+    rows_meta: list[tuple[str, str]] = []
+    if pivot.location:
+        rows_meta.append(("Location", pivot.location))
+    if pivot.source_range:
+        rows_meta.append(("Source range", pivot.source_range))
+    if pivot.row_fields:
+        rows_meta.append(("Row fields", ", ".join(pivot.row_fields)))
+    if pivot.col_fields:
+        rows_meta.append(("Column fields", ", ".join(pivot.col_fields)))
+    if pivot.data_fields:
+        rows_meta.append(("Value fields", ", ".join(pivot.data_fields)))
+    if not rows_meta:
+        rows_meta.append(("Fields", "(empty)"))
+    tbl = doc.add_table(rows=len(rows_meta), cols=2)
+    tbl.style = "Table Grid"
+    for r_idx, (label, value) in enumerate(rows_meta):
+        tbl.rows[r_idx].cells[0].text = label
+        cell = tbl.rows[r_idx].cells[1]
+        cell.text = value
+        for paragraph in cell.paragraphs:
+            for r in paragraph.runs:
+                r.font.name = "Courier New"
+                r.font.size = Pt(10)
+
+
+def _add_revision_paragraph(doc: Document, rev: Revision) -> None:
+    p = doc.add_paragraph()
+    tag = "ins" if rev.change == "insert" else "del"
+    ch = OxmlElement(f"w:{tag}")
+    if rev.author:
+        ch.set(qn("w:author"), rev.author)
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = rev.text
+    r.append(t)
+    ch.append(r)
+    p._p.append(ch)
+
+
+def _apply_section_props(doc: Document, model: DocumentModel) -> None:
+    props = (model.metadata or {}).get("section_props") or {}
+    if not props:
+        return
+    section = doc.sections[0]
+    try:
+        w = props.get("page_width_mm")
+        h = props.get("page_height_mm")
+        if w and h:
+            section.page_width = Mm(float(w))
+            section.page_height = Mm(float(h))
+        margins = props.get("margins_mm") or {}
+        if isinstance(margins, dict):
+            for side in ("top", "right", "bottom", "left"):
+                raw = margins.get(side)
+                if raw is not None:
+                    setattr(section, f"margin_{side}", Mm(float(raw)))
+    except (TypeError, ValueError):
+        pass
+
+
+def _add_content_control_sdt(doc: Document, cc: ContentControl) -> None:
+    """Export as w:sdt block (lightweight round-trip with import enrich)."""
+    sdt = OxmlElement("w:sdt")
+    sdt_pr = OxmlElement("w:sdtPr")
+    if cc.tag:
+        tag_el = OxmlElement("w:tag")
+        tag_el.set(qn("w:val"), cc.tag)
+        sdt_pr.append(tag_el)
+    if cc.alias:
+        alias_el = OxmlElement("w:alias")
+        alias_el.set(qn("w:val"), cc.alias)
+        sdt_pr.append(alias_el)
+    if cc.control_type and cc.control_type not in ("richText", ""):
+        ctype = cc.control_type.lower()
+        if ctype in ("dropdown", "dropdownlist"):
+            ddl = OxmlElement("w:dropDownList")
+            item = OxmlElement("w:listItem")
+            item.set(qn("w:displayText"), cc.text or "")
+            item.set(qn("w:val"), cc.text or "")
+            ddl.append(item)
+            sdt_pr.append(ddl)
+        elif ctype == "date":
+            date_el = OxmlElement("w:date")
+            fmt = OxmlElement("w:dateFormat")
+            fmt.set(qn("w:val"), "yyyy/M/d")
+            date_el.append(fmt)
+            sdt_pr.append(date_el)
+    sdt.append(sdt_pr)
+    sdt_content = OxmlElement("w:sdtContent")
+    inner_p = OxmlElement("w:p")
+    r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = cc.text or ""
+    r.append(t)
+    inner_p.append(r)
+    sdt_content.append(inner_p)
+    sdt.append(sdt_content)
+    doc.element.body.append(sdt)
+
+
+def _add_content_control_paragraph(doc: Document, cc: ContentControl, theme_cfg: dict) -> None:
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent = Inches(0.2)
+    label = cc.alias or cc.tag or "控件"
+    run = p.add_run(f"{label}: {cc.text}")
+    run.font.color.rgb = theme_cfg.get("heading", RGBColor(0x18, 0x5F, 0xA5))
+
+
+def _add_textbox_paragraph(doc: Document, box: TextBox) -> None:
+    """Export as w:txbxContent under w:r (matches docx_ooxml import enrich)."""
+    p = doc.add_paragraph()
+    r = p.add_run()
+    txbx = OxmlElement("w:txbxContent")
+    inner_p = OxmlElement("w:p")
+    inner_r = OxmlElement("w:r")
+    t = OxmlElement("w:t")
+    t.text = box.text or ""
+    inner_r.append(t)
+    inner_p.append(inner_r)
+    txbx.append(inner_p)
+    r._r.append(txbx)
 
 
 def _add_image(doc: Document, image: Image) -> None:

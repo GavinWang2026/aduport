@@ -77,6 +77,11 @@ def test_should_handle_respects_anydoc_only():
     assert "xlsx" not in _ONLY
     assert should_handle("xlsx") is False  # xlsx stays native by default
     assert should_handle("docx") is True   # docx is in the default allow-list
+    assert should_handle("doc") is True    # OLE Word → Rust fast path by default
+    assert should_handle("pptx") is True
+    assert should_handle("rtf") is True
+    assert should_handle("epub") is True
+    assert should_handle("csv") is True
 
 
 def test_should_handle_disabled_when_master_switch_off(monkeypatch):
@@ -132,12 +137,36 @@ def test_marker_map_covers_enum():
         ("xls", "xls/sheet.xls"),
         ("ods", "ods/sheet.ods"),
         ("ppt", "ppt/pres.ppt"),
+        ("docx", "docx/text.docx"),
+        ("docx", "docx/handmade-tables.docx"),
+        ("docx", "docx/handmade-rich.docx"),
+        ("rtf", "rtf/text.rtf"),
+        ("rtf", "rtf/handmade-blockstyle.rtf"),
+        ("odt", "odt/text.odt"),
+        ("pptx", "pptx/pres.pptx"),
+        ("doc", "doc/text.doc"),
     ],
 )
 def test_fast_markdown_channel(fmt, rel):
     data = open(os.path.join(FIX, rel), "rb").read()
     out = bridge.markdown_via_anydoc(data, fmt, rel)
     assert isinstance(out, str) and out.strip()
+
+
+@skip_if_no_anydoc
+@pytest.mark.parametrize(
+    "fmt,rel",
+    [
+        ("docx", "docx/handmade-tables.docx"),
+        ("rtf", "rtf/text.rtf"),
+        ("doc", "doc/text.doc"),
+    ],
+)
+def test_model_channel_office_basic(fmt, rel):
+    data = open(os.path.join(FIX, rel), "rb").read()
+    model = bridge.import_via_anydoc(data, rel, fmt)
+    assert model.nodes, f"expected nodes from {rel}"
+    assert model.metadata.get("importer") == "anydoc"
 
 
 @skip_if_no_anydoc
@@ -149,6 +178,37 @@ def test_model_channel_odf_table_spans():
     # anydoc reports header_rows / cell spans; md-bridge model must carry them.
     assert hasattr(tables[0], "cells")
     assert hasattr(tables[0], "header_rows")
+
+
+@skip_if_no_anydoc
+@pytest.mark.parametrize(
+    "fmt,rel",
+    [
+        ("epub", "epub/book.epub"),
+        ("epub", "epub/handmade-features.epub"),
+        ("csv", "csv/sheet.csv"),
+        ("csv", "csv/handmade-quoted.csv"),
+    ],
+)
+def test_fast_markdown_epub_csv(fmt, rel):
+    data = open(os.path.join(FIX, rel), "rb").read()
+    out = bridge.markdown_via_anydoc(data, fmt, rel)
+    assert isinstance(out, str) and out.strip()
+
+
+@skip_if_no_anydoc
+@pytest.mark.parametrize(
+    "fmt,rel",
+    [
+        ("epub", "epub/book.epub"),
+        ("csv", "csv/sheet.csv"),
+    ],
+)
+def test_model_channel_epub_csv(fmt, rel):
+    data = open(os.path.join(FIX, rel), "rb").read()
+    model = bridge.import_via_anydoc(data, rel, fmt)
+    assert model.nodes, f"expected nodes from {rel}"
+    assert model.metadata.get("importer") == "anydoc"
 
 
 @skip_if_no_anydoc

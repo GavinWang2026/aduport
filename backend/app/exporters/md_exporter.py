@@ -5,10 +5,17 @@ from __future__ import annotations
 import base64
 import re
 
+from app.config import settings
+from app.exporters.table_span import (
+    render_table_html,
+    table_flat_matrix,
+    table_has_span_cells,
+)
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
     Comment,
+    ContentControl,
     DocumentModel,
     Footnote,
     Heading,
@@ -19,9 +26,12 @@ from app.core.document_model import (
     InlineMarkType,
     ListItem,
     MathBlock,
+    PivotTable,
+    Revision,
     Paragraph,
     RichText,
     Table,
+    TextBox,
     ensure_rich_text,
 )
 
@@ -66,6 +76,35 @@ def export_md(model: DocumentModel) -> str:
         elif isinstance(node, Comment):
             anchor = f' "{node.anchor}"' if node.anchor else ""
             lines.append(f"<!-- comment:{node.author}{anchor} {node.text} -->")
+            lines.append("")
+        elif isinstance(node, Revision):
+            if node.change == "delete":
+                lines.append(f"~~{node.text}~~ <!-- del:{node.author} -->")
+            else:
+                lines.append(f"++{node.text}++ <!-- ins:{node.author} -->")
+            lines.append("")
+        elif isinstance(node, ContentControl):
+            label = node.alias or node.tag or "control"
+            lines.append(
+                f"**[{label}]** {node.text} <!-- content_control:{node.control_type} -->"
+            )
+            lines.append("")
+        elif isinstance(node, PivotTable):
+            lines.append(f"### Pivot: {node.name or 'table'}")
+            if node.location:
+                lines.append(f"- location: {node.location}")
+            if node.source_range:
+                lines.append(f"- source: {node.source_range}")
+            if node.row_fields:
+                lines.append(f"- rows: {', '.join(node.row_fields)}")
+            if node.col_fields:
+                lines.append(f"- cols: {', '.join(node.col_fields)}")
+            if node.data_fields:
+                lines.append(f"- values: {', '.join(node.data_fields)}")
+            lines.append("")
+        elif isinstance(node, TextBox):
+            src = f" ({node.source})" if node.source else ""
+            lines.append(f"> **[文本框{src}]** {node.text}")
             lines.append("")
         elif isinstance(node, Table):
             lines.extend(_render_table(node))
@@ -147,41 +186,44 @@ def _split_by_marks(rich: RichText) -> list[tuple[str, list[InlineMark]]]:
 
 
 def _render_table(table: Table) -> list[str]:
-    if not table.rows:
+    if table_has_span_cells(table):
+        html_table = render_table_html(table)
+        return ["", html_table, ""] if html_table else []
+
+    matrix = table_flat_matrix(table)
+    if not matrix:
         return []
 
-    col_count = max((len(row) for row in table.rows), default=0)
+    col_count = max((len(row) for row in matrix), default=0)
     if col_count == 0:
         return []
 
-    matrix: list[list[str]] = []
-    for row in table.rows:
-        cells = [_escape_cell(str(c) if c is not None else "") for c in row]
-        if len(cells) < col_count:
-            cells.extend([""] * (col_count - len(cells)))
-        else:
-            cells = cells[:col_count]
-        matrix.append(cells)
-
     widths = [3] * col_count
     for row in matrix:
-        for i, cell in enumerate(row):
+        for i, cell in enumerate(row[:col_count]):
             widths[i] = max(widths[i], len(cell), 3)
 
     def fmt_row(cells: list[str]) -> str:
-        padded = [cells[i].ljust(widths[i]) for i in range(col_count)]
+        padded = [cells[i].ljust(widths[i]) if i < len(cells) else "".ljust(widths[i]) for i in range(col_count)]
         return "| " + " | ".join(padded) + " |"
 
     separator = "| " + " | ".join("-" * widths[i] for i in range(col_count)) + " |"
-    lines = [fmt_row(matrix[0]), separator]
-    for row in matrix[1:]:
+    header_end = _table_md_header_rows(table, len(matrix))
+    lines: list[str] = []
+
+    if len(matrix) == 1:
+        lines.append(fmt_row(matrix[0]))
+        return lines
+
+    for i in range(header_end):
+        lines.append(fmt_row(matrix[i]))
+    lines.append(separator)
+    for row in matrix[header_end:]:
         lines.append(fmt_row(row))
     return lines
 
 
-def _escape_cell(text: str) -> str:
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = text.replace("\n", "<br>")
-    text = text.replace("|", "\\|")
-    text = re.sub(r"[ \t]+", " ", text).strip()
-    return text
+def _table_md_header_rows(table: Table, row_count: int) -> int:
+    if table.header_rows > 0:
+        return min(int(table.header_rows), row_count)
+    return 1 if settings.table_first_row_header and row_count > 1 else 0

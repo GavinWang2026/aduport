@@ -35,6 +35,15 @@ def import_mobi(source_bytes: bytes, filename: str = "input.mobi") -> DocumentMo
     if not _looks_like_mobi(source_bytes):
         raise InvalidDocumentError(f"文件不是有效的 MOBI: {filename}")
 
+    from app.importers.mobi_text import try_extract_mobi_model
+
+    title = Path(filename).stem
+    native = try_extract_mobi_model(source_bytes, title=title)
+    if native is not None and native.nodes:
+        native.metadata = dict(native.metadata or {})
+        native.metadata["importer"] = "mobi_text"
+        return native
+
     get_converter = _require_docling()
     suffix = Path(filename).suffix or ".mobi"
     with tempfile.TemporaryDirectory(prefix="mdbridge-mobi-") as tmpdir:
@@ -44,7 +53,7 @@ def import_mobi(source_bytes: bytes, filename: str = "input.mobi") -> DocumentMo
         try:
             converter = get_converter()
             result = converter.convert(str(tmp_path))
-            return docling_document_to_model(result.document, title=Path(filename).stem)
+            return docling_document_to_model(result.document, title=title)
         except (InvalidDocumentError, CorruptedFileError):
             raise
         except Exception as exc:

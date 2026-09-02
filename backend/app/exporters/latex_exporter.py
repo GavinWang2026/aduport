@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
+    Comment,
     DocumentModel,
     Footnote,
     Heading,
@@ -14,6 +15,7 @@ from app.core.document_model import (
     ListItem,
     MathBlock,
     Paragraph,
+    PivotTable,
     Table,
     ensure_rich_text,
 )
@@ -85,6 +87,19 @@ def export_latex(model: DocumentModel) -> str:
         elif isinstance(node, Footnote):
             parts.append(rf"\footnote{{{_esc(node.text)}}}")  # id lost; text kept
             i += 1
+        elif isinstance(node, Comment):
+            anchor = f" on {_esc(node.anchor)}" if node.anchor else ""
+            parts.append(
+                rf"% comment by {_esc(node.author or 'reviewer')}{anchor}: {_esc(node.text)}"
+            )
+            i += 1
+        elif isinstance(node, PivotTable):
+            fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+            parts.append(
+                rf"% pivot {_esc(node.name or 'table')}: {_esc(fields)}"
+                + (rf" src={_esc(node.source_range)}" if node.source_range else "")
+            )
+            i += 1
         elif isinstance(node, Image):
             alt = _esc(node.alt_text.split("|", 1)[0] if node.alt_text else "image")
             parts.append(rf"% image: {alt}")
@@ -141,13 +156,27 @@ def _render_rich(rich) -> str:
 
 
 def _render_table(table: Table) -> str:
-    if not table.rows:
+    from app.exporters.table_span import (
+        render_table_html,
+        render_table_latex,
+        table_flat_matrix,
+        table_has_span_cells,
+    )
+
+    if not table.rows and not table.cells:
         return ""
-    cols = max(len(r) for r in table.rows)
+    if table_has_span_cells(table):
+        return render_table_latex(table)
+    matrix = table_flat_matrix(table)
+    if not matrix:
+        return ""
+    cols = max(len(r) for r in matrix)
     spec = "l" * cols
-    lines = [rf"\begin{{tabular}}{{{spec}}}", r"\hline"]
-    for r_idx, row in enumerate(table.rows):
-        cells = [_esc(str(row[c]) if c < len(row) else "") for c in range(cols)]
+    lines: list[str] = []
+    lines.append(rf"\begin{{tabular}}{{{spec}}}")
+    lines.append(r"\hline")
+    for r_idx, row in enumerate(matrix):
+        cells = [_esc(row[c] if c < len(row) else "") for c in range(cols)]
         lines.append(" & ".join(cells) + r" \\")
         if r_idx == 0:
             lines.append(r"\hline")

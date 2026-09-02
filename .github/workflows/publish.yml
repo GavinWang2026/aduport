@@ -1,5 +1,9 @@
 # Publish md-bridge to PyPI (Trusted Publishing / OIDC preferred).
 #
+# IMPORTANT: the published sdist/wheel is Python-only. Vendored anydoc
+# (native/anydoc → mdbridge_native._doc) is NOT built or uploaded here.
+# Full-program delivery = Docker (INSTALL_NATIVE=1) or scripts/build_native.sh.
+#
 # One-time setup on https://pypi.org :
 #   1. Create project "md-bridge" (or claim name)
 #   2. Publishing → Add a new pending publisher
