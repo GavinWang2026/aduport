@@ -43,7 +43,7 @@ cd /path/to/md-bridge
 
 # 1) 质量门（开发机）
 cd backend && pytest -q tests/test_acceptance_pack.py tests/test_p0_commercial.py \
-  tests/test_error_contract.py tests/test_tenant_jobs.py
+  tests/test_error_contract.py tests/test_surface_webhooks_results.py
 cd ..
 
 # 2) 构建并打包

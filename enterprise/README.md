@@ -33,7 +33,7 @@
 ```bash
 # 1) 验收用例
 cd backend && pytest -q tests/test_acceptance_pack.py tests/test_p0_commercial.py \
-  tests/test_error_contract.py tests/test_tenant_jobs.py
+  tests/test_error_contract.py tests/test_surface_webhooks_results.py
 
 # 2) 全量回归（可选）
 pytest -q --tb=short -m "not integration"

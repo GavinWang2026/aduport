@@ -23,9 +23,9 @@
 
 ```bash
 cd backend
-pytest -q tests/test_acceptance_pack.py tests/test_tenant_jobs.py \
+pytest -q tests/test_acceptance_pack.py tests/test_p0_commercial.py \
   tests/test_latex_import.py tests/test_license.py tests/test_ocr_engines.py \
-  tests/test_error_contract.py tests/test_ocr_ci_contract.py tests/test_fidelity_98.py
+  tests/test_error_contract.py tests/test_fidelity_98.py tests/test_surface_webhooks_results.py
 export MDBRIDGE_OCR_HOME=../.paddle_home
 # 可选：强制启用本机 Paddle（可能弹 macOS 崩溃窗）
 # export MDBRIDGE_OCR_ALLOW_PADDLE=true

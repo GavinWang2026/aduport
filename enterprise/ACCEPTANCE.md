@@ -27,7 +27,7 @@
 | B10 | 病毒扫描 fail-closed | 启用 `MDBRIDGE_VIRUS_SCAN=true` 且无 ClamAV 时返回 `virus_scan_unavailable` | ☐ |
 | B11 | 租户 Job 隔离 | 不同 API Key / tenant 互不可见；SQLite `tenant_id` 列可过滤 | ☐ |
 
-自动化对应：`pytest tests/test_acceptance_pack.py tests/test_error_contract.py tests/test_ocr_ci_contract.py tests/test_fidelity_98.py tests/test_tenant_jobs.py` + `enterprise/scripts/smoke_test.sh`。  
+自动化对应：`pytest tests/test_acceptance_pack.py tests/test_error_contract.py tests/test_fidelity_98.py tests/test_p0_commercial.py tests/test_surface_webhooks_results.py tests/test_ocr_engines.py` + `enterprise/scripts/smoke_test.sh`。  
 扫描回归：`backend/tests/fixtures/scan/` + `test_scan_ocr_regression.py`（见 [OCR.md](./OCR.md)）。
 
 ## C. 配置基线（企业默认）
