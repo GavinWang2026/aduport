@@ -27,6 +27,4 @@ native/anydoc/target
 **/target
 
 # Reports / local scratch (not needed for image)
-anydoc_mdbridge_fusion_report*.html
-verify_anydoc_fix.py
 enterprise/dist

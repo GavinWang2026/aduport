@@ -3,192 +3,214 @@
 [![CI](https://github.com/crayfish-team/md-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/crayfish-team/md-bridge/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/md-bridge.svg)](https://pypi.org/project/md-bridge/)
 
-本地私有化文档双向转换工具。支持 **PDF**、**DOCX**、**Markdown**、**ODT**、**RTF** 等格式相互转换，提供 Python SDK、CLI、FastAPI 后端与 Vue3 Web 前端，所有处理完全在本地完成，不调用第三方云端 API。
+**本地私有化文档交换枢纽** — 以统一 AST（`DocumentModel`）为中心，在 **29 种源格式** 与 **16 种目标格式** 之间做双向转换。提供 Python SDK、CLI、FastAPI 与 Vue3 Web UI；默认纯本地处理，不依赖第三方云端 API。
 
-## 功能特性
+当前包版本：**0.16.0** · 后端回归：**366 pytest pass**（2026-09）
 
-- 统一中间文档模型 `DocumentModel`（AST），导入器与导出器解耦
-- 输入：PDF、DOCX、Markdown、TXT、HTML、PPTX、EPUB、MOBI、ODT、RTF、**DOC**、**PPT**、**ODS**、**XLS/XLSB/XLSM**、CSV
-- 输出：Markdown、DOCX、PDF、HTML、TXT、EPUB、PPTX、CSV、ODT、JSON、XLSX
-- **anydoc 高保真导入引擎（内置，Rust/MIT，源码 vendored 于 `native/anydoc/`）**：`doc`/`odt`/`rtf`/`ppt`/`ods`/`xls`/`xlsb`/`xlsm`/`docm`/`pptm` 等经内置 anydoc 解析，获得**合并单元格表格**、**有序列表原始编号**、**OMML/MathML 公式（LaTeX）**、**嵌入图片字节**、**脚注/尾注**，以及此前原生不支持的二进制 Office / ODF 格式（`doc`/`ppt`/`xls`/`ods`/`odp`）
-- anydoc-first + native-fallback 双通道：目标为 Markdown 时走 anydoc 直出快通道（零保真损失），其余走中间模型喂给既有导出器（docx/pdf/epub…）
-- 单文件与**批量目录**转换（CLI + API）；异步任务队列（进度轮询）
-- 可选 API-Key / Basic Auth、限流、审计日志、结果缓存与 Prometheus 指标
-- 三种使用形态：Python SDK、命令行 CLI、Web UI + HTTP API
-- Docker Compose 一键本地部署
-- 扫描版 PDF 支持 OCR（依赖 Tesseract / docling 模型，可通过 `.env` 开关）
-- 数字版 PDF：默认 `auto` 引擎走本地文本层（无需 Hugging Face），Hub 超时自动回退
-- PDF 导出支持自定义字体 / CSS
-- 标准化错误 JSON（损坏文件、格式错误、超限等）
+---
 
-## 协议说明
+## 它能做什么
 
-| 类别 | 协议 |
+md-bridge 解决的是「多格式文档进 → 结构化中间表示 → 多格式出」：
+
+```
+Office / PDF / 电子书 / 表格 / 标记语言
+        ↓  Importer（anydoc Rust + 原生 Python）
+   DocumentModel（AST）
+        ↓  Exporter
+MD / DOCX / PDF / HTML / EPUB / PPTX / XLSX / JSON / …
+```
+
+**典型场景**
+
+| 场景 | 做法 |
 |------|------|
-| 本项目自研代码 | **MIT** |
-| FastAPI、Typer、docling、markdown-it-py、python-docx | MIT |
-| WeasyPrint | BSD-3-Clause |
-| pydantic-settings、python-multipart | MIT |
-| anydoc（源码 vendored 于 `native/anydoc/`，非外部依赖） | MIT |
+| 合同 DOCX → Markdown 知识库 | `docx → md`（anydoc 快通道或 AST） |
+| Markdown → 可打印 PDF | `md → pdf`（WeasyPrint + CJK 字体/CSS） |
+| 批量目录 Office → MD | CLI `batch` 或 API `/api/convert/batch` |
+| 扫描 PDF → 可编辑文本 | OCR 双引擎（MinerU / PaddleOCR-VL，企业可选） |
+| 私有化 API 服务 | Docker Compose + API Key / 多租户 / Prometheus |
 
-**硬性约束：**
+---
 
-1. 底层第三方依赖仅允许 MIT / BSD-3-Clause / Apache-2.0 协议库
-2. **Pandoc（GPL-2）禁止打包**进程序或 Docker 镜像；代码中仅保留可选外部调用注释
-3. 禁止引入 AGPL、GPL 传染协议组件
+## 功能概览
+
+### 格式
+
+| 方向 | 数量 | 格式 |
+|------|------|------|
+| **源** | 29 | `md` `txt` `html` `docx` `doc` `docm` `pdf` `pptx` `ppt` `pps` `pot` `pptm` `ppsx` `ppsm` `xlsx` `xls` `xlsb` `xlsm` `ods` `odp` `csv` `odt` `rtf` `epub` `mobi` `azw3` `kf8` `latex` `json` |
+| **目标** | 16 | `md` `txt` `html` `docx` `pdf` `pptx` `epub` `mobi` `azw3` `kf8` `latex` `csv` `odt` `json` `xlsx` `rtf` |
+
+权威列表见 `backend/app/core/converter.py` 的 `SUPPORTED_*`；运行时以 `GET /api/formats` / `mdbridge formats` 为准。
+
+### 保真能力（AST + 导出）
+
+- **表格合并单元格**：11 路目标格式原生 `colspan`/`rowspan`（含 MD/TXT HTML 嵌入、LaTeX `\multicolumn`、RTF `\clmgf`）；LaTeX/RTF/MD **import roundtrip** 已接
+- **批注 / 脚注 / 修订 / 内容控件 / 文本框 / 透视表**：进 `DocumentModel` 后可在 HTML、EPUB、DOCX、PDF、PPTX、XLSX、JSON 等通道导出
+- **数学公式**：MathBlock → HTML KaTeX、LaTeX、PDF 等
+- **PDF 文本层**：数字 PDF 默认 `pypdfium2` 本地提取（无需 Hugging Face）；可选双栏启发式
+- **DOCX 主题 / 批注导出 / 标题编号**：CLI 与 API 参数对齐
+
+### 内置 anydoc（Rust / MIT）
+
+源码 vendored 于 [`native/anydoc/`](native/anydoc/)，编译为 **`mdbridge_native._doc`**（Docker 默认编装；PyPI _wheel 不含 native，需自行 `bash scripts/build_native.sh`）。
+
+| 通道 | 行为 |
+|------|------|
+| **快通道** `fast_md` | 目标 = Markdown 时直出 anydoc GFM，零 AST 损失 |
+| **模型通道** | `to_document` → `DocumentModel` → 既有导出器 |
+| **独占格式** | `doc` `ppt` `xls` `xlsb` `ods` `odp` 及宏变体等 — native 未覆盖时由 anydoc 接管 |
+| **共享格式** | `docx` `odt` `rtf` `pptx` `epub` `csv` 等 — anydoc 优先，原生兜底；**`xlsx` 默认留原生**（表头行推断更准） |
+
+配置：`MDBRIDGE_ANYDOC_*`（见 [.env.example](.env.example)）。
+
+### 产品与运维
+
+- **Web UI**：拖拽上传、批量队列、历史、MD/HTML 预览、PDF/DOCX 高级选项
+- **HTTP API**：同步转换、批量 ZIP、异步 Job + **Webhook**（`callback_url`）
+- **持久化**：`MDBRIDGE_JOB_RESULT_DIR` 任务结果落盘；`MDBRIDGE_OBJECT_STORAGE_URI` 可选归档（file / S3）
+- **安全**：可选 `X-API-Key` / Basic Auth、多租户 `MDBRIDGE_API_KEYS`、限流、审计 JSONL、Magic bytes 校验
+- **可观测**：`GET /api/metrics`（Prometheus 文本）、anydoc 命中率、OCR 就绪、按错误码统计；Grafana/告警见 [`docs/ops/prometheus/`](docs/ops/prometheus/)
+
+### 性能与稳定性
+
+| 机制 | 说明 |
+|------|------|
+| anydoc 快通道 | Office → MD 毫秒级，跳过 Python AST 构建 |
+| 结果缓存 | 内存 LRU + 可选 gzip（`MDBRIDGE_CACHE_*`） |
+| 流式转换 | 大 MD/TXT/HTML 分块处理（`MDBRIDGE_STREAM_CONVERT`） |
+| 子进程隔离 | `MDBRIDGE_CONVERT_ISOLATE`：native 崩溃时 worker 隔离，失败则 in-process 回退 |
+| 批量并发 | `MDBRIDGE_BATCH_WORKERS` 控制并行 worker |
+| 启动预热 | docling / WeasyPrint 可选 warmup（`MDBRIDGE_WARMUP_ON_STARTUP`） |
+
+---
 
 ## 架构
 
 ```
-PDF/DOCX/MD  →  [Importer]  →  DocumentModel (AST)  →  [Exporter]  →  MD/DOCX/PDF/...
-                     │
-        anydoc 桥接层（内置，Rust/MIT，源码 vendored，无网络/无 ML/无 LibreOffice）
-        ├─ 快通道：目标=Markdown 时直接返回 anydoc 的 GFM（零保真损失）
-        └─ 模型通道：映射到 DocumentModel 喂给既有导出器（含合并单元格/列表编号/公式）
+                    ┌─────────────────────────────────────┐
+                    │  CLI / FastAPI / Vue Web UI         │
+                    └─────────────────┬───────────────────┘
+                                      │ convert()
+                    ┌─────────────────▼───────────────────┐
+                    │  Registry：importer / exporter 插件   │
+                    └─────────────────┬───────────────────┘
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+   anydoc_bridge              native importers              ocr_engine
+   (Rust → mdbridge_native)   docx/pdf/md/html/…           MinerU / Paddle / docling
+          │                           │                           │
+          └───────────────────────────┼───────────────────────────┘
+                                      ▼
+                         DocumentModel（AST）
+                    Heading / Paragraph / Table+span
+                    Comment / Footnote / Revision / PivotTable …
+                                      │
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+      md/docx/pdf/html            epub/mobi/azw3              xlsx/json/rtf/latex
 ```
 
-`DocumentModel` 节点类型：`Heading`、`Paragraph`、`ListItem`、`Table`、`Image`、`CodeBlock`、`InlineMark`。
+AST 节点与手写示例见 [`docs/document-model.md`](docs/document-model.md)。
 
-### anydoc 集成说明
-
-anydoc 的 Rust 源码**已 vendored 进本仓库**（`native/anydoc/`，约 24k 行、MIT），通过 `app/importers/anydoc_bridge.py` 接入注册表（`app/core/registry.py` 的 `_wire_anydoc`）。它不是外部 PyPI 依赖，而是 md-bridge 自带的 native 组件（编译为 `mdbridge_native._doc` 扩展）。规则：
-
-- **anydoc 独占格式**（无原生 importer）：`doc`、`ppt`、`pps`、`pot`、`xls`、`xlsb`、`xlsm`、`ods`、`odp`、`docm`、`pptm`、`ppsx`、`ppsm` —— 只要 `MDBRIDGE_ANYDOC_ENABLED=true` 即由 anydoc 接管；关闭时若无兼容原生兄弟（如 `docm`→`docx`）则降级。
-- **共享格式**（有原生 importer）：`docx`、`odt`、`rtf`、`pptx`、`epub`、`csv` —— anydoc 优先，原生兜底；`xlsx` **默认留在原生**（原生推断表头行更准，anydoc 报 `header_rows=0`）。
-- 通过 `MDBRIDGE_ANYDOC_FORMATS` 可缩小 anydoc 接管的共享格式范围（设为 `*` 全接管）。
+---
 
 ## 快速开始
 
-### 方式一：Docker Compose（推荐）
+### Docker Compose（推荐）
 
 ```bash
-git clone <repo-url> md-bridge
-cd md-bridge
+git clone <repo-url> md-bridge && cd md-bridge
+cp .env.example .env
 docker compose up --build
-# 瘦镜像（无 docling/torch，仅 MD↔DOCX/PDF 导出路径）：
-# docker compose -f docker-compose.yml -f docker-compose.slim.yml up --build
 ```
 
-- Web UI：http://localhost:8080
-- API 文档：http://localhost:8080/docs
-- 后端直连：http://localhost:8000
-- 默认 `INSTALL_NATIVE=1`：多阶段构建会编译并安装 `mdbridge_native`（高保真 Office 导入）
-- 若宿主机路径含非 ASCII 字符（例如 U+2011 特殊连字符），Colima/Docker Desktop 偶发上下文陈旧；推荐：
-  - `bash scripts/docker_build_safe.sh`（rsync 到 `/tmp/md-bridge-build` 再构建），或
-  - `ln -s "$(pwd)" /tmp/md-bridge && cd /tmp/md-bridge && docker compose build`
+| 服务 | 地址 |
+|------|------|
+| Web UI | http://localhost:8080 |
+| OpenAPI | http://localhost:8080/docs |
+| 后端直连 | http://localhost:8000 |
 
-### 方式二：pip（PyPI / 本地包）
+**镜像分层**
 
 ```bash
-pip install md-bridge                 # 发布后（纯 Python，不含 Rust 扩展）
-# 或从源码：
-cd backend && pip install -e ".[dev]"
-# 可选：pip install 'md-bridge[office,images]'
-# 高保真 Office/EPUB/表格导入（anydoc 源码已 vendored，Rust/MIT，无外部依赖）：
-#   PyPI 包刻意不带 mdbridge_native；企业镜像走 Docker 多阶段编译。
-#   源码/SDK 路径需自行编译一次：
+# 瘦镜像（无 docling/torch，MD↔DOCX/PDF 主路径）
+docker compose -f docker-compose.yml -f docker-compose.slim.yml up --build
+
+# OCR 叠加（开发）
+docker compose -f docker-compose.yml -f docker-compose.ocr.yml up --build
+
+# 路径含非 ASCII 时避免 Docker 上下文问题
+bash scripts/docker_build_safe.sh
+```
+
+默认 `INSTALL_NATIVE=1`：多阶段 Dockerfile 编译 `mdbridge_native`。
+
+### pip / 源码
+
+```bash
+pip install md-bridge                    # PyPI：纯 Python，不含 Rust 扩展
+cd backend && pip install -e ".[dev]"    # 开发安装
+
+# 高保真 Office 导入（源码 / 企业路径）
 bash scripts/build_native.sh
 ```
 
-发布脚手架：`scripts/publish_dry_run.sh` 本地打 wheel；GitHub Release 触发 `.github/workflows/publish.yml`（Trusted Publishing）。**发布物不含** `native/anydoc` 编译产物。
+### 本地开发
 
-### 方式三：本地开发运行
-
-**环境要求：** Python 3.11+
-
-**系统依赖（WeasyPrint + OCR）：**
+**要求：** Python 3.11+
 
 ```bash
-# macOS（PDF 导出依赖 Pango/GObject）
+# macOS 系统依赖（PDF + OCR）
 brew install pango gdk-pixbuf libffi tesseract
-# 启动后端时需能找到 Homebrew 动态库，推荐：
-#   cd backend && ./start.sh
 
-# Debian/Ubuntu
-sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim \
-  libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 fonts-noto-cjk
+cd backend && python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+./start.sh                               # API :8000
+
+cd frontend && npm install && npm run dev  # UI  :7173，/api 代理到 8000
 ```
 
-**安装后端：**
+---
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"            # MD / DOCX-out / PDF-out
-pip install -e ".[office,dev]"     # 另含 PDF/DOCX 导入（docling，体积较大）
-```
+## 配置
 
-**启动 API 服务：**
-
-```bash
-cd backend
-./start.sh
-# 或: uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-**启动前端（开发模式）：**
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-访问 http://localhost:7173（Vite 已配置 `/api` 代理到 8000 端口）。
-
-## 配置（.env）
-
-复制 [.env.example](.env.example) 为 `.env`：
-
-```bash
-cp .env.example .env
-```
+复制 [.env.example](.env.example) → `.env`。常用项：
 
 | 变量 | 说明 | 默认 |
 |------|------|------|
-| `MDBRIDGE_MAX_UPLOAD_MB` | 上传/转换文件大小上限（MB） | `100` |
-| `MDBRIDGE_OCR_ENABLED` | 扫描 PDF OCR 开关 | `true` |
-| `MDBRIDGE_PDF_ENGINE` | PDF 导入：`auto` / `text` / `docling` | `auto` |
-| `MDBRIDGE_HF_ENDPOINT` | Hugging Face 镜像（docling 模型） | `https://hf-mirror.com` |
-| `MDBRIDGE_DEBUG` | 暴露内部错误详情 | `false` |
-| `MDBRIDGE_CORS_ORIGINS` | CORS：`local` 白名单 / `*` / 逗号列表 | `local` |
-| `MDBRIDGE_CORS_ALLOW_CREDENTIALS` | 是否允许 credentials（勿与 `*` 同开） | `false` |
-| `MDBRIDGE_API_KEY` | 可选 API Key（设值后需 `X-API-Key`） | 空=关闭 |
-| `MDBRIDGE_MAX_BATCH_FILES` | 批量最大文件数 | `20` |
-| `MDBRIDGE_MAX_BATCH_TOTAL_MB` | 批量总大小上限（MB） | `200` |
-| `MDBRIDGE_BATCH_WORKERS` | 批量并发 worker 数 | `3` |
-| `MDBRIDGE_PDF_FONT_FAMILY` | PDF 默认字体族 | Noto Sans CJK SC ... |
-| `MDBRIDGE_PDF_CUSTOM_CSS` | PDF 追加 CSS（自动过滤 url/@import） | 空 |
-| `MDBRIDGE_ANYDOC_ENABLED` | anydoc 高保真导入总开关（关闭则完全退回原生，零行为变化） | `true` |
-| `MDBRIDGE_ANYDOC_FORMATS` | anydoc 接管的**共享**格式（逗号分隔，`*`=全接管；独占格式不受此限） | `doc,docx,rtf,odt,pptx,…,epub,csv`（默认不含 xlsx） |
-| `MDBRIDGE_ANYDOC_FAST_MARKDOWN` | 目标=Markdown 时走 anydoc 直出快通道（零保真损失） | `true` |
-| `MDBRIDGE_ANYDOC_FALLBACK` | anydoc 可恢复拒绝时回退原生 importer（关=直接报错） | `true` |
-| `MDBRIDGE_ANYDOC_SNIFF` | 用 anydoc 内容嗅探修正无扩展名/错扩展名上传的格式识别 | `true` |
+| `MDBRIDGE_MAX_UPLOAD_MB` | 单文件上限（MB） | `100` |
+| `MDBRIDGE_API_KEY` / `MDBRIDGE_API_KEYS` | 鉴权（空=关闭） | 空 |
+| `MDBRIDGE_OCR_ENABLED` | 扫描 PDF OCR | `false`（开发）；企业 compose 默认 `true` |
+| `MDBRIDGE_OCR_ENGINE` | `auto` / `mineru` / `paddleocr_vl` / `docling` | `auto` |
+| `MDBRIDGE_PDF_ENGINE` | PDF 导入引擎 | `auto` |
+| `MDBRIDGE_ANYDOC_ENABLED` | 内置 anydoc 总开关 | `true` |
+| `MDBRIDGE_ANYDOC_FAST_MARKDOWN` | MD 目标快通道 | `true` |
+| `MDBRIDGE_JOB_RESULT_DIR` | 异步任务结果目录 | `data/job_results` |
+| `MDBRIDGE_OBJECT_STORAGE_URI` | 结果归档 `file://` / `s3://` | 空 |
+| `MDBRIDGE_HTML_KATEX` | HTML 导出注入 KaTeX | `true` |
+| `MDBRIDGE_CONVERT_ISOLATE` | 转换子进程隔离 | 见 `.env.example` |
 
-Docker Compose 会通过 `env_file: .env` 注入这些变量。
+完整列表与 enterprise 变量见 `.env.example`、`enterprise/.env.example`。
 
-## CLI 使用
+---
+
+## CLI
 
 ```bash
-# 单文件转换
 mdbridge convert input.docx output.md
-mdbridge convert input.md output.pdf --pdf-font "Georgia, serif" --pdf-page-size A4 --pdf-toc
+mdbridge convert input.md output.pdf --pdf-font "Noto Sans CJK SC" --pdf-toc
 mdbridge convert input.md output.docx --docx-theme academic
 
-# 显式指定格式
-mdbridge convert input.bin output.md --from docx --to md
-
-# 批量目录转换（输出到目标目录，可 -r 递归）
-mdbridge batch ./inbox ./outbox --from docx --to md
-mdbridge batch ./inbox ./outbox --from md --to pdf -r --pdf-orientation landscape
-
-# 查看支持格式 / 企业一机一码
+mdbridge batch ./inbox ./outbox --from docx --to md -r
 mdbridge formats
-mdbridge machine-id
+mdbridge machine-id          # 企业一机一码
 ```
 
-PDF/DOCX 选项与 HTTP API 对齐：`--pdf-font`、`--pdf-css`、`--pdf-page-size`、`--pdf-orientation`、`--pdf-header`、`--pdf-footer`、`--pdf-page-numbers`、`--pdf-toc`、`--docx-theme`。
+PDF/DOCX 选项与 HTTP API 字段一致。
+
+---
 
 ## Python SDK
 
@@ -196,176 +218,119 @@ PDF/DOCX 选项与 HTTP API 对齐：`--pdf-font`、`--pdf-css`、`--pdf-page-si
 from app.core.converter import convert
 
 with open("report.docx", "rb") as f:
-    docx_bytes = f.read()
-
-md_bytes = convert(docx_bytes, "docx", "md", filename="report.docx")
-
-with open("report.md", "wb") as f:
-    f.write(md_bytes)
+    md_bytes = convert(f.read(), "docx", "md", filename="report.docx")
 ```
 
-手写 / 操作中间 AST 见 [`docs/document-model.md`](docs/document-model.md)；完整示例 [`examples/sdk_demo.py`](examples/sdk_demo.py)（含 `demo_document_model`）：
+手写 AST、插件注册见 [`docs/document-model.md`](docs/document-model.md)；完整示例 [`examples/sdk_demo.py`](examples/sdk_demo.py)。
 
-```bash
-cd backend && pip install -e .
-python ../examples/sdk_demo.py
-```
+---
 
-企业交付边界见 [`ENTERPRISE.md`](ENTERPRISE.md)。
+## HTTP API（摘要）
 
-## HTTP API
-
-### POST `/api/convert`（单文件）
-
-- Content-Type: `multipart/form-data`
-- 字段：`file`、`source_format`、`target_format`
-- 可选 PDF：`pdf_font_family`、`pdf_custom_css`、`pdf_page_size`、`pdf_orientation`、`pdf_header`、`pdf_footer`、`pdf_page_numbers`、`pdf_toc`
-- 可选 DOCX：`docx_theme`（`default` / `academic` / `minimal`）
-- 成功：文件流下载
-- 失败：标准化 JSON
+| 端点 | 用途 |
+|------|------|
+| `POST /api/convert` | 单文件 multipart 转换 |
+| `POST /api/convert/batch` | 多文件 → ZIP（失败项写入 `errors.json`） |
+| `POST /api/jobs` | 异步任务；可选 `callback_url` Webhook |
+| `GET /api/jobs/{id}` | 轮询状态 |
+| `GET /api/jobs/{id}/result` | 下载结果 |
+| `GET /api/health` | 健康 + OCR/anydoc 就绪 |
+| `GET /api/metrics` | Prometheus 指标 |
 
 ```bash
 curl -X POST http://localhost:8000/api/convert \
-  -F "file=@sample.docx" \
-  -F "source_format=docx" \
-  -F "target_format=md" \
+  -F "file=@sample.docx" -F "source_format=docx" -F "target_format=md" \
   -o output.md
 ```
 
-### POST `/api/convert/batch`（批量）
+错误体统一 JSON：`code` / `message` / `status_code`（如 `corrupted_file`、`ocr_unavailable`、`unsupported_format`）。
 
-- 字段：`files`（多文件）、`source_format`、`target_format`；可选同上 PDF/DOCX 参数
-- 成功（至少一个）：返回 ZIP；部分失败时 ZIP 内含 `errors.json`
-- 全部失败：标准化 JSON（含每项错误）
-
-```bash
-curl -X POST http://localhost:8000/api/convert/batch \
-  -F "files=@a.docx" \
-  -F "files=@b.docx" \
-  -F "source_format=docx" \
-  -F "target_format=md" \
-  -o converted_batch.zip
-```
-
-### POST `/api/jobs`（异步 + Webhook）
-
-- 同上转换字段，另可选 `callback_url`（http/https）：任务结束 POST JSON `{event, job, download_hint}`
-- 元数据：`MDBRIDGE_JOB_DB_PATH`；结果字节：`MDBRIDGE_JOB_RESULT_DIR`（进程重启后仍可 `GET /api/jobs/{id}/result`，直至 TTL）
-- 轮询 `GET /api/jobs/{id}` → 下载 `GET /api/jobs/{id}/result`
-
-### 错误响应格式
-
-```json
-{
-  "error": true,
-  "code": "corrupted_file",
-  "message": "DOCX 文件已损坏或不是有效的 Office 文档: bad.docx",
-  "status_code": 422
-}
-```
-
-常见 `code`：`unsupported_format`、`empty_file`、`file_too_large`、`corrupted_file`、`invalid_document`、`export_error`、`validation_error`、`batch_failed`。
-
-OpenAPI 文档：http://localhost:8000/docs
-
-### 监控（anydoc 通道占比）
-
-Prometheus 文本：`GET /api/metrics`（`/health` 的 `metrics` 字段含同一快照）。
-
-| 指标 | 含义 |
-|------|------|
-| `mdbridge_anydoc_hits` / `mdbridge_anydoc_degrades` | Rust 命中 vs 指定引擎后回退原生 |
-| `metrics.alerts` | 轻量告警钩子（高失败率 / p95 延迟），供 Prometheus/运维对接 |
-| `mdbridge_anydoc_hits_by_channel{channel=fast_md\|model}` | 快通道 vs 模型通道命中 |
-| `mdbridge_anydoc_hit_rate` | `hits / (hits + degrades)` |
-| `mdbridge_anydoc_channel_share` | `importer=~"anydoc.*"` 占 `conversions_by_importer` 比例 |
-| `mdbridge_ocr_enabled` / `mdbridge_ocr_ready` | OCR 开关与引擎就绪（gauge） |
-| `mdbridge_conversions_failed_by_code{code=…}` | 按错误码统计失败（含 `ocr_unavailable`） |
-| `mdbridge_conversions_by_importer{importer=…}` | `anydoc_fast_md` / `anydoc` / `native` / … |
-
-Grafana 看板与 Prometheus 告警规则：`docs/ops/prometheus/`（`grafana_mdbridge.json`、`alert_rules.yml`）。
-
-示例 PromQL：`mdbridge_anydoc_channel_share` 或  
-`sum(mdbridge_conversions_by_importer{importer=~"anydoc.*"}) / sum(mdbridge_conversions_by_importer)`。
-
-企业多租户可在 `MDBRIDGE_API_KEYS` JSON 中配置 `daily_quota`（UTC 日转换次数上限）。
-
-**OCR 镜像分层：**
-- 企业默认：`enterprise/docker-compose.yml`（`INSTALL_OCR=1`，`MDBRIDGE_OCR_ENABLED=true`）
-- 开发可选：`docker compose -f docker-compose.yml -f docker-compose.ocr.yml up --build`
-- 本地构建：`bash scripts/docker_build_ocr.sh`（full + OCR）
-- 轻量无 OCR：`docker build -f backend/Dockerfile.slim .`
-
-## Web UI
-
-- 选择源格式与目标格式
-- 转换完成后下载输出文件
-- 目标格式为 Markdown 时右侧预览文本
-
-## 边界与限制
-
-1. **PDF 不是可编辑文档格式**：PDF 转其他格式只能还原语义结构，无法 100% 还原原始排版。
-2. **数字版 PDF**：默认 `MDBRIDGE_PDF_ENGINE=auto`，有文本层时走本地 pypdfium2（不访问外网）。
-3. **扫描版 PDF**：需 docling 模型 + Tesseract；可先运行 `./scripts/download_docling_models.sh`（默认经 hf-mirror 下载）。
-4. **复杂 Word 特性**：页眉页脚、批注、内容控件等高级特性还原有限。
-5. **Pandoc**：可作为可选外部工具自行安装，本项目不打包、不分发、不默认依赖。
-6. **anydoc 为内置原生组件**：`doc`/`ppt`/`xls`/`ods`/`odp`/`xlsb` 等格式由 vendored 的 Rust 源码（编译为 `mdbridge_native._doc`）提供；未运行 `scripts/build_native.sh` 编译时，这些格式降级为 `unsupported_format`，其余格式行为与之前完全一致。anydoc 是纯 Rust（MIT），无网络调用、无 ML 模型、无 LibreOffice 依赖，满足私有化硬性约束；其上游 `ocr="hosted"` 联网分支已在 vendoring 时裁剪。
+---
 
 ## 项目结构
 
 ```
 md-bridge/
-├── LICENSE
-├── README.md
-├── .env.example
-├── docker-compose.yml
-├── native/anydoc/         # vendored Rust 解析内核 → mdbridge_native._doc
-├── scripts/
-│   ├── build_native.sh    # maturin 编译内置扩展
-│   └── sync_anydoc.sh     # 上游半自动同步
-├── backend/
-│   ├── Dockerfile         # 多阶段：编装 mdbridge_native + 运行时
+├── backend/                 # FastAPI + 转换内核
 │   ├── app/
-│   │   ├── core/          # DocumentModel + convert() + batch + exceptions + registry
-│   │   ├── importers/     # docx, pdf, md, **anydoc_bridge**
-│   │   ├── exporters/     # md, docx, pdf (CSS/font)
-│   │   ├── api/           # FastAPI routes
-│   │   ├── config.py      # pydantic-settings / .env
-│   │   └── cli.py
-│   ├── main.py
+│   │   ├── core/            # DocumentModel, convert(), registry, jobs, metrics
+│   │   ├── importers/       # docx, pdf, md, anydoc_bridge, ocr_engine, …
+│   │   ├── exporters/       # md, docx, pdf, html, xlsx, table_span, …
+│   │   └── api/             # routes, auth, rate_limit
+│   ├── tests/               # 366+ 单元/集成/金样测试
+│   ├── Dockerfile           # 多阶段：native + 运行时
 │   └── pyproject.toml
-├── frontend/              # Vue3 + Ant Design Vue
-└── examples/
-    └── sdk_demo.py
+├── frontend/                # Vue3 + Ant Design Vue
+├── native/anydoc/           # vendored Rust → mdbridge_native._doc
+├── enterprise/              # 私有化交付、验收、OCR、Prometheus compose
+├── docs/                    # document-model.md, ops/prometheus/
+├── scripts/                 # build_native.sh, sync_anydoc.sh, docker_build_*.sh
+├── examples/                # sdk_demo.py, sample.md
+├── docker-compose*.yml
+├── ENTERPRISE.md            # 企业能力边界一页纸
+└── .env.example
 ```
+
+---
 
 ## 开发
 
 ```bash
-# 后端 lint
-cd backend && ruff check app
+cd backend
 
-# 前端构建
-cd frontend && npm run build
+# Lint
+ruff check app
+
+# 全量回归（默认跳过 @integration OCR  live 测试）
+pytest -q --tb=short -m "not integration"
+
+# 全量含 integration 标记
+pytest -q
+
+# 前端
+cd ../frontend && npm run build
 ```
 
-## License
+CI（`.github/workflows/ci.yml`）覆盖 backend 测试、native 编译 smoke、前端 build；nightly 跑更重矩阵。
 
-MIT — 详见 [LICENSE](LICENSE)
+---
 
-## 商业支持 / 企业版
+## 边界与已知限制
 
-开源 MIT 版本可自由自托管。若需要**企业私有化交付**（离线镜像含 docling 模型与 CJK 字体、SLA、安装支持、商业授权书），请通过仓库 Issues / Discussions 留下联系方式，或邮件咨询维护团队。
+1. **PDF 非可编辑格式** — 只能还原语义结构，无法 100% 复刻原版式。
+2. **数字 PDF** — `MDBRIDGE_PDF_ENGINE=auto` 优先本地文本层；无文本层才走 OCR/docling。
+3. **扫描 PDF** — 需 OCR 可选依赖与模型；见 [`enterprise/OCR.md`](enterprise/OCR.md)。
+4. **复杂 Word** — 页眉页脚、动画、DRM 等部分特性为 PARTIAL 或 ACCEPTED 边界。
+5. **PyPI vs Docker** — PyPI 包不含 `mdbridge_native`；`doc`/`ppt`/`xls` 等需 Docker 或 `build_native.sh`。
+6. **协议** — 禁止打包 Pandoc（GPL-2）；依赖仅 MIT / BSD / Apache-2.0。anydoc 上游 hosted OCR 已在 vendoring 时裁剪。
 
-交付包与验收清单见 [`enterprise/`](./enterprise/)（总览 [`enterprise/DELIVERY.md`](./enterprise/DELIVERY.md)，含 SLA / 授权 / 运维 / 报价边界）。
-扫描件双引擎（MinerU / PaddleOCR-VL）见 [`enterprise/OCR.md`](./enterprise/OCR.md)。
+能力评估报告（与代码/CI 对齐）：[`mdbridge_capability_eval_report.html`](mdbridge_capability_eval_report.html)
+
+---
+
+## 协议
+
+| 组件 | 协议 |
+|------|------|
+| md-bridge 自研代码 | **MIT** |
+| anydoc（`native/anydoc/`） | MIT |
+| FastAPI, Typer, markdown-it-py, python-docx, WeasyPrint 等 | MIT / BSD-3 |
+
+详见 [LICENSE](LICENSE)。
+
+---
+
+## 企业版 / 商业支持
+
+开源 MIT 可自由自托管。企业交付（离线镜像、预置 OCR 模型、SLA、一机一码、验收清单）见：
+
+- [`ENTERPRISE.md`](ENTERPRISE.md) — 能力边界
+- [`enterprise/DELIVERY.md`](enterprise/DELIVERY.md) — 交付总览
+- [`enterprise/OCR.md`](enterprise/OCR.md) — 扫描双引擎
+- [`enterprise/ACCEPTANCE.md`](enterprise/ACCEPTANCE.md) — 验收 B1–B11
 
 | 形态 | 说明 |
 |------|------|
 | 开源自托管 | MIT，功能完整，自行运维 |
-| 企业交付包 | 预置模型与中文排版、安装脚本、SLA 模板、授权文件 |
-| 托管 SaaS | 路线图中（多租户 / 计量 / 计费），可用 `MDBRIDGE_API_KEYS` 先行隔离客户 |
-
-相关环境变量：`MDBRIDGE_API_KEYS`、`MDBRIDGE_JOB_DB_PATH`、`MDBRIDGE_REDIS_URL`、`MDBRIDGE_VIRUS_SCAN`、`MDBRIDGE_DOCX_MAX_NODES`。
-
-**DOCX 超大文档**：默认节点上限 `MDBRIDGE_DOCX_MAX_NODES=50000`，超出返回 `docx_too_large`；企业批量请分片，而非无限调高。
+| 企业离线包 | 预置模型与 CJK 字体、安装脚本、授权与 SLA 模板 |
+| 多租户 SaaS 预备 | `MDBRIDGE_API_KEYS` + `daily_quota` + `/api/usage` |
