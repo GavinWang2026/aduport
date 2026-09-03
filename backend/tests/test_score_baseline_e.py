@@ -22,6 +22,16 @@ def test_score_baseline_anchors_66_not_88():
     assert "MIT" in risk
 
 
+def test_v8_decision_table_closes_split_commits():
+    """§07: worktree split + CI gates must not still say「待人工」."""
+    report = (_ROOT / "md-bridge-功能与性能全面评估报告-v8.html").read_text(encoding="utf-8")
+    assert "拆提交待人工" not in report
+    assert "工作树已按主题拆分提交" in report or "CLOSED" in report
+    assert "66.2" in report
+    assert "rag_elements" in report or "骨架已落" in report
+    assert "libreoffice_bridge" in report or "钩子 OK" in report
+
+
 def test_v8_six_dim_callout_not_stale():
     """六维解读不得再写 xlsx span 断裂或拆提交待人工。"""
     report = (_ROOT / "md-bridge-功能与性能全面评估报告-v8.html").read_text(encoding="utf-8")
