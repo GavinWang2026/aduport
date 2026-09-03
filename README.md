@@ -19,6 +19,7 @@
 md-bridge 不是「又一个格式转换脚本」，而是一套**可部署的文档交换平台**：
 
 1. **解析（Import）** — 把异构二进制/文本文件读入统一的 `DocumentModel`（AST）
+   - DOCX：native 优先抽取 `w:drawing`/`a:blip` 图片与 List Bullet；`anydoc_formats` 默认不含 `docx`（可选手动加回快通道）
 2. **变换（Transform）** — 在 AST 上可做 enrich（DOCX 批注/页眉）、路由（anydoc 快/慢通道）、OCR（扫描 PDF）
 3. **生成（Export）** — 从同一 AST 写出多种目标格式，保证语义一致
 

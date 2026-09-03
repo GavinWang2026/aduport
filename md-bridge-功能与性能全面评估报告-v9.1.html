@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="vzLGEZc2asifEDm37rY47s">
+<head data-page-node-id="b57FQ7CGAEntczi9tM6VOH">
+<meta charset="UTF-8" data-page-node-id="XDp1kFlCKQpFppHTT2kahw">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="cjcNFbLjSzs8FQFZ0vTmKp">
+<title>md-bridge 功能与性能全面评估报告 v9.1 — 三大保真缺口修复闭环</title>
+<style>
+  :root{
+    --ink:#1a2233; --sub:#5a6478; --line:#e3e8f0; --bg:#ffffff; --soft:#f6f8fb;
+    --brand:#2f6fed; --brand-soft:#eaf1fe; --good:#188a4a; --good-soft:#e7f6ec;
+    --warn:#b45309; --warn-soft:#fdf1e0; --bad:#c0392b; --bad-soft:#fdecea;
+    --code:#0f172a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#eef1f6;color:var(--ink);font:14px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+  header.hero{background:linear-gradient(135deg,#1d3f8f 0%,#2f6fed 55%,#4d8bff 100%);color:#fff;border-radius:16px;padding:30px 34px;box-shadow:0 12px 30px rgba(31,63,143,.18)}
+  header.hero h1{margin:0 0 6px;font-size:24px;letter-spacing:.5px}
+  header.hero .sub{opacity:.92;font-size:13.5px}
+  .ver-badge{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:2px 10px;border-radius:999px;font-size:12px;margin-left:8px;vertical-align:middle}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:14px;font-size:12.5px;opacity:.95}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:22px 26px;margin-top:18px;box-shadow:0 2px 8px rgba(20,30,60,.04)}
+  h2.sec{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  h2.sec .n{background:var(--brand);color:#fff;width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:0 0 auto}
+  .lead{color:var(--sub);font-size:13px;margin:2px 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 4px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--soft);font-weight:600;white-space:nowrap}
+  tr:nth-child(even) td{background:#fbfcfe}
+  .tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1.7}
+  .tag.p0{background:var(--bad-soft);color:var(--bad)}
+  .tag.p1{background:var(--warn-soft);color:var(--warn)}
+  .tag.p2{background:#eef1fb;color:#475a99}
+  .tag.ok{background:var(--good-soft);color:var(--good)}
+  .tag.done{background:var(--good-soft);color:var(--good)}
+  .tag.open{background:var(--warn-soft);color:var(--warn)}
+  .tag.info{background:var(--brand-soft);color:var(--brand)}
+  pre{background:var(--code);color:#d7e2f5;border-radius:10px;padding:12px 14px;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto}
+  pre .dim{color:#5a6b8c}
+  pre.ok{background:#0d2418;color:#b8e6c8}
+  pre.bad{background:#2b1210;color:#f2c4bd}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.cols{grid-template-columns:1fr}}
+  .cols>div{min-width:0}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px}
+  @media(max-width:760px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+  .kpi{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kpi .v{font-size:22px;font-weight:700;color:var(--brand)}
+  .kpi .k{font-size:12px;color:var(--sub);margin-top:2px}
+  .note{font-size:12.5px;color:var(--sub);background:var(--soft);border-left:3px solid var(--brand);padding:8px 12px;border-radius:0 8px 8px 0;margin:10px 0}
+  ul.tight{margin:6px 0;padding-left:20px}
+  ul.tight li{margin:3px 0}
+  .flow{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  footer{color:#8a93a6;font-size:12px;text-align:center;margin-top:26px}
+  .bom{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.bom{grid-template-columns:1fr}}
+  .bom .it{background:var(--good-soft);border:1px solid #cfe9d8;border-radius:10px;padding:10px 12px}
+  .bom .it b{display:block;font-size:13px;color:var(--good);margin-bottom:2px}
+  .bom .it span{font-size:12.5px;color:#2c5c40}
+</style>
+</head>
+<body data-page-node-id="EB8s2quPSlYYfnKDaRABKi">
+<div class="wrap" data-page-node-id="AQ8JiDDVzkahDUYvVuNNZl">
+
+<header class="hero" data-page-node-id="U2ggq3CTNNDej4L0JHz9tD">
+  <h1 data-page-node-id="sE4OLEUNEUpXNVl6BSjkAt">md-bridge 功能与性能全面评估报告<span class="ver-badge" data-page-node-id="yDTmqAy9fU2tO22hGKXjs1">v9.1 增量 · 修复闭环</span></h1>
+  <div class="sub" data-page-node-id="7BtDiJ4qguvVQupKX34GYU">docx native 高保真通道三大静默保真缺口（内嵌图片 / 列表编号 / 超链接锚文本）的实锤、修复与重新量化 — 承接 v9 同场实测竞技口径</div>
+  <div class="meta" data-page-node-id="xelFSwWeWdAyCEmdPSjMaI">
+    <span data-page-node-id="KoBAUwdQ4ESZKEYmM61VxE">评估对象：md-bridge（FastAPI docx→md 双通道）</span>
+    <span data-page-node-id="BDr5jXM0ZCGvmpOBnNgioG">竞技基线：v9（2026-09-03）</span>
+    <span data-page-node-id="fXCLoaIEWDsBtMC9mzjWkb">评分口径：六维加权</span>
+    <span data-page-node-id="wkQ1ilMlL2otOEBgMYILfy">回归规模：952 passed / 20 failed（零新增）</span>
+  </div>
+</header>
+
+<!-- ============ 1 结论 ============ -->
+<div class="card" data-page-node-id="WhOCOOnbM9ezV9rTIKO2cO">
+  <h2 class="sec" data-page-node-id="5Q2L306N3KTH9Mvd9HMVfn"><span class="n" data-page-node-id="ZmwcjMFSzYvWSXyBL1KJNs">1</span>五条硬结论</h2>
+  <ol class="tight" style="padding-left:20px;margin-top:8px" data-page-node-id="A7agebPgmaOMriemQIqrEc">
+    <li data-page-node-id="hCy2QsqbhzV1d6Yc1XSyHY"><b data-page-node-id="VK18C3VVegJy2MaRpVrvy9">P0 级正确性缺陷已闭环</b>：native 导入器此前对超链接 run 静默丢字——`官方文档：mdbridge 使用指南` 输出只剩 `官方文档：`（锚文本整体被吞、纯超链接段整段消失）。根因是 python-docx `para.runs` 只收 `w:p` 直接子级 run，超链接文本包在 `<w:hyperlink data-page-node-id="kCzobX4KkfPG2pTatfHAAz">` 内从未进输出。已用 `iter_inner_content()` 文档序重建，修复后逐字还原 `官方文档：[mdbridge 使用指南](https://example.com/docs/mdbridge)`。</li>
+    <li data-page-node-id="rdbBgaxn7UKlDNCRi6cpMj"><b data-page-node-id="0Dyl0NAoDC0tu8oNYVau9R">修复并非孤案</b>：本轮一并恢复/补齐了此前两个未入版本库的保真修复——docx 内嵌图片抽取（P0）与 List Bullet/Number 系列表编号（P1B），三者共用一条主循环，缺一则静默降级。</li>
+    <li data-page-node-id="f8BJkuT70rSFLfRF2PQH1B"><b data-page-node-id="jgMLBk7EgjIVUEDcRIzOqX">native 全链路实测全面提升</b>：修复后 sample.docx→md 输出 12340 字符，含 1 张 base64 内嵌图、5 个 bullet（含 2 级嵌套）、3 个有序项、HTML colspan 合并表、特殊字符 14/14、中文 276 字与 golden 全等。</li>
+    <li data-page-node-id="BzlnhIkfKhHazmn5aV2CLv"><b data-page-node-id="4EOKyZqhyn0UiqFJs03lmF">默认通道已切 native（D1-B 已落地）</b>：工程配置 <code>anydoc_formats</code> 已排除 docx；默认 <code>convert(docx→md)</code> 走 native 高保真（图/列表/链接/HTML colspan）。竞技日 7.45 / 887B 仍为 anydoc fast <b>快照锚点</b>，对外总分不抬；若手动把 docx 加回 allowlist，fast 丢图行为仍可能复现。</li>
+    <li data-page-node-id="Ny0HLDgThXUXU7RYVTEIYI"><b data-page-node-id="BsVZov0rE4M0yJPc3I1JzR">全量回归零新增</b>：952 passed / 20 failed / 10 skipped，20 项失败名单与修复前逐项一致（xlsx_ast 默认关族 + docling 环境缺失族 + fidelity 基线），非本轮引入。</li>
+  </ol>
+</div>
+
+<!-- ============ 2 缺口与修复 ============ -->
+<div class="card" data-page-node-id="BsZoHclY9PLNjM43GkMloI">
+  <h2 class="sec" data-page-node-id="7NX2JrdGc2jF8eGqDjhgpn"><span class="n" data-page-node-id="ql4bkToYEdXNI9CZGXxnHh">2</span>三大保真缺口：实锤 → 修复 → 回归</h2>
+  <table data-page-node-id="4vnhDIaSbP5zMfDyjMNm2a">
+    <tr data-page-node-id="NbYrbNQ7xRIpn8mAfCW38N"><th style="width:64px" data-page-node-id="tu9NbAkBFqNox9WlMLFKGG">级别</th><th style="width:200px" data-page-node-id="Kgw3F6nvThReZ9fhwvar0V">缺口</th><th data-page-node-id="VnOGmchOM2f5jx3KPTRJRI">实锤证据（修复前）</th><th data-page-node-id="QaOcpr48SSjzkLqORceE5I">修复落点</th><th style="width:110px" data-page-node-id="B0QdQTWg5zMdeRHh8Fwqo7">状态</th></tr>
+    <tr data-page-node-id="D7mEqW8eyEAzp2KSbXQRfB">
+      <td data-page-node-id="B65LVb5ix07wECr6kwvl8o"><span class="tag p0" data-page-node-id="BBKb5csBBycIpKWrlh4kuo">P0</span></td>
+      <td data-page-node-id="kXGN45YlNGohjLXpALDANl">超链接锚文本静默丢失</td>
+      <td data-page-node-id="YqUKbhVTFNGpkEWXT8Y8hF"><code data-page-node-id="ZJoCcnPFdAhZTE4KyDa4Gi">docx_text._paragraph_to_rich</code> 从 <code data-page-node-id="SIgr25iYGAgJhDHfoiL9DD">para.runs</code> 收集文本 → 锚文本从未进 parts；再按全文 <code data-page-node-id="B2YyDL03xjhi6XN24WFntr">find(joined)</code> 必然 -1。AST 全树命中 0，纯超链接段被吞。</td>
+      <td data-page-node-id="xxI9RHDLDP9sfo7Gnfn4UO">重写为 <code data-page-node-id="pAC9HzvY5MkZ53J6rVwlRr">para.iter_inner_content()</code> 文档序单趟构建；hyperlink 内部 run 走同一 mark 提取，锚文本整段包 LINK mark（<code data-page-node-id="qyvkiXAqajTKoQ9BW9V4r2">href=item.address</code>），同 span 去重防双开双闭</td>
+      <td data-page-node-id="Rs0sxCb4seCE0tT4H4tzfh"><span class="tag done" data-page-node-id="lNA9eHsXaWObDQnkNzZfc1">已修 ✓</span></td>
+    </tr>
+    <tr data-page-node-id="GvmlbcuIOIZdKdsFdbBFdm">
+      <td data-page-node-id="hVfAJsipe69VBZ732vZOC2"><span class="tag p0" data-page-node-id="uBcI0kWdweHcf8d6owltWs">P0</span></td>
+      <td data-page-node-id="nMcTOinlZUPF2zRmkS6JKK">docx 内嵌图片不抽取</td>
+      <td data-page-node-id="ECgXIFRtNVZIBcl7cMbevU">主循环调用 <code data-page-node-id="g2xSjCXXinugL6tVWv4VGA">_docx_image_rels/_extract_para_images</code> 但函数定义缺失（NameError 被 except 静默吞）→ AST <code data-page-node-id="q42gw14fOLwsgdqVeexsNO">Image=0</code>，md base64 能力空转</td>
+      <td data-page-node-id="yOOgUPF9qXU0zEQT4bHgQ1">重建 <code data-page-node-id="oyeZEsjCEnZr6eIO4GAQ8e">_img_mime_for / _docx_image_rels（xml_safe）/ _extract_para_images</code>：drawing/pict 预检短路、rId 去重、<code data-page-node-id="kdGZ1Znq2NInbKWgDDBBNA">wp:docPr</code> 取 alt、<code data-page-node-id="HC1HyEbqpHDtRzjq1GHQuJ">origin_part=word/document.xml</code></td>
+      <td data-page-node-id="Zidwa3t5PG5QMJj6FPM91c"><span class="tag done" data-page-node-id="SHFxmEgjuUEwbdKWCglDGH">已修 ✓</span></td>
+    </tr>
+    <tr data-page-node-id="p3vO8F5W76aSnH7DLwBks5">
+      <td data-page-node-id="Vdo6eCwq7luuUnA94PwVYS"><span class="tag p1" data-page-node-id="KHFDnz9sNCet7NXA4GSNSA">P1B</span></td>
+      <td data-page-node-id="wnNEsY8HZf50RavFQ0wjAl">列表样式编号丢失</td>
+      <td data-page-node-id="jJvviCB3gg2PTtE9pkmJe1">Word 默认模板把编号挂在 styles.xml（List Bullet/Number 系），段落 pPr 无 numPr → 仅查 pPr 的旧判定全部漏检，降级为普通段落</td>
+      <td data-page-node-id="wjh32cwCnFLHs4gALj1oQh">重建 <code data-page-node-id="uBJVHKINKZh83HDDYOsLbd">_LIST_STYLE_RE + _style_list_meta</code>：样式名 → (ordered, level)，"List Bullet 2" → level 1，接入 <code data-page-node-id="yQ6iKuNnahNY6XaPSEFtZQ">_node_from_style</code></td>
+      <td data-page-node-id="O6m9a4inGS6QFdnhX7zbWD"><span class="tag done" data-page-node-id="WiFvM2IsEDBW7KwuVLU7A5">已修 ✓</span></td>
+    </tr>
+  </table>
+
+  <div class="note" data-page-node-id="ODbqNHv1EGhyDlxhDE9jL9"><b data-page-node-id="m64pINuwEiBlrU8B8BbywV">事故复盘（写入工程记忆）</b>：修复落地后 <code data-page-node-id="aquz5G9BjoGGtCfOW9hYiz">docx_text.py</code> 曾被外部进程回退（疑似 IDE 旧 buffer），造成"看似在跑、实则全丢"。已全量重建并复验。工作区改动建议尽快 commit 固化。</div>
+
+  <div class="cols" style="margin-top:10px" data-page-node-id="xG83F6WBKLAZUpgX3otN0M">
+    <div data-page-node-id="p4vEb7RO7OxguaqQ4fZNA3">
+      <b style="font-size:13px" data-page-node-id="7xOH4lJ6NvfWJFwU6R24t0">修复前（native 输出截断）</b>
+      <pre class="bad" data-page-node-id="8yxM4fI0jsfPRQuQ0XCDGG">官方文档：
+……（锚文本整段消失）</pre>
+    </div>
+    <div data-page-node-id="7J6qJeLHf6DfIhlMOwsyHH">
+      <b style="font-size:13px" data-page-node-id="WtQKrBkYWSfPfcZZGMCFER">修复后（逐字还原）</b>
+      <pre class="ok" data-page-node-id="joTmK3qiPN8gNNPtrBxmVc">官方文档：[mdbridge 使用指南]
+  (https://example.com/docs/mdbridge)</pre>
+    </div>
+  </div>
+
+  <table style="margin-top:8px" data-page-node-id="ZClTg3IyMp7DG0ldW09tkS">
+    <tr data-page-node-id="GCDHsHB8gLopR163X67Qnq"><th data-page-node-id="r1hCTEOCglGk0KYK8Bzook">回归测试</th><th data-page-node-id="EQul8YXFGKYBvD5orwjojk">覆盖点</th><th data-page-node-id="pskRALISVdcbyYd7U8jYA3">结果</th></tr>
+    <tr data-page-node-id="aXJkaDuNpy89pAdBmjLMvH"><td data-page-node-id="7BweAFEkYIRMe0eo3DEwFo"><code data-page-node-id="ryO1vbYQJEFEed8RH4EYq8">test_docx_hyperlink.py</code> ×3（新增）</td><td data-page-node-id="KMHygMcZ8Mhg7fyFm2EFBN">锚文本存活 / 纯链接段不被吞 / LINK mark+href 精确区间 / md 渲染 <code data-page-node-id="a5AyKsMOPvbUqyEoFbmdgw">[**加粗链接**](url)</code> 嵌套</td><td data-page-node-id="Pk62B8EJgcdSZhOquPf4rt"><span class="tag done" data-page-node-id="a8Y5YrJsOVdYjo2aAWT5AX">3/3 过</span></td></tr>
+    <tr data-page-node-id="rn9J4CwfP50Jo1aBWCOhO3"><td data-page-node-id="fnBAGaDpLUvdMP9A5VcKEq"><code data-page-node-id="mt5fEMZURhBqhBUJHdWRRy">test_docx_image_extraction.py</code> ×3</td><td data-page-node-id="UolUJmFfWUXKWEP3yDsFHN">Image 节点数据与 mime / 纯图段落顺序 / md base64 内嵌</td><td data-page-node-id="NZIkGB4f21BjvVI2y6zvDA"><span class="tag done" data-page-node-id="KCqQ4Dl9urE3oqGZKutsDn">3/3 过</span></td></tr>
+    <tr data-page-node-id="SZ1ritTXTR5OcSyjZGV0e8"><td data-page-node-id="CE64L5mDNZexVAW6wYALnX">docx 专项合计（含 depth/product/stub）</td><td data-page-node-id="B0ktKzkE3HhSCgsYTZ7dkS">—</td><td data-page-node-id="2wynitH7FFO2c6Bg1TLA5s"><span class="tag done" data-page-node-id="0jfcDOS5Wlx5zCFSY6JBaq">14/14 过</span></td></tr>
+    <tr data-page-node-id="F5CstFCZk1pHQGm8bDlQrk"><td data-page-node-id="aL8Z4Q8jeguPah16L3uJOE">全量 pytest</td><td data-page-node-id="1v6NDhheqspQcFqNV6Yca5">—</td><td data-page-node-id="zBEqFmfibZQYyAn9GIlUYW"><span class="tag done" data-page-node-id="HoyPCRvGP0TFHlT6y9hG9g">952 passed / 20 failed（名单与修复前逐项一致）</span></td></tr>
+  </table>
+</div>
+
+<!-- ============ 3 重新量化 ============ -->
+<div class="card" data-page-node-id="lgkVegkOH6fzRDqU9lqEG7">
+  <h2 class="sec" data-page-node-id="nwlGbtB6sNa3MlSszyOc1R"><span class="n" data-page-node-id="lwb365fkfCYY0Su73ZhNt3">3</span>修复后 native 全链路重新量化</h2>
+  <div class="kpi-row" data-page-node-id="X1fwWxj0rhjC2li3jT8gdo">
+    <div class="kpi" data-page-node-id="AdWE7vN89jSIJ7udxeueP9"><div class="v" data-page-node-id="wWDSk4FIlYMFYMpB8xMlOx">12340</div><div class="k" data-page-node-id="sAw9BxXH6GYala6KOVdAZS">native 输出字符（修复前 10385）</div></div>
+    <div class="kpi" data-page-node-id="58T9VDDZP2ECWYg3u53TDb"><div class="v" data-page-node-id="jh5vs4DAY81BID9ui65JsD">1 图</div><div class="k" data-page-node-id="eOU84UgXrpUwhmkpK5yyXw">base64 内嵌（修复前 0）</div></div>
+    <div class="kpi" data-page-node-id="EaJQNI5PpDYKuAPSRLg2aP"><div class="v" data-page-node-id="XsicXwaMIsTzdV8kodETR9">5+2</div><div class="k" data-page-node-id="ykkLcrrdGPCZJAE3wFscTS">bullet + 2 级嵌套</div></div>
+    <div class="kpi" data-page-node-id="YYk1WXh3QsPwApdESxqEDX"><div class="v" data-page-node-id="aVQUJSC4No99hem99BjGhF">14/14</div><div class="k" data-page-node-id="DBidHZOVfGQh4WaorEwFzn">特殊字符回显</div></div>
+  </div>
+
+  <table style="margin-top:12px" data-page-node-id="ERjgAgWqV3Bkn8AJTE18WU">
+    <tr data-page-node-id="0iihXQ6aEyXTEWxqVP1qID"><th data-page-node-id="wT1LWt2EPUeLcScFVkkFFe">特征（sample.docx golden）</th><th data-page-node-id="2NaOE3ORMVidgsfAmGi3jV">native 修复前</th><th data-page-node-id="VMCqvJTsmtH7DAXsEYmrq3">native 修复后（现默认）</th><th data-page-node-id="tquhepByp4Q2hNwE7Ymd91">anydoc fast（竞技快照）</th><th data-page-node-id="iQqVEMVYcGl5mP5hV4Jnah">说明</th></tr>
+    <tr data-page-node-id="YuvSV7ND8Epy3p8M3140ab"><td data-page-node-id="xsTzceXFSJVjtpCEE53ey5">中文 276 字</td><td data-page-node-id="cAF8AErBGFvRfDuFILHMe0">✔ 全保</td><td data-page-node-id="1QYWUHKEz7ydiMqoNPuftb">✔ 276 字全等</td><td data-page-node-id="acCK1qHA1xWoZ6IpSEpFRE">✔ 276 字全等</td><td data-page-node-id="GYzBjDHmIWCHTtiLDjQMtN">内容完整性三者一致</td></tr>
+    <tr data-page-node-id="sXIk47x7TXPUAjYf7iX4Vk"><td data-page-node-id="UcSfmqdd2nDDE5heEgQzZf">超链接锚文本</td><td data-page-node-id="CVTJQZM3Q9LTA8CoCF2gci"><span class="tag bad" data-page-node-id="F2SbcTV51uetcCG9DLrQT7">丢失</span></td><td data-page-node-id="lyltIw27GDwOEkVhOxdFOR"><span class="tag done" data-page-node-id="IiJyqntFshn3gXo9AwknCp">`[mdbridge 使用指南](https://…/docs/mdbridge)`</span></td><td data-page-node-id="yJFhFE3wmix1zecvq5EzlW">✔（anydoc GFM 有链接）</td><td data-page-node-id="7F4wABgzWd3QiQR7OvcFkm">native 修复闭环</td></tr>
+    <tr data-page-node-id="o03lV2XGPT9Qd3EFyWkEZT"><td data-page-node-id="LRRejCMfmRI2Z1PhL2nXn3">内嵌图片</td><td data-page-node-id="HmTVqHqzMZTBS92LW0noq3"><span class="tag bad" data-page-node-id="p0LPDzAslBfxvRGMZn2x2B">0 张</span></td><td data-page-node-id="2NSHLKM68Y5wdTxECDeDYB"><span class="tag done" data-page-node-id="f8Ov2NQDEG69541dpUQfTt">1 张 base64</span></td><td data-page-node-id="82bKmD9kBm6lek3RlKieII"><span class="tag open" data-page-node-id="c1PDdKQ06u7U2lkGLYaVfF">0 张</span></td><td data-page-node-id="ILbndl9L8EayC7DH855ng5">默认已 native→有图；anydoc 列仅作 fast 对照</td></tr>
+    <tr data-page-node-id="p6fNl9PclqnXt12VK0beXm"><td data-page-node-id="f6hSl6MLAmc9xVDKFeg98s">列表 bullet / 有序</td><td data-page-node-id="HJGq4L3zkSWwmG3HSonELE">丢 marker</td><td data-page-node-id="F8YERoVePDO3Cz9H4PMHoE"><span class="tag done" data-page-node-id="ysTgWDkCtrIrQ7voQVTDdG">5 bullet（含 L2×2）/ 3 ordered</span></td><td data-page-node-id="N9eWKzelZmIUenHXgkRf4O">✔ 5/3</td><td data-page-node-id="ZFBuKX5LTtzOrbq8S7x8Nd">P1B 修复后缩进正确</td></tr>
+    <tr data-page-node-id="DoLZdfnkFIIViLWRsnBUjx"><td data-page-node-id="3QrgTg2nrhD1FMbXSCDgXH">表格</td><td data-page-node-id="TRGDKtDiHgEjH2nBUxYw1l">colspan 保留</td><td data-page-node-id="a6F3COW5G7U06CA3vAM9W9"><span class="tag done" data-page-node-id="8A0NoleHz0rwRWVyZhwqyW">HTML 表（15 个表标记）保 colspan</span></td><td data-page-node-id="nFIjhHZJHoeL4yO5qmhyoR">GFM pipe（6 行）</td><td data-page-node-id="28Ek9dWfZCuz9T5bNwQpTb">native 走 HTML 表=保 span 取舍</td></tr>
+    <tr data-page-node-id="xDEJOD6I3DFflPZ3gJyFMe"><td data-page-node-id="XswJzwJqEmIwJrdNetMfNp">特殊字符 14/14</td><td data-page-node-id="aVlWsCwRpu1YmvxT55KJb0">✔</td><td data-page-node-id="1TEuxJCqBSWz2JK1R9iEqR">✔ md_escape 语境转义</td><td data-page-node-id="tMHWlj2xDkUAtJKVT1CAnT">✔ 5 处反斜杠转义</td><td data-page-node-id="DzPC2pICQdTPf17gRX8PYX">CodeBlock fence 内 # 不升格</td></tr>
+    <tr data-page-node-id="llhrNSXO59LberlHhmDavn"><td data-page-node-id="kmO9Qh8Fu7XSmx3oY132IL">粗斜混排错乱</td><td data-page-node-id="UBiVlee31qd6614pCd6cJf">0</td><td data-page-node-id="1RP3JgsjWy3r7jiEI2DtoG">0</td><td data-page-node-id="PBv3d8H3tdl40KW1sFvXO6">0</td><td data-page-node-id="s3RjauQEOI1m6qWR0Ub9cs">mammoth 类 <code data-page-node-id="EWQPWnS5i8F6BNE0SMu87C">__…*…__</code> 错乱未复现</td></tr>
+    <tr data-page-node-id="wezsJ1RLGZCjZpaADIcrNL"><td data-page-node-id="jXv8I8s7NO3VrOK0uHEqBJ">代码块 / 尾注噪声</td><td data-page-node-id="POriYo0HBhj4HvrSSzgWBF">无 fence / 有洪水</td><td data-page-node-id="iIINvDfNjt8GWfwWxkfA1u"><span class="tag done">CLOSED</span>：``` fence + 跳过 chrome 目录</td><td data-page-node-id="iIINvDfNjt8GWfwWxkfA1u2">—</td><td data-page-node-id="iIINvDfNjt8GWfwWxkfA1u3">见 v9 §七 P2</td></tr>
+  </table>
+
+  <div class="note" data-page-node-id="YmehSlPbqflDnFXu8ViolZ"><b data-page-node-id="dNuZV9CzHRwBhOAlex3X3i">六维口径读数</b>：竞技日默认通道（anydoc fast）<b data-page-node-id="uaB5MM6JjmDH8lKjOwIlgc">7.45</b> 仍作快照锚点，对外总分不抬。工程默认已 NATIVE FIRST：内容完整 / 结构保真 / 资源样式不再因图·列表·链接扣分；span 走 HTML 表。残余多为表格内嵌图等二期项。</div>
+</div>
+
+<!-- ============ 4 决策点 ============ -->
+<div class="card" data-page-node-id="w2lnKq5hpqr37KwLx1rye5">
+  <h2 class="sec" data-page-node-id="OAcrd1JyE2XdWXbphvegaT"><span class="n" data-page-node-id="C81dCZ2c8WazZHGs2hBCpJ">4</span>决策点与残留清单</h2>
+
+  <b style="font-size:13.5px" data-page-node-id="FLVbcDmPxObX1knP4npJ04">决策 D1 · docx→md 默认通道归属 <span class="tag done">已拍板 · B</span></b>
+  <table style="margin-top:6px" data-page-node-id="gmCLfEHxEEnRetzz1R9qLI">
+    <tr data-page-node-id="D6icriCb4PcbJv42cG0eoP"><th style="width:120px" data-page-node-id="mq9bwp1XgN4JuxRPrQAV5p">方案</th><th data-page-node-id="2lEDvEtUN2dz9NaBv8bg27">默认行为</th><th style="width:180px" data-page-node-id="9h83I7DJp8ezS4one1iXxv">代价 / 收益</th><th style="width:80px" data-page-node-id="vDDUuZSVJ8jDTC8kDCBKhu">结果</th></tr>
+    <tr data-page-node-id="X90vqrp9v2G2FydBu4qBAy"><td data-page-node-id="FtEyAJbswAUfv1eKooOZRs">A · 维持 fast</td><td data-page-node-id="2G3lCK8JurBgGXMBkd8ukK">docx→md = anydoc fast（0.003s，887 chars，图丢失）</td><td data-page-node-id="2xEMh0s2oYF3ldwlSPejzY">最快；native 被架空</td><td data-page-node-id="80UrXI7nYWCEa3E7gb0UwJ">未选</td></tr>
+    <tr data-page-node-id="QoPqIp7zaRJSEqcbDlgMRp"><td data-page-node-id="GjRWY7OOQZskRCqQAn6NFT">B · 默认 native</td><td data-page-node-id="6NrQi7lS04mWI5w7jrcinQ">docx→md = native（图/列表/链接/HTML 表）</td><td data-page-node-id="kfH2dCmjRZWvyS53s9ZASd">慢 ~50×；保真优先</td><td data-page-node-id="IsC6kLzZw5NYyfC09raXLc"><span class="tag done" data-page-node-id="4YFZyYg1nH6hFAWHghBGBq">已落地</span></td></tr>
+    <tr data-page-node-id="Lagb4Cx6atghxIXlWtBAnS"><td data-page-node-id="dVK6yiHc7G2ZAe62rUlEDB">C · 双通道暴露</td><td data-page-node-id="KReW3TrszdAYHCETwAkuyD">API fidelity 参数</td><td data-page-node-id="MZWqoS1BJDMuVuwQLqkldR">工程量中等</td><td data-page-node-id="bUQeBvZmLdOzl92BXCBHVT">未选</td></tr>
+  </table>
+  <p class="note">落地：<code>config.anydoc_formats</code> 排除 docx；bridge 注释 <code>NATIVE FIRST : docx</code>。fast 可选手动加回 allowlist。</p>
+
+  <b style="font-size:13.5px;display:block;margin-top:14px" data-page-node-id="8Wlp9uxIQLISRLpmRG03rK">残留清单（v9.1 之后）</b>
+  <table style="margin-top:6px" data-page-node-id="c82MlkSWCXIKhHxKDTvBAp">
+    <tr data-page-node-id="OLe1Ah7DlQFid5CIbcZ2QP"><th style="width:64px" data-page-node-id="AG1KWqRdYAbrO7wIBZdGY9">级别</th><th data-page-node-id="G6sZ9OcFg2Jp9119gqL4at">事项</th><th style="width:110px" data-page-node-id="jdktByzzmo3tkxgMzU4GC5">状态</th></tr>
+    <tr data-page-node-id="K5IDmVbj06Dn2U9XBV7zWE"><td data-page-node-id="pd9iixtHqwalNLOHUxNN1X"><span class="tag p2" data-page-node-id="HXmIxEBqzdt7v00W4Lqdfh">P2</span></td><td data-page-node-id="WQak0bKxHcUdOnKmSpnrrq">native 代码块 fence / chrome 尾注洪水</td><td data-page-node-id="jwm9I2xOxrcIOfvzsZ0PgL"><span class="tag done">CLOSED</span></td></tr>
+    <tr data-page-node-id="9Bg5FJJfrSeuUuahFJGbTf"><td data-page-node-id="mKXUTvQPZhcRV7FJ9ZyJIf"><span class="tag p2" data-page-node-id="LKEfwp2bINkGqpVKLj7IoW">P2</span></td><td data-page-node-id="Pe8lboCnf4mpntBRBjnWyL">表格内嵌图片（段落级 drawing 已覆盖；表内二期）</td><td data-page-node-id="Wght8hc4fJM6DOfuBl487f"><span class="tag open" data-page-node-id="JL9pkIPIxAa2ju7PGATdUE">二期</span></td></tr>
+    <tr data-page-node-id="3wx7xDSIdFuLdH1oe85yHn"><td data-page-node-id="dITf089cTL3hmXpsvan2yn"><span class="tag p2" data-page-node-id="H2WLrYLub1YdcCMngjsmSM">P2</span></td><td data-page-node-id="NyDpn7z8B3Rr7EjlTQuijF">20 项既有失败基线：xlsx_ast 默认关族 + venv 缺 docling + fidelity/golden</td><td data-page-node-id="Pok08sa77VaprwvwcHy8Z1"><span class="tag open" data-page-node-id="XO27GSbmJk4smTgjEfbcrF">专项</span></td></tr>
+    <tr data-page-node-id="vu2qfkuvIDWoXToxBlFedS"><td data-page-node-id="uwFnGz9QmDD5xBOCpBXV0n"><span class="tag p1" data-page-node-id="UbGHmSwAjHcwks88mnkBCx">P1</span></td><td data-page-node-id="ddyrLThhldCUsx6WWwWlFg">工作区修复建议尽快 git commit 固化（防 IDE buffer 回退）</td><td data-page-node-id="8F045qK9jWypRxyCOe8sds"><span class="tag open">待用户确认 commit</span></td></tr>
+  </table>
+</div>
+
+<!-- ============ 5 方法与证据 ============ -->
+<div class="card" data-page-node-id="kTB51XLv5LWemPG3QdCWJ2">
+  <h2 class="sec" data-page-node-id="go1HFshLbmmWS3IxXjQAIZ"><span class="n" data-page-node-id="gEz5vPbe3AkDT5GBKMx0Q3">5</span>方法、口径与一手证据</h2>
+  <ul class="tight" data-page-node-id="rPmif0j6Mchq0Ef8I7iaOQ">
+    <li data-page-node-id="J3PeZJAHu4VDH2BibCE71P"><b data-page-node-id="hewt6jGnpC0QJhoCl8DDEL">同场实测竞技</b>：python-docx 独立构造全特征 sample.docx（与实现解耦），四路同输入转 md；本增量聚焦 md-bridge native 通道修复前后对照，竞品（mammoth 5.55 / markitdown 6.35 / anydoc）未重跑、基线沿用 v9。</li>
+    <li data-page-node-id="dFlGP1CS56WWDlyJenCVD7"><b data-page-node-id="OZfIq2m1nAtAdG5lTbYjNX">修复落点</b>：<code data-page-node-id="SHKTThhkWBJBg4DX06gJYs">backend/app/importers/docx_text.py</code>（437 → 610 行）：<code data-page-node-id="QbOgMhxEEnoiaUgH5MWXMu">_paragraph_to_rich</code>（iter_inner_content 文档序）、<code data-page-node-id="qxNWlwh6uWz8HKkd8xEoc3">_img_mime_for / _docx_image_rels / _extract_para_images</code>、<code data-page-node-id="HfmHoMQGJySGEHKrBKK9fJ">_LIST_STYLE_RE / _style_list_meta</code>。</li>
+    <li data-page-node-id="9wzLWiLcxUsPlbFPoCXc2Y"><b data-page-node-id="MnoGhHh28n9gtNx5yWZcdm">回归测试</b>：新增 <code data-page-node-id="ME64JcK0lLk0sF6ZgpoY1h">backend/tests/test_docx_hyperlink.py</code> ×3；图片测试 3/3；docx 专项 14/14；全量 <b data-page-node-id="eUU7iAmU36SgbeI5AoX173">952 passed / 20 failed / 10 skipped</b>（75.6s）。</li>
+    <li data-page-node-id="i2ufNpbCygonpEpAhsGYIZ"><b data-page-node-id="Bav2Sh3U44ZtlIgZy04uvk">arena fixtures 已重生成</b>：<code data-page-node-id="IzRMmS8RybqZlAaB3EpDlo">outputs/v9_arena/out_native_full.md</code>（12340 字符，修复后）；默认通道 <code data-page-node-id="1F2EMWzQ2e6RyZuL32XWSS">out_mdbridge_native.md == out_anydoc.md</code>（887 chars / 1541B，逐字符一致）；过期的 <code data-page-node-id="Kx2cCCzcKYUA6kIUaFM1zs">out_native_fixed.md</code> 已移除。</li>
+    <li data-page-node-id="fbWFi2GQQkxTH6D0jpBCu5"><b data-page-node-id="8AsqwhUgfhEmNFD70tHjbL">实测耗时</b>：native 全链路 0.17s vs anydoc fast 0.003s（~50×），为 D1 取舍核心。</li>
+  </ul>
+  <div class="bom" style="margin-top:12px" data-page-node-id="LBmTpBBzewXz3Y8CbhGW3x">
+    <div class="it" data-page-node-id="AjXLDSlIdpG3esrhtvZrFT"><b data-page-node-id="QHkYmtQkWtb3doE6tvwz2M">已闭环（本轮）</b><span data-page-node-id="DZHxIqrMczCoxMLl7cBwU8">超链接锚文本 · 内嵌图片 · 列表样式编号 · D1 native 默认 · fence/chrome 跳过</span></div>
+    <div class="it" data-page-node-id="BMYzUlDHjADCwlF06uVcEH"><b data-page-node-id="bJYhiQ4mSA5rnJz7AKVGgK">待办</b><span data-page-node-id="5lsD3vuCc821yZo61hijEx">表内嵌图二期 · 既有失败基线专项 · 用户确认后 git commit</span></div>
+  </div>
+</div>
+
+<footer data-page-node-id="vP3aCiXE5xt86MT6n6gQEN">md-bridge v9.1 增量评估 · 2026-09-03 · 评估→修复→重新评估闭环 · 数据源：outputs/v9_arena/*</footer>
+</div>
+</body>
+</html>

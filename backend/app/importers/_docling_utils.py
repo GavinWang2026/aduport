@@ -8,11 +8,15 @@ from io import BytesIO
 from typing import Any
 
 from app.core.document_model import (
+    Blockquote,
     CodeBlock,
     DocumentModel,
+    Footnote,
     Heading,
+    HorizontalRule,
     Image,
     ListItem,
+    MathBlock,
     Paragraph,
     RichText,
     Table,
@@ -92,15 +96,10 @@ def _table_from_item(item: Any) -> Table | None:
 
     if not rows:
         return None
-    # Only keep cells when real spans exist (avoid origin_* header-switch illusion).
-    has_span = any(
-        c.covered or c.row_span > 1 or c.col_span > 1
-        for row in cell_grid
-        for c in row
-    )
+    # Keep cell grid when present; never stamp self-origin (HTML header-switch illusion).
     return Table(
         rows=rows,
-        cells=cell_grid if has_span else [],
+        cells=cell_grid,
         header_rows=1 if len(rows) > 1 else 0,
     )
 
@@ -189,8 +188,11 @@ def _item_to_node(item: Any):
         if img:
             return img
 
+    if "page_break" in label or label in ("pagebreak",):
+        return HorizontalRule()
+
     text = _extract_text(item)
-    if not text:
+    if not text and "formula" not in label and "equation" not in label:
         return None
 
     if _is_code(item):
@@ -205,9 +207,34 @@ def _item_to_node(item: Any):
     if "heading" in label or "title" in label or "section_header" in label:
         return Heading(level=_heading_level(item), text=RichText(text=text))
 
+    if "footnote" in label or "endnote" in label:
+        fid = str(getattr(item, "id", "") or getattr(item, "marker", "") or "1")
+        return Footnote(id=fid, text=text)
+
+    if "formula" in label or "equation" in label:
+        return MathBlock(content=text or str(getattr(item, "latex", "") or ""))
+
+    if "caption" in label:
+        return Paragraph(text=RichText(text=text))
+
+    if "quote" in label or "blockquote" in label:
+        return Blockquote(paragraphs=[text] if text else [])
+
+    if "checkbox" in label or "check_box" in label:
+        checked = bool(getattr(item, "checked", False) or "checked" in label)
+        return ListItem(text=RichText(text=text), ordered=False, checked=checked, level=0)
+
+    if "key_value" in label or "form" in label:
+        key = str(getattr(item, "key", "") or "").strip()
+        val = str(getattr(item, "value", "") or text).strip()
+        joined = f"{key}: {val}" if key else val
+        return Paragraph(text=RichText(text=joined))
+
     if "paragraph" in label or label.endswith("text") or not label:
         return Paragraph(text=RichText(text=text))
 
+    # Unknown labels still become paragraphs so layout text is not dropped
+    # (avoids 「弱文本层 → 2 个 Paragraph」total loss when structure is partial).
     return Paragraph(text=RichText(text=text))
 
 

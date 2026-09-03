@@ -11,5 +11,5 @@ def test_all_supported_targets_have_exporters():
     registered = set(registered_export_formats())
     missing = sorted(SUPPORTED_TARGET_FORMATS - registered)
     assert not missing, f"targets without exporter: {missing}"
-    assert len(SUPPORTED_TARGET_FORMATS) == 18
-    assert {"ods", "odp"} <= SUPPORTED_TARGET_FORMATS
+    assert len(SUPPORTED_TARGET_FORMATS) == 19
+    assert {"ods", "odp", "rag"} <= SUPPORTED_TARGET_FORMATS

@@ -49,6 +49,7 @@ export type TargetFormat =
   | 'ods'
   | 'odp'
   | 'json'
+  | 'rag'
   | 'xlsx'
   | 'rtf'
 export type DocFormat = SourceFormat | TargetFormat | 'auto'
@@ -202,6 +203,7 @@ export function formatLabel(fmt: DocFormat, locale: 'zh' | 'en' = 'zh'): string 
     odt: 'OpenDocument 文本 (.odt)',
     rtf: 'RTF',
     json: 'JSON',
+    rag: 'RAG Elements（JSON）',
     xlsx: 'Excel (.xlsx)',
     xls: 'Excel 97-2003（文本级）',
     xlsb: 'Excel 二进制（xlsb/anydoc）',
@@ -234,6 +236,7 @@ export function formatLabel(fmt: DocFormat, locale: 'zh' | 'en' = 'zh'): string 
     odt: 'OpenDocument Text (.odt)',
     rtf: 'RTF',
     json: 'JSON',
+    rag: 'RAG Elements (JSON)',
     xlsx: 'Excel (.xlsx)',
     xls: 'Excel 97-2003 (text-level)',
     xlsb: 'Excel binary (xlsb/anydoc)',

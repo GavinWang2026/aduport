@@ -260,6 +260,7 @@ def _ensure_builtin_plugins_unlocked() -> None:
     from app.exporters.odp_exporter import export_odp
     from app.exporters.pdf_exporter import export_pdf
     from app.exporters.pptx_exporter import export_pptx
+    from app.exporters.rag_elements import export_rag_elements
     from app.exporters.rtf_exporter import export_rtf
     from app.exporters.txt_exporter import export_txt
     from app.exporters.xlsx_exporter import export_xlsx
@@ -346,6 +347,15 @@ def _ensure_builtin_plugins_unlocked() -> None:
     def _export_json_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_json(model).encode("utf-8")
 
+    def _export_rag_bytes(model: DocumentModel, **_: Any) -> bytes:
+        import json
+
+        els = export_rag_elements(model)
+        return json.dumps(
+            {"schema": "mdbridge.rag_elements.v1", "elements": els},
+            ensure_ascii=False,
+        ).encode("utf-8")
+
     def _export_xlsx_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_xlsx(model)
 
@@ -368,6 +378,7 @@ def _ensure_builtin_plugins_unlocked() -> None:
     register_exporter("ods", _export_ods_bytes)
     register_exporter("odp", _export_odp_bytes)
     register_exporter("json", _export_json_bytes)
+    register_exporter("rag", _export_rag_bytes)
     register_exporter("xlsx", _export_xlsx_bytes)
     register_exporter("rtf", _export_rtf_bytes)
 

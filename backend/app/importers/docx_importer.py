@@ -1,4 +1,9 @@
-"""DOCX importer: native python-docx first; docling optional enrichment path."""
+"""DOCX importer: native python-docx first; docling optional enrichment path.
+
+v9 P0: 内嵌图片经 ``docx_text`` 抽取（``w:drawing`` / ``a:blip`` / ``r:embed`` /
+``v:imagedata`` / ``w:pict`` → ``word/media/*`` relationship → ``Image`` node）。
+本模块在 docling 路径下会把 native 抽出的图片合并回去，避免静默丢图。
+"""
 
 from __future__ import annotations
 
@@ -9,7 +14,7 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 
-from app.core.document_model import DocumentModel
+from app.core.document_model import DocumentModel, Image
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
 from app.importers.docx_text import try_extract_docx_model
 
@@ -30,6 +35,7 @@ def import_docx(source_bytes: bytes, filename: str = "input.docx") -> DocumentMo
         raise
 
     title = Path(filename).stem
+    # Native path always runs first — owns drawing/blip/image/pict extraction.
     native = try_extract_docx_model(source_bytes, title=title)
 
     # Prefer docling when installed (layout-richer); always keep native fallback.
@@ -55,8 +61,11 @@ def import_docx(source_bytes: bytes, filename: str = "input.docx") -> DocumentMo
             result = converter.convert(str(tmp_path))
             model = docling_document_to_model(result.document, title=title)
             model = enrich_docx_model(model, source_bytes)
+            model = _merge_native_images(model, native)
             meta = dict(model.metadata or {})
             meta["importer"] = "docx_docling"
+            if any(isinstance(n, Image) for n in model.nodes):
+                meta["docx_images"] = "native_merged"
             model.metadata = meta
             return model
     except Exception as exc:
@@ -68,3 +77,32 @@ def import_docx(source_bytes: bytes, filename: str = "input.docx") -> DocumentMo
         raise CorruptedFileError(
             f"DOCX 解析失败（文件可能已损坏）: {filename} — {exc}"
         ) from exc
+
+
+def _merge_native_images(
+    model: DocumentModel, native: DocumentModel | None
+) -> DocumentModel:
+    """If docling dropped embedded pictures, reinject Image nodes from native extract.
+
+    Matches v9 P0: drawing/blip → media must survive whichever importer wins.
+    """
+    if native is None:
+        return model
+    native_imgs = [n for n in native.nodes if isinstance(n, Image) and n.data]
+    if not native_imgs:
+        return model
+    have = {
+        (len(n.data), n.mime_type, (n.alt_text or "")[:40])
+        for n in model.nodes
+        if isinstance(n, Image) and n.data
+    }
+    missing = [
+        img
+        for img in native_imgs
+        if (len(img.data), img.mime_type, (img.alt_text or "")[:40]) not in have
+    ]
+    if not missing:
+        return model
+    # Append after body content so captions that follow images stay readable.
+    model.nodes.extend(missing)
+    return model

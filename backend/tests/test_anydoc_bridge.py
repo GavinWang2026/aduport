@@ -76,7 +76,7 @@ def test_should_handle_respects_anydoc_only():
     # Shared formats are NOT anydoc-only and follow the allow-list.
     assert "xlsx" not in _ONLY
     assert should_handle("xlsx") is False  # xlsx stays native by default
-    assert should_handle("docx") is True   # docx is in the default allow-list
+    assert should_handle("docx") is False  # v9 P1: docx returned to native
     assert should_handle("doc") is True    # OLE Word → Rust fast path by default
     assert should_handle("pptx") is True
     assert should_handle("rtf") is True

@@ -88,10 +88,9 @@ class Settings(BaseSettings):
     # always owned when enabled; this list governs formats that also have a
     # native importer. xlsx is intentionally excluded (kept native for header
     # inference). "*" enables every supported shared format.
-    # Shared formats anydoc leads on (exclusive anydoc-only siblings always lead).
-    # doc/pptx: Rust OLE/OOXML path preferred over heavy docling for →md fast channel.
-    # xlsx omitted on purpose (native header-row inference). epub/csv now default-on (P2-4).
-    anydoc_formats: str = "doc,docx,rtf,odt,pptx,ppt,pps,pot,pptm,ppsx,ppsm,docm,epub,csv"
+    # Shared formats anydoc may accelerate. v9 P1: docx 交回 native（图片/列表/span
+    # 高保真管线）；legacy OLE `doc` 与 ppt 系仍走 Rust 快通道。xlsx 保持 native。
+    anydoc_formats: str = "doc,rtf,odt,pptx,ppt,pps,pot,pptm,ppsx,ppsm,docm,epub,csv"
     # Route Markdown targets straight to anydoc's own GFM (no fidelity loss).
     anydoc_fast_markdown: bool = True
     # Recoverable AnydocFallback → native importer (False = surface the decline).
@@ -151,6 +150,15 @@ class Settings(BaseSettings):
 
     # Tables: treat first row as <th> (MD/GFM convention). Set false for all <td>.
     table_first_row_header: bool = True
+    # v9 P2: when True, span tables export as HTML (<td colspan>) instead of flat GFM;
+    # also skips anydoc fast→md for office sources so the model path can emit spans.
+    html_table_for_span: bool = True
+
+    # v9 P3: LLM-friendly Markdown — whitespace normalize, strip base64 images,
+    # optional YAML front-matter (title + importer metadata).
+    llm_mode: bool = False
+    llm_mode_strip_images: bool = True
+    llm_mode_front_matter: bool = True
 
     # HTML export: inject KaTeX CDN for MathBlock rendering
     html_katex: bool = True

@@ -123,11 +123,82 @@ def test_rag_elements_contract():
     assert all("metadata" in e and "source_node" in e["metadata"] for e in els)
 
 
+def test_rag_registered_export_roundtrip():
+    from app.core.converter import convert
+    from app.core.registry import ensure_builtin_plugins
+
+    ensure_builtin_plugins()
+    out = convert(b"# Title\n\nHello RAG.\n", "md", "rag", filename="t.md", skip_magic=True)
+    import json
+
+    payload = json.loads(out.decode())
+    assert payload.get("schema") == "mdbridge.rag_elements.v1"
+    assert isinstance(payload.get("elements"), list) and payload["elements"]
+    # alias
+    out2 = convert(b"# T\n", "md", "elements", filename="t.md", skip_magic=True)
+    assert b"mdbridge.rag_elements" in out2
+
+
 def test_libreoffice_bridge_disabled_by_default(monkeypatch):
     monkeypatch.setattr(settings, "libreoffice_enabled", False)
     assert libreoffice_enabled() is False
     with pytest.raises(LibreOfficeUnavailable):
         convert_via_libreoffice(b"%PDF", filename="x.pdf", target_ext="docx")
+
+
+def test_libreoffice_pdf_path_skipped_when_disabled(monkeypatch):
+    from app.core import converter as conv
+
+    monkeypatch.setattr(settings, "libreoffice_enabled", False)
+    assert conv._try_libreoffice_pdf(b"PK", "docx", "pdf", "a.docx") is None
+
+
+def test_docling_semantic_labels_map_to_ast_nodes():
+    from app.core.document_model import Blockquote, Footnote, HorizontalRule, MathBlock
+    from types import SimpleNamespace
+
+    items = [
+        SimpleNamespace(label="footnote", text="note body", id="1"),
+        SimpleNamespace(label="blockquote", text="quoted"),
+        SimpleNamespace(label="formula", text="E=mc^2"),
+        SimpleNamespace(label="page_break"),
+        SimpleNamespace(label="checkbox_selected", text="done", checked=True),
+        SimpleNamespace(label="unknown_widget", text="kept"),
+    ]
+    doc = SimpleNamespace(texts=items)
+    model = du.docling_document_to_model(doc, title="sem")
+    kinds = {type(n).__name__ for n in model.nodes}
+    assert "Footnote" in kinds
+    assert "Blockquote" in kinds
+    assert "MathBlock" in kinds
+    assert "HorizontalRule" in kinds
+    assert any(isinstance(n, Footnote) and n.text == "note body" for n in model.nodes)
+    assert any(isinstance(n, Blockquote) for n in model.nodes)
+    assert any(isinstance(n, MathBlock) and "E=mc" in n.content for n in model.nodes)
+    assert any(isinstance(n, HorizontalRule) for n in model.nodes)
+
+
+def test_docx_text_table_gridspan_without_anydoc():
+    pytest.importorskip("docx")
+    from docx import Document
+    from io import BytesIO
+
+    from app.importers.docx_text import try_extract_docx_model
+
+    buf = BytesIO()
+    doc = Document()
+    t = doc.add_table(rows=2, cols=2)
+    t.cell(0, 0).merge(t.cell(0, 1))
+    t.cell(0, 0).text = "Merged"
+    t.cell(1, 0).text = "a"
+    t.cell(1, 1).text = "b"
+    doc.save(buf)
+    model = try_extract_docx_model(buf.getvalue(), title="span")
+    assert model is not None
+    tables = [n for n in model.nodes if isinstance(n, Table)]
+    assert tables and tables[0].cells
+    assert tables[0].cells[0][0].col_span == 2
+    assert tables[0].cells[0][1].covered is True
 
 
 def test_docling_table_without_origin_illusion():

@@ -86,6 +86,8 @@ SUPPORTED_TARGET_FORMATS = frozenset(
         "json",
         "xlsx",
         "rtf",
+        # v8 §D: unstructured-like element list (RAG ETL contract)
+        "rag",
     }
 )
 SUPPORTED_FORMATS = SUPPORTED_SOURCE_FORMATS | SUPPORTED_TARGET_FORMATS
@@ -109,6 +111,7 @@ MIME_TYPES = {
     "rtf": "application/rtf",
     "doc": "application/msword",
     "json": "application/json; charset=utf-8",
+    "rag": "application/json; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 
@@ -158,7 +161,10 @@ class BatchResult:
 
 
 def _normalize_format(fmt: str) -> str:
-    return fmt.lower().lstrip(".")
+    key = fmt.lower().lstrip(".")
+    if key in ("elements", "rag_elements", "rag-json"):
+        return "rag"
+    return key
 
 
 def _validate_formats(source_format: str, target_format: str) -> tuple[str, str]:
@@ -300,6 +306,57 @@ def _export(
         set_last_export_warnings(merged)
 
 
+_LO_PDF_SOURCES = frozenset(
+    {
+        "docx",
+        "doc",
+        "docm",
+        "odt",
+        "rtf",
+        "xlsx",
+        "xls",
+        "xlsm",
+        "xlsb",
+        "ods",
+        "pptx",
+        "ppt",
+        "pptm",
+        "odp",
+        "html",
+        "csv",
+    }
+)
+
+
+def _try_libreoffice_pdf(
+    source_bytes: bytes, src: str, tgt: str, filename: str
+) -> bytes | None:
+    """Optional layout-faithful office→PDF via system soffice (never bundled)."""
+    if tgt != "pdf" or src not in _LO_PDF_SOURCES:
+        return None
+    try:
+        from app.exporters.libreoffice_bridge import (
+            LibreOfficeUnavailable,
+            convert_via_libreoffice,
+            libreoffice_enabled,
+        )
+    except ImportError:
+        return None
+    if not libreoffice_enabled():
+        return None
+    try:
+        return convert_via_libreoffice(
+            source_bytes,
+            filename=filename or f"input.{src}",
+            target_ext="pdf",
+        )
+    except LibreOfficeUnavailable:
+        return None
+    except Exception:
+        # Fall through to AST→Weasy so enabling LO never hard-breaks conversions.
+        return None
+
+
 def _try_anydoc_fast_markdown(
     source_bytes: bytes, src: str, tgt: str, filename: str
 ) -> bytes | None:
@@ -313,6 +370,16 @@ def _try_anydoc_fast_markdown(
     if tgt != "md" or not settings.anydoc_fast_markdown:
         return None
     if settings.heading_numbering or settings.image_compress:
+        return None
+    # v9 P2: span-aware HTML tables live on the model→export_md path; skip fast
+    # for office sources when html_table_for_span is on.
+    if getattr(settings, "html_table_for_span", True) and src in {
+        "docx",
+        "doc",
+        "docm",
+        "xlsx",
+        "xlsm",
+    }:
         return None
     try:
         from app.importers.anydoc_bridge import (
@@ -406,6 +473,9 @@ def convert(
             f"toc={int(bool(getattr(settings, 'docx_auto_toc', False)))}",
             f"scc={getattr(settings, 'stream_chunk_chars', 0)}",
             f"tfrh={int(bool(getattr(settings, 'table_first_row_header', False)))}",
+            f"lo={int(bool(getattr(settings, 'libreoffice_enabled', False)))}",
+            f"hts={int(bool(getattr(settings, 'html_table_for_span', True)))}",
+            f"llm={int(bool(getattr(settings, 'llm_mode', False)))}",
         ]
     )
     cache_key = result_cache.make_key(source_bytes, src, tgt, extra)
@@ -436,6 +506,26 @@ def convert(
     started = time.perf_counter()
     importer = ""
     try:
+        out = _try_libreoffice_pdf(source_bytes, src, tgt, filename)
+        if out is not None:
+            importer = "libreoffice"
+            elapsed = time.perf_counter() - started
+            result_cache.put(cache_key, out)
+            metrics.record_success(src, tgt, elapsed, importer=importer)
+            audit_event(
+                action="convert",
+                source_format=src,
+                target_format=tgt,
+                filename=filename,
+                success=True,
+                client=client,
+                cached=False,
+                bytes_in=len(source_bytes),
+                bytes_out=len(out),
+                importer=importer,
+            )
+            return out
+
         out = _try_anydoc_fast_markdown(source_bytes, src, tgt, filename)
         if out is not None:
             importer = "anydoc_fast_md"

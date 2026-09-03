@@ -69,6 +69,10 @@ def test_docling_document_to_model_from_texts():
             data=SimpleNamespace(grid=[["h"], ["v"]], table_cells=None),
         ),
         SimpleNamespace(label="picture", image=_FakeImg(), text="fig"),
+        SimpleNamespace(label="footnote", text="fn-body", id="7"),
+        SimpleNamespace(label="quote", text="quoted-line"),
+        SimpleNamespace(label="formula", text="a^2"),
+        SimpleNamespace(label="page_break"),
     ]
     doc = SimpleNamespace(texts=items)
     model = du.docling_document_to_model(doc, title="T")
@@ -76,6 +80,8 @@ def test_docling_document_to_model_from_texts():
     assert "Heading" in kinds and "Paragraph" in kinds
     assert "ListItem" in kinds and "CodeBlock" in kinds
     assert "Table" in kinds and "Image" in kinds
+    assert "Footnote" in kinds and "Blockquote" in kinds
+    assert "MathBlock" in kinds and "HorizontalRule" in kinds
     assert any(isinstance(n, Heading) and "Title" in n.plain_text() for n in model.nodes)
 
 

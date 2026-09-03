@@ -79,10 +79,13 @@ _FORMAT_MAP: dict[str, str] = {
 # allow-list (which only governs formats that also have a native importer).
 #
 # Fast-path migration notes (shared formats → default allowlist):
-#   MOVE NOW  : doc, pptx  — Rust OLE/OOXML strong; unlocks to_markdown_bytes
-#   ALREADY   : docx, rtf, odt (+ anydoc-only siblings)
-#   KEEP OUT  : xlsx (native header-row), pdf (no anydoc model; OCR/docling)
-#   ENABLED   : epub, csv — default allowlist (P2-4); native fallback when anydoc declines
+#   MOVE NOW     : doc, pptx  — Rust OLE/OOXML strong; unlocks to_markdown_bytes
+#   NATIVE FIRST : docx (v9 P1) — images / List Bullet / span HTML on native path;
+#                  put docx back into anydoc_formats only when intentionally
+#                  preferring speed over fidelity
+#   ALREADY      : rtf, odt (+ anydoc-only siblings)
+#   KEEP OUT     : xlsx (native header-row), pdf (no anydoc model; OCR/docling)
+#   ENABLED      : epub, csv — default allowlist (P2-4); native fallback when anydoc declines
 ANYDOC_ONLY_SIBLINGS: dict[str, str | None] = {
     # value = native sibling importer format (None → dedicated native below)
     "ppt": "ppt",

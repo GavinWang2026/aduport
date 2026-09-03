@@ -99,9 +99,20 @@ def enrich_docx_model(model: DocumentModel, source_bytes: bytes) -> DocumentMode
     if not header_footers and header_text:
         # v6/T2-#8 / D-05: also emit a real HeaderFooter AST node (was metadata-only).
         model.nodes.append(HeaderFooter(kind="header", text=header_text[:500]))
-    for rs in run_styles[:80]:
+    # v9: keep run/numbering catalogs in metadata for JSON fidelity; still append a
+    # capped AST sample so depth tests see live RunStyle/Numbering nodes — but the
+    # full 80-entry dump no longer floods Markdown exporters (see md_exporter skip).
+    if run_styles:
+        meta = dict(model.metadata or {})
+        meta["docx_run_styles_count"] = len(run_styles)
+        model.metadata = meta
+    for rs in run_styles[:12]:
         model.nodes.append(rs)
-    for num in numberings[:50]:
+    if numberings:
+        meta = dict(model.metadata or {})
+        meta["docx_numberings_count"] = len(numberings)
+        model.metadata = meta
+    for num in numberings[:8]:
         model.nodes.append(num)
 
     # v6/T2-#8: promote section / page / field / bookmark metadata into AST nodes

@@ -26,7 +26,7 @@ import { t, type Locale as UILocale } from './i18n'
 const sourceFormats: SourceFormat[] = [...SOURCE_FORMAT_ORDER]
 const targetFormats: TargetFormat[] = [
   'docx', 'pdf', 'md', 'html', 'txt', 'epub', 'pptx', 'mobi',
-  'azw3', 'kf8', 'latex', 'csv', 'odt', 'ods', 'odp', 'json', 'xlsx', 'rtf',
+  'azw3', 'kf8', 'latex', 'csv', 'odt', 'ods', 'odp', 'json', 'rag', 'xlsx', 'rtf',
 ]
 
 const locale = ref<UILocale>((localStorage.getItem('mdbridge-locale') as UILocale) || 'zh')
