@@ -13,6 +13,20 @@ def test_score_baseline_anchors_66_not_88():
     assert "**当前对外分**" in score or "当前对外分" in score
     acc = (_ROOT / "enterprise" / "ACCEPTANCE.md").read_text(encoding="utf-8")
     assert "66.2" in acc
+    assert "KNOWN_ILLUSIONS" in acc
+    illusions = (_ROOT / "enterprise" / "KNOWN_ILLUSIONS.md").read_text(encoding="utf-8")
+    assert "66.2" in illusions
+    assert "R-01" in illusions and "R-02" in illusions and "R-03" in illusions
     risk = (_ROOT / "enterprise" / "ANYDOC_RISK.md").read_text(encoding="utf-8")
     assert "xlsb" in risk.lower()
     assert "MIT" in risk
+
+
+def test_v8_decision_table_closes_split_commits():
+    """§07: worktree split + CI gates must not still say「待人工」."""
+    report = (_ROOT / "md-bridge-功能与性能全面评估报告-v8.html").read_text(encoding="utf-8")
+    assert "拆提交待人工" not in report
+    assert "工作树已按主题拆分提交" in report or "CLOSED" in report
+    assert "66.2" in report
+    assert "rag_elements" in report or "骨架已落" in report
+    assert "libreoffice_bridge" in report or "钩子 OK" in report
