@@ -58,13 +58,11 @@ def _docx_import_available() -> bool:
     if bridge.anydoc_available() and bridge.should_handle("docx"):
         return True
     try:
-        from app.importers.docx_importer import _require_docling
+        import docx  # noqa: F401
 
-        _require_docling()
         return True
-    except InvalidDocumentError:
+    except ImportError:
         return False
-
 
 def _binary_magic(target: str, data: bytes) -> bool:
     if target == "md":
@@ -162,7 +160,7 @@ def test_golden_docx_anydoc_channel():
     raw = _fixture_bytes("docx/handmade-tables.docx")
     md = convert(raw, "docx", "md", filename="handmade-tables.docx")
     text = md.decode("utf-8", errors="replace")
-    assert "table" in text.lower() or "|" in text
+    assert "|" in text
 
 
 def _build_ebook_golden_sample(fmt: str) -> bytes:

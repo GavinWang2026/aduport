@@ -67,7 +67,10 @@ def test_docx_ooxml_enrich_comments_header_theme():
     assert model.metadata.get("docx_theme") == "Office Theme"
     assert "Acme Header" in (model.metadata.get("docx_header") or "")
     assert any(isinstance(n, Comment) and n.text == "fix me" for n in model.nodes)
-    assert any(isinstance(n, Paragraph) and "页眉" in n.plain_text() for n in model.nodes)
+    # Header stays in metadata only — must not pollute body (P1 #6)
+    assert not any(
+        isinstance(n, Paragraph) and "页眉" in n.plain_text() for n in model.nodes
+    )
 
 
 def test_md_autolink_and_footnote_crossref():

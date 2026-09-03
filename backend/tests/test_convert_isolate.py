@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,40 +18,56 @@ def test_convert_isolated_md_roundtrip():
     assert b"world" in out
 
 
-def test_convert_isolated_falls_back_when_worker_crash(tmp_path: Path):
-    """Worker crash without status.json → in-process fallback still succeeds."""
+def _fake_popen(*, returncode: int = -6, stderr: bytes = b"abort: fake native crash"):
+    def factory(cmd, **kwargs):
+        proc = MagicMock()
+        proc.pid = 4242
+        proc.returncode = returncode
+        proc.communicate.return_value = (b"", stderr)
+        return proc
 
-    def fake_run(cmd, **kwargs):
-        class Proc:
-            returncode = -6
-            stderr = b"abort: fake native crash"
-            stdout = b""
+    return factory
 
-        return Proc()
 
+def test_convert_isolated_falls_back_when_worker_nonzero_exit():
+    """Non-signal worker exit without status.json → in-process fallback."""
     with patch("app.core.convert_isolate.settings") as s:
         s.convert_isolate = True
+        s.convert_isolate_fork = True
         s.convert_timeout_seconds = 60
-        with patch("app.core.convert_isolate.subprocess.run", side_effect=fake_run):
+        with patch(
+            "app.core.convert_isolate.subprocess.Popen",
+            side_effect=_fake_popen(returncode=1, stderr=b"worker oops"),
+        ):
             out = convert_isolated(b"# x\n", "md", "txt", filename="x.md")
             assert b"x" in out
 
 
-def test_convert_isolated_reports_worker_crash_when_fallback_fails(tmp_path: Path):
-    """If worker dies and in-process fallback fails, surface worker_crash."""
-
-    def fake_run(cmd, **kwargs):
-        class Proc:
-            returncode = -6
-            stderr = b"abort: fake native crash"
-            stdout = b""
-
-        return Proc()
-
+def test_convert_isolated_no_fallback_on_signal_kill():
+    """Signal/OOM (rc < 0) must not retry in-process (P1 #24)."""
     with patch("app.core.convert_isolate.settings") as s:
         s.convert_isolate = True
+        s.convert_isolate_fork = True
         s.convert_timeout_seconds = 60
-        with patch("app.core.convert_isolate.subprocess.run", side_effect=fake_run):
+        with patch(
+            "app.core.convert_isolate.subprocess.Popen",
+            side_effect=_fake_popen(returncode=-6),
+        ):
+            with pytest.raises(ExportError) as ei:
+                convert_isolated(b"# x\n", "md", "txt", filename="x.md")
+            assert ei.value.code == "worker_crash"
+
+
+def test_convert_isolated_reports_worker_crash_when_fallback_fails():
+    """If worker dies with non-signal rc and fallback fails, surface worker_crash."""
+    with patch("app.core.convert_isolate.settings") as s:
+        s.convert_isolate = True
+        s.convert_isolate_fork = True
+        s.convert_timeout_seconds = 60
+        with patch(
+            "app.core.convert_isolate.subprocess.Popen",
+            side_effect=_fake_popen(returncode=1, stderr=b"abort"),
+        ):
             with patch(
                 "app.core.convert_isolate.convert",
                 side_effect=RuntimeError("boom"),

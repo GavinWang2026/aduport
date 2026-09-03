@@ -1,0 +1,5 @@
+Plain ops sample for TXT cold path.
+
+SENT_TXT_OPS_ALPHA
+
+Second paragraph keeps UTF-8 round-trip: 验收代理.

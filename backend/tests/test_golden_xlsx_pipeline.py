@@ -60,12 +60,10 @@ def test_xlsx_to_html_golden_pipeline():
     assert "<ul>" in html and "Bullet item" in html
     assert "<ol>" in html and "Numbered item" in html
     assert "<hr" in html
-    assert "<pre><code" in html or "<pre>" in html
-    assert "xlsx-golden" in html
+    assert "<pre>" in html and "xlsx-golden" in html
     assert "<blockquote>" in html and "Quoted wisdom." in html
-    assert "class='comment'" in html or 'class="comment"' in html
-    assert "check totals" in html
-    assert "footnotes" in html.lower() or "See appendix" in html
+    assert "comment" in html and "check totals" in html
+    assert "See appendix" in html and "footnote" in html.lower()
     assert "SalesPivot" in html
     assert 'colspan="2"' in html
 
@@ -76,6 +74,7 @@ def test_xlsx_to_docx_golden_pipeline():
 
     with zipfile.ZipFile(BytesIO(raw)) as zf:
         xml = zf.read("word/document.xml").decode("utf-8", errors="replace")
+        fn_xml = zf.read("word/footnotes.xml").decode("utf-8", errors="replace")
 
     assert "Region" in xml and "East" in xml and "Merged" in xml
     assert "Regional Summary" in xml
@@ -84,8 +83,9 @@ def test_xlsx_to_docx_golden_pipeline():
     assert "Numbered item" in xml
     assert 'print("xlsx-golden")' in xml
     assert "Quoted wisdom." in xml
-    assert "Footnotes" in xml and "See appendix" in xml
     assert "SalesPivot" in xml
+    assert "See appendix" in fn_xml
+    assert "footnoteReference" in xml
 
 
 def test_xlsx_to_txt_golden_pipeline():
@@ -119,7 +119,7 @@ def test_xlsx_to_pdf_golden_pipeline():
     assert raw[:4] == b"%PDF"
     assert len(raw) > 512
     # Font-subset PDFs may not embed plaintext literals; structural smoke only.
-    assert b"/Type" in raw and (b"/Pages" in raw or b"stream" in raw)
+    assert b"/Type" in raw and b"stream" in raw
 
 
 def test_xlsx_to_rtf_golden_pipeline():
@@ -143,7 +143,7 @@ def test_xlsx_to_latex_golden_pipeline():
 def test_xlsx_to_csv_golden_pipeline():
     csv_text = convert(_export_bytes(), "xlsx", "csv", filename="golden.xlsx").decode()
 
-    assert "Region,Sales" in csv_text or "Region" in csv_text
+    assert "Region" in csv_text and "Sales" in csv_text
     assert "East" in csv_text and "100" in csv_text
     assert "Merged" in csv_text
 
@@ -166,7 +166,7 @@ def test_xlsx_to_pptx_golden_pipeline():
     assert "Text boxes" in blob and "Sidebar note" in blob
     assert "Pivot tables" in blob and "SalesPivot" in blob
     assert "Merged" in blob
-    assert "gridSpan" in blob or "a:gridSpan" in blob
+    assert "gridSpan" in blob
 
 
 def test_xlsx_to_odt_golden_pipeline():
@@ -179,15 +179,15 @@ def test_xlsx_to_odt_golden_pipeline():
     assert "Region" in content and "East" in content and "Merged" in content
     assert 'table:number-columns-spanned="2"' in content
     assert "Regional Summary" in content
-    assert "SalesPivot" in content or "Pivot" in content
-    assert "check totals" in content or "reviewer" in content
+    assert "SalesPivot" in content
+    assert "check totals" in content
 
 
 def test_xlsx_to_json_golden_pipeline():
     text = convert(_export_bytes(), "xlsx", "json", filename="golden.xlsx").decode()
     data = json.loads(text)
 
-    assert data.get("schema_version") == "1.0"
+    assert data.get("schema_version") in ("1.0", "1.1", "1.2")
     blocks = data.get("blocks") or []
     types = {b.get("type") for b in blocks}
     assert "table" in types

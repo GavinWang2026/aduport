@@ -1,0 +1,35 @@
+{
+  "version": "1.2",
+  "description": "Acceptance sample library (proxy for customer抽检 ≥90%). CI: test_sample_pack_t39 + test_phase_c_gates. Private volume: MDBRIDGE_PRIVATE_SAMPLES_DIR",
+  "audit_proxy_min_pass_rate": 0.9,
+  "samples": [
+    {
+      "id": "cjk_report",
+      "file": "cjk_report.md",
+      "source": "md",
+      "targets": ["docx", "pdf", "html", "txt", "odt", "rtf", "md"],
+      "must_contain": ["季度业务报告", "营收增长", "华北"]
+    },
+    {
+      "id": "rich_semantics",
+      "file": "rich_semantics.md",
+      "source": "md",
+      "targets": ["docx", "html", "odt", "latex", "json", "odp", "txt", "rtf"],
+      "must_contain": ["Semantic Rich", "bullet alpha", "ColX", "footnote body", "task done"]
+    },
+    {
+      "id": "office_table",
+      "file": "office_table.md",
+      "source": "md",
+      "targets": ["xlsx", "csv", "pptx", "ods", "html"],
+      "must_contain": ["SKU", "Widget-A", "120"]
+    },
+    {
+      "id": "plain_ops",
+      "file": "plain_ops.txt",
+      "source": "txt",
+      "targets": ["md", "txt", "html", "docx"],
+      "must_contain": ["SENT_TXT_OPS_ALPHA", "验收代理"]
+    }
+  ]
+}

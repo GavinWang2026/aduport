@@ -5,6 +5,9 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
+import pytest
+
+from app.config import settings
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
@@ -32,6 +35,11 @@ _TINY_PNG = (
     b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
     b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
 )
+
+
+@pytest.fixture(autouse=True)
+def _enable_xlsx_ast_sheet(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "xlsx_ast_sheet", True)
 
 
 def _full_ast_model() -> DocumentModel:

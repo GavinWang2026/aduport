@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import re
 import zipfile
 from io import BytesIO
 
+import pytest
+
+from app.config import settings
 from app.core.document_model import DocumentModel, Image, Paragraph, PivotTable, Revision, Table, TableCell
 from app.exporters.md_exporter import export_md
 from app.exporters.html_render import render_body_html
@@ -15,6 +19,12 @@ from app.importers.pdf_text_fallback import extract_pdf_text_model
 
 
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+@pytest.fixture(autouse=True)
+def _enable_xlsx_ast_sheet(monkeypatch: pytest.MonkeyPatch):
+    """These depth tests exercise the opt-in `_AST` meta sheet."""
+    monkeypatch.setattr(settings, "xlsx_ast_sheet", True)
 
 
 def _minimal_docx_zip() -> bytes:
@@ -426,8 +436,10 @@ def test_docx_pivot_table_and_footnotes_export():
     raw = export_docx(model)
     with zipfile.ZipFile(BytesIO(raw)) as zf:
         xml = zf.read("word/document.xml").decode()
+        fn_xml = zf.read("word/footnotes.xml").decode()
     assert "SalesPivot" in xml and "Region" in xml and "Amount" in xml
-    assert "Footnotes" in xml and "See note" in xml
+    assert "footnoteReference" in xml
+    assert "See note" in fn_xml
 
 
 def test_mobi_footnotes_css_embedded():
@@ -497,7 +509,11 @@ def test_xlsx_unified_ast_all_node_types():
     assert sum(isinstance(n, ContentControl) for n in back.nodes) == 1
     assert sum(isinstance(n, TextBox) for n in back.nodes) == 1
     with zipfile.ZipFile(BytesIO(raw)) as zf:
-        ast = zf.read("xl/worksheets/sheet2.xml").decode()
+        # Prefer sheet named _AST (may not be sheet2 when Content sheet exists)
+        wb = zf.read("xl/workbook.xml").decode()
+        names = re.findall(r'name="([^"]+)"', wb)
+        idx = names.index("_AST") + 1 if "_AST" in names else 2
+        ast = zf.read(f"xl/worksheets/sheet{idx}.xml").decode()
     assert "revision" in ast and "content_control" in ast and "text_box" in ast
 
 

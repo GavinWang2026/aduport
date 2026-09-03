@@ -116,12 +116,17 @@ def test_plugin_registry():
 
 
 def test_health_and_metrics(client):
-    h = client.get("/api/health")
+    h = client.get("/api/health/detail")
     assert h.status_code == 200
     body = h.json()
     assert body["version"] == "0.16.0"
     assert "cache" in body
     assert "metrics" in body
+
+    live = client.get("/api/health")
+    assert live.status_code == 200
+    assert live.json()["status"] == "ok"
+    assert "metrics" not in live.json()
 
     m = client.get("/api/metrics")
     assert m.status_code == 200

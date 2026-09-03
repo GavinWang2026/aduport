@@ -21,7 +21,7 @@ def _footnote_model() -> DocumentModel:
 def test_golden_mobi_footnote_ast_roundtrip():
     """Export MOBI with footnotes section → extract Footnote AST nodes."""
     blob = export_mobi(_footnote_model())
-    assert blob[:32].find(b"BOOK") >= 0 or len(blob) > 128
+    assert len(blob) > 128
     model = try_extract_mobi_model(blob, title="FootnoteGolden")
     assert model is not None
     footnotes = [n for n in model.nodes if isinstance(n, Footnote)]
@@ -35,7 +35,7 @@ def test_golden_mobi_footnote_convert_md_roundtrip():
     mobi = convert(src, "md", "mobi", filename="golden.md")
     assert mobi and len(mobi) > 64
     back = convert(mobi, "mobi", "md", filename="golden.mobi").decode("utf-8", errors="replace")
-    assert "Endnote golden" in back or "endnote" in back.lower()
+    assert "endnote" in back.lower() and "golden" in back.lower()
 
 
 def test_golden_mobi_footnote_html_section_in_payload():

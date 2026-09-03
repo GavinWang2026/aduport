@@ -54,14 +54,45 @@ def test_html_col_span():
 def test_html_row_span():
     out = html_render._render_table_html(_row_span_table())
     assert 'rowspan="2"' in out
-    assert out.count("<th") == 1  # Tall is header (row 0)
-    assert out.count("<td") == 2  # Y and Z; covered slot omitted
+    # First-row header (default): row0 Tall+Y are <th>; row1 Z is <td> (covered omitted)
+    assert out.count("<th") == 2
+    assert out.count("<td") == 1
 
 
 def test_html_header_rows():
     out = html_render._render_table_html(_header_table())
     # header_rows=2 -> both rows are <th>; 2 cols x 2 rows = 4 <th>
     assert out.count("<th") == 4
+
+
+def test_html_span_respects_first_row_header_off(monkeypatch):
+    """v8 P1: origin_* alone must not force spans path past header switch."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "table_first_row_header", False)
+    # Plain cells that only carry origin self-coords (md import illusion)
+    plain = Table(
+        rows=[["a", "b"], ["1", "2"]],
+        cells=[
+            [
+                TableCell(text="a", origin_row=0, origin_col=0),
+                TableCell(text="b", origin_row=0, origin_col=1),
+            ],
+            [
+                TableCell(text="1", origin_row=1, origin_col=0),
+                TableCell(text="2", origin_row=1, origin_col=1),
+            ],
+        ],
+        header_rows=1,
+    )
+    out = html_render._render_table_html(plain)
+    assert "<th>" not in out
+    assert out.count("<td>") == 4
+    # Real spans still render colspan/rowspan, but never as <th> when switch off
+    spanned = html_render._render_table_html(_col_span_table())
+    assert 'colspan="2"' in spanned
+    assert "<th>" not in spanned
+    assert "<td" in spanned
 
 
 # --------------------------------------------------------------------------
