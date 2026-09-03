@@ -4,15 +4,20 @@ from __future__ import annotations
 
 import base64
 import html
+import re
 
 from app.config import settings
 from app.core.document_model import (
     Blockquote,
+    Bookmark,
+    Chart,
     CodeBlock,
     DocumentModel,
     Comment,
     ContentControl,
+    FieldCode,
     Footnote,
+    HeaderFooter,
     Heading,
     HorizontalRule,
     HtmlBlock,
@@ -21,13 +26,31 @@ from app.core.document_model import (
     InlineMarkType,
     ListItem,
     MathBlock,
+    Numbering,
+    PageSetup,
     PivotTable,
     Revision,
     Paragraph,
+    RunStyle,
+    Section,
+    SpeakerNote,
+    SmartArt,
+    OleObject,
     Table,
     TextBox,
     ensure_rich_text,
 )
+from app.exporters.export_warnings import node_type_name, placeholder_line, warn_export
+
+_SAFE_MIME_RE = re.compile(r"^[\w.+-]+/[\w.+-]+$")
+
+
+def _safe_image_mime(mime: str | None) -> str:
+    raw = (mime or "application/octet-stream").strip()
+    if not _SAFE_MIME_RE.match(raw):
+        return "application/octet-stream"
+    # Escape any residual attribute-breaking chars
+    return html.escape(raw, quote=True)
 
 
 def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str:
@@ -43,6 +66,24 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
 
     i = 0
     nodes = model.nodes
+    meta = model.metadata or {}
+    # D-30: consume leftover OOXML metadata when AST chrome is absent.
+    if not any(isinstance(n, HeaderFooter) for n in nodes) and meta.get("docx_header"):
+        parts.append(
+            f"<header class='docx-chrome'>{html.escape(str(meta['docx_header'])[:500])}</header>"
+        )
+    if not any(isinstance(n, FieldCode) for n in nodes):
+        fields = meta.get("docx_field_codes") or []
+        if isinstance(fields, list):
+            for item in fields[:20]:
+                if isinstance(item, dict):
+                    inst = str(item.get("instr") or item.get("instruction") or item.get("text") or "")
+                else:
+                    inst = str(item)
+                if inst:
+                    parts.append(
+                        f"<span class='field-code'>{html.escape(inst[:200])}</span>"
+                    )
     while i < len(nodes):
         node = nodes[i]
         if isinstance(node, Heading):
@@ -62,7 +103,7 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
             parts.append(f"<blockquote>{inner}</blockquote>")
             i += 1
         elif isinstance(node, HorizontalRule):
-            parts.append("<hr/>")
+            parts.append('<hr data-mdbridge="---"/>')
             i += 1
         elif isinstance(node, ListItem):
             ordered = node.ordered
@@ -72,13 +113,27 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
                 li = nodes[i]
                 if li.checked is not None:
                     checked = " checked" if li.checked else ""
+                    mark = "[x]" if li.checked else "[ ]"
                     box = (
                         f'<input type="checkbox" disabled{checked} '
                         f'aria-checked="{"true" if li.checked else "false"}"/> '
+                        f'<span class="task-mark">{mark}</span> '
                     )
                 else:
                     box = ""
-                parts.append(f"<li>{box}{_render_rich_html(ensure_rich_text(li.text))}</li>")
+                body = _render_rich_html(ensure_rich_text(li.text))
+                # v6/T1-#3: render multi-paragraph / fenced-code children that
+                # live inside the list item, instead of dropping them silently.
+                for child in li.children:
+                    if isinstance(child, CodeBlock):
+                        lang = child.lang or ""
+                        cls = f' class="language-{html.escape(lang)}"' if lang else ""
+                        body += (
+                            f"<pre><code{cls}>{html.escape(child.content)}</code></pre>"
+                        )
+                    elif isinstance(child, Paragraph):
+                        body += f"<p>{_render_rich_html(ensure_rich_text(child.text))}</p>"
+                parts.append(f"<li>{box}{body}</li>")
                 i += 1
             parts.append(f"</{tag}>")
         elif isinstance(node, Table):
@@ -93,8 +148,9 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
             if node.data:
                 b64 = base64.b64encode(node.data).decode("ascii")
                 alt = html.escape(node.alt_text.split("|", 1)[0])
+                mime = _safe_image_mime(node.mime_type)
                 parts.append(
-                    f"<img src='data:{node.mime_type};base64,{b64}' alt='{alt}'{wrap_style}/>"
+                    f"<img src='data:{mime};base64,{b64}' alt='{alt}'{wrap_style}/>"
                 )
             else:
                 alt = html.escape(node.alt_text)
@@ -151,19 +207,81 @@ def render_body_html(model: DocumentModel, *, include_title: bool = True) -> str
         elif isinstance(node, PivotTable):
             parts.append(_render_pivot_table_html(node))
             i += 1
+        elif isinstance(node, Chart):
+            parts.append(
+                f"<aside class='chart' data-chart-type='{html.escape(node.chart_type)}'>"
+                f"{html.escape(node.plain_text())}</aside>"
+            )
+            i += 1
+        elif isinstance(node, SpeakerNote):
+            parts.append(
+                f"<aside class='speaker-note' data-slide='{int(node.slide_index)}'>"
+                f"{html.escape(node.text)}</aside>"
+            )
+            i += 1
+        elif isinstance(node, SmartArt):
+            items = "".join(f"<li>{html.escape(it)}</li>" for it in node.items[:50])
+            parts.append(
+                f"<aside class='smartart' data-layout='{html.escape(node.layout)}'>"
+                f"<strong>{html.escape(node.plain_text())}</strong>"
+                f"<ul>{items}</ul></aside>"
+            )
+            i += 1
+        elif isinstance(node, OleObject):
+            parts.append(
+                f"<aside class='ole-object' data-prog='{html.escape(node.prog_id)}'>"
+                f"{html.escape(node.plain_text())}</aside>"
+            )
+            i += 1
         elif isinstance(node, TextBox):
             parts.append(_render_textbox_html(node))
             i += 1
         elif isinstance(node, HtmlBlock):
-            safe = node.content.replace("<script", "&lt;script").replace("<iframe", "&lt;iframe")
-            parts.append(safe)
+            from app.importers.md_importer import _sanitize_html_fragment
+
+            parts.append(_sanitize_html_fragment(node.content or ""))
             i += 1
         elif isinstance(node, CodeBlock):
             lang = html.escape(node.lang)
             content = html.escape(node.content)
             parts.append(f"<pre><code class='language-{lang}'>{content}</code></pre>")
             i += 1
+        elif isinstance(node, HeaderFooter):
+            tag = "header" if node.kind == "header" else "footer"
+            parts.append(
+                f"<{tag} class='docx-chrome'>{html.escape(node.text)}</{tag}>"
+            )
+            i += 1
+        elif isinstance(node, FieldCode):
+            label = html.escape(
+                node.result_text or node.instruction or node.field_type
+            )
+            parts.append(
+                f"<span class='field-code' data-field='{html.escape(node.field_type)}'>"
+                f"{label}</span>"
+            )
+            i += 1
+        elif isinstance(
+            node,
+            (Section, PageSetup, Bookmark, RunStyle, Numbering),
+        ):
+            kind = node_type_name(node)
+            detail = node.plain_text() if hasattr(node, "plain_text") else kind
+            warn_export(model, f"html: {kind} → placeholder (layout shallow)")
+            parts.append(
+                f"<aside class='mdbridge-placeholder' data-type='{html.escape(kind)}'>"
+                f"{html.escape(placeholder_line(kind, detail))}</aside>"
+            )
+            i += 1
         else:
+            kind = node_type_name(node)
+            plain = getattr(node, "plain_text", None)
+            detail = plain() if callable(plain) else kind
+            warn_export(model, f"html: unhandled node {kind} → placeholder")
+            parts.append(
+                f"<aside class='mdbridge-placeholder' data-type='{html.escape(kind)}'>"
+                f"{html.escape(placeholder_line(kind, str(detail)[:200]))}</aside>"
+            )
             i += 1
     footnotes_html = _render_footnotes_section(nodes)
     if footnotes_html:
@@ -238,20 +356,35 @@ def render_pdf_layout_html(model: DocumentModel) -> str:
 
 
 def render_section_props_html(model: DocumentModel) -> str:
-    props = (model.metadata or {}).get("section_props") or {}
-    if not props:
-        return ""
+    """Prefer PageSetup/Section AST nodes; fall back to legacy metadata."""
     bits: list[str] = []
-    if props.get("page_width_mm") and props.get("page_height_mm"):
-        bits.append(f"{props['page_width_mm']}×{props['page_height_mm']} mm")
-    margins = props.get("margins_mm") or {}
-    if isinstance(margins, dict) and margins:
-        bits.append(
-            "边距 "
-            + ", ".join(f"{k} {v}mm" for k, v in margins.items())
-        )
-    if props.get("orientation"):
-        bits.append(str(props["orientation"]))
+    page = next((n for n in model.nodes if isinstance(n, PageSetup)), None)
+    section = next((n for n in model.nodes if isinstance(n, Section)), None)
+    if page is not None:
+        bits.append(f"{page.page_size} {page.orientation}")
+        if page.margins_mm:
+            bits.append(
+                "边距 "
+                + ", ".join(f"{k} {v}mm" for k, v in page.margins_mm.items())
+            )
+    if section is not None and section.title:
+        bits.append(section.title)
+    if section is not None and section.props:
+        props = section.props
+        if props.get("page_width_mm") and props.get("page_height_mm"):
+            bits.append(f"{props['page_width_mm']}×{props['page_height_mm']} mm")
+    if not bits:
+        props = (model.metadata or {}).get("section_props") or {}
+        if props.get("page_width_mm") and props.get("page_height_mm"):
+            bits.append(f"{props['page_width_mm']}×{props['page_height_mm']} mm")
+        margins = props.get("margins_mm") or {}
+        if isinstance(margins, dict) and margins:
+            bits.append(
+                "边距 "
+                + ", ".join(f"{k} {v}mm" for k, v in margins.items())
+            )
+        if props.get("orientation"):
+            bits.append(str(props["orientation"]))
     if not bits:
         return ""
     body = html.escape(" · ".join(bits))
@@ -368,22 +501,13 @@ def _render_table_html(table: Table) -> str:
 
 
 def _table_header_rows(table: Table) -> int:
+    # Global switch wins — callers may set header_rows from GFM thead, but
+    # MDBRIDGE_TABLE_FIRST_ROW_HEADER=false must still emit all <td> (P1 #10 / v11).
+    if not settings.table_first_row_header:
+        return 0
     if table.header_rows > 0:
         return int(table.header_rows)
-    return 1 if settings.table_first_row_header else 0
-
-
-def _table_cell_tag(r_idx: int, cell: TableCell, header_rows: int) -> str:
-    if header_rows > 0 and r_idx < header_rows:
-        return "th"
-    if (
-        header_rows == 0
-        and settings.table_first_row_header
-        and r_idx == 0
-        and (cell.row_span > 1 or cell.col_span > 1)
-    ):
-        return "th"
-    return "td"
+    return 1
 
 
 def _table_has_span_cells(table: Table) -> bool:
@@ -391,15 +515,20 @@ def _table_has_span_cells(table: Table) -> bool:
         return False
     for row in table.cells:
         for cell in row:
+            # Only real spans — origin_* alone must not bypass header switch (v8 P1).
             if cell.covered or cell.row_span > 1 or cell.col_span > 1:
-                return True
-            if cell.origin_row or cell.origin_col:
                 return True
     return False
 
 
+def _table_cell_tag(r_idx: int, cell: TableCell, header_rows: int) -> str:
+    if header_rows > 0 and r_idx < header_rows:
+        return "th"
+    return "td"
+
+
 def _render_table_html_spans(table: Table) -> str:
-    header_rows = int(table.header_rows or 0)
+    header_rows = _table_header_rows(table)
     lines = ["<table>"]
     for r_idx, row in enumerate(table.cells):
         lines.append("<tr>")

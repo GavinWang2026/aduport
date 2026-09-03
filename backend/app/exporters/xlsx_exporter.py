@@ -12,6 +12,7 @@ from xml.sax.saxutils import escape
 
 from app.core.document_model import (
     Blockquote,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
@@ -31,12 +32,15 @@ from app.core.document_model import (
     TextBox,
 )
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
+from app.core import xml_safe
+from app.core.safe_zip import ZipInflateBudget
 
 _NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 _REL_NS = {"r": "http://schemas.openxmlformats.org/package/2006/relationships"}
 _M = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 _R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _META_AST = "_AST"
+_META_CONTENT = "Content"  # visible body sheet (not underscore-prefixed; counts as body)
 # Legacy sheet names (import still supported)
 _META_REVISIONS = "_Revisions"
 _META_CONTROLS = "_Controls"
@@ -64,19 +68,62 @@ def _safe_sheet_name(name: str, index: int) -> str:
 
 def export_xlsx(model: DocumentModel) -> bytes:
     """Export tables (+ formulas), PivotTable, Revision/ContentControl meta sheets."""
+    from app.config import settings
+    from app.exporters.export_warnings import warn_export
+
     tables = [n for n in model.nodes if isinstance(n, Table)]
     pivots = [n for n in model.nodes if isinstance(n, PivotTable)]
-    meta_sheets = _meta_ast_sheets(model)
-    max_data_sheets = max(1, 8 - len(meta_sheets))
+    charts_all = [n for n in model.nodes if isinstance(n, Chart)]
+    chart_cap = 8
+    if len(charts_all) > chart_cap:
+        warn_export(
+            model,
+            f"xlsx: truncated {len(charts_all) - chart_cap} Chart(s) (cap {chart_cap})",
+        )
+    charts = charts_all[:chart_cap]
+    if any((c.chart_type or "").lower().strip() in ("scatter", "xy") for c in charts):
+        warn_export(
+            model,
+            "xlsx: scatter/xy Chart degraded to lineChart (literal category axis)",
+        )
+    emit_ast = bool(getattr(settings, "xlsx_ast_sheet", False))
+    meta_sheets = _meta_ast_sheets(model) if emit_ast else []
+    non_table = [
+        n
+        for n in model.nodes
+        if not isinstance(n, Table)
+    ]
+    content_sheet = _content_sheet(model) if non_table else None
+    if non_table and meta_sheets and not content_sheet:
+        warn_export(
+            model,
+            f"xlsx: {len(non_table)} non-table node(s) parked on _AST sheet (not body cells)",
+        )
+    elif non_table and not emit_ast and not content_sheet:
+        warn_export(
+            model,
+            f"xlsx: {len(non_table)} non-table node(s); _AST sheet disabled "
+            "(MDBRIDGE_XLSX_AST_SHEET=0) — body cells / Content sheet only",
+        )
+    sheet_cap = max(1, min(255, int(getattr(settings, "xlsx_max_sheets", 64) or 64)))
+    reserved = len(meta_sheets) + (1 if content_sheet else 0)
+    max_data_sheets = max(1, sheet_cap - reserved)
+    if len(tables) > max_data_sheets:
+        warn_export(
+            model,
+            f"xlsx: truncated {len(tables) - max_data_sheets} table sheet(s) (cap {max_data_sheets})",
+        )
     if not tables:
-        rows = []
-        for node in model.nodes:
-            text = getattr(node, "plain_text", None)
-            if callable(text):
-                rows.append([text()])
-            elif isinstance(node, Paragraph):
-                rows.append([node.plain_text()])
-        tables = [Table(rows=rows or [[""]])]
+        # Single-sheet body with searchable text for every node type (not table-only).
+        vis_rows = _visible_body_rows(model)
+        tables = [Table(rows=vis_rows or [[""]], name="Content", header_rows=0)]
+        content_sheet = None
+    elif content_sheet is None and non_table:
+        # Mixed doc but content builder returned None — still warn
+        warn_export(
+            model,
+            f"xlsx: {len(non_table)} non-table node(s) without Content sheet",
+        )
 
     sheet_xmls: list[tuple[str, str, str]] = []  # path, xml, name
     used_names: set[str] = set()
@@ -89,9 +136,15 @@ def export_xlsx(model: DocumentModel) -> bytes:
             name = (base[: 31 - len(suffix)] + suffix) if len(base) + len(suffix) > 31 else base + suffix
             n += 1
         used_names.add(name.lower())
+        drawing_r_id = "rId1" if (i == 1 and charts) else None
         sheet_xmls.append(
-            (f"xl/worksheets/sheet{i}.xml", _sheet_xml(table), name)
+            (f"xl/worksheets/sheet{i}.xml", _sheet_xml(table, drawing_r_id=drawing_r_id), name)
         )
+
+    if content_sheet is not None:
+        path, xml, name = content_sheet
+        idx = len(sheet_xmls) + 1
+        sheet_xmls.append((f"xl/worksheets/sheet{idx}.xml", xml, name))
 
     base_idx = len(sheet_xmls)
     for j, (path, xml, name) in enumerate(meta_sheets, start=1):
@@ -128,6 +181,16 @@ def export_xlsx(model: DocumentModel) -> bytes:
             f'<Override PartName="/xl/pivotCache/pivotCacheRecords{i}.xml" '
             'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml"/>'
         )
+    if charts:
+        content_types.append(
+            '<Override PartName="/xl/drawings/drawing1.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>'
+        )
+        for i in range(1, len(charts) + 1):
+            content_types.append(
+                f'<Override PartName="/xl/charts/chart{i}.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>'
+            )
     content_types.append("</Types>")
 
     workbook_sheets = "".join(
@@ -214,6 +277,19 @@ def export_xlsx(model: DocumentModel) -> bytes:
                 f"xl/pivotCache/pivotCacheRecords{i}.xml",
                 _pivot_cache_records_xml(pivot, tables=tables),
             )
+        if charts:
+            warn_export(model, f"xlsx: embedded {len(charts)} DrawingML chart(s) on sheet1")
+            zf.writestr(
+                "xl/worksheets/_rels/sheet1.xml.rels",
+                _sheet_drawing_rels(),
+            )
+            zf.writestr("xl/drawings/drawing1.xml", _charts_drawing_xml(len(charts)))
+            zf.writestr(
+                "xl/drawings/_rels/drawing1.xml.rels",
+                _drawing_chart_rels(len(charts)),
+            )
+            for i, ch in enumerate(charts, start=1):
+                zf.writestr(f"xl/charts/chart{i}.xml", _chart_space_xml(ch))
     return buf.getvalue()
 
 
@@ -302,6 +378,142 @@ def _pivot_source_rows(p: PivotTable, tables: list[Table]) -> list[list[str]]:
     return out[:500]
 
 
+def _visible_body_rows(model: DocumentModel) -> list[list[str]]:
+    """Flatten all nodes to searchable single-column rows for the primary sheet."""
+    from app.exporters.rich_visible import render_rich_visible
+
+    rows: list[list[str]] = []
+    for node in model.nodes:
+        if isinstance(node, Table):
+            for row in node.rows or []:
+                rows.append([str(c) for c in row])
+            continue
+        if isinstance(node, Heading):
+            rows.append(["#" * node.level + " " + node.plain_text()])
+        elif isinstance(node, Paragraph):
+            rows.append([render_rich_visible(node.text)])
+        elif isinstance(node, ListItem):
+            indent = "  " * max(0, int(node.level or 0))
+            if node.checked is not None:
+                mark = "[x]" if node.checked else "[ ]"
+            else:
+                mark = "1." if node.ordered else "-"
+            rows.append([f"{indent}{mark} {render_rich_visible(node.text)}"])
+        elif isinstance(node, Blockquote):
+            rows.append(["> " + _blockquote_text(node)])
+        elif isinstance(node, CodeBlock):
+            rows.append([f"```{node.lang or ''}\n{node.content}\n```"])
+        elif isinstance(node, MathBlock):
+            rows.append([f"$$ {node.content} $$"])
+        elif isinstance(node, HorizontalRule):
+            rows.append(["---"])
+        elif isinstance(node, Footnote):
+            rows.append([f"[^{node.id}]: {node.text}"])
+        elif isinstance(node, Image):
+            alt = (node.alt_text or "image").split("|", 1)[0]
+            rows.append([f"[Image: {alt}]"])
+        elif isinstance(node, HtmlBlock):
+            import re
+
+            text = re.sub(r"<[^>]+>", "", node.content or "").strip()
+            if text:
+                rows.append([text])
+        elif isinstance(node, Comment):
+            rows.append([f"[Comment {node.author}] {node.text}"])
+        elif isinstance(node, Revision):
+            tag = "ins" if node.change == "insert" else "del"
+            rows.append([f"[{tag} {node.author}] {node.text}"])
+        elif isinstance(node, TextBox):
+            rows.append([f"[TextBox] {node.text}"])
+        elif isinstance(node, PivotTable):
+            fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+            rows.append([f"[PivotTable {node.name}] {fields}"])
+        else:
+            plain = getattr(node, "plain_text", None)
+            if callable(plain):
+                text = plain()
+                if text:
+                    rows.append([str(text)])
+    return rows
+
+
+def _content_sheet(model: DocumentModel) -> tuple[str, str, str] | None:
+    """Visible body sheet for mixed docs (headings/lists/rich text searchable)."""
+    from app.exporters.rich_visible import render_rich_visible
+
+    rows: list[list[str]] = [["kind", "text"]]
+    for node in model.nodes:
+        if isinstance(node, Table):
+            continue
+        if isinstance(node, Heading):
+            rows.append(["heading", "#" * node.level + " " + node.plain_text()])
+        elif isinstance(node, Paragraph):
+            rows.append(["paragraph", render_rich_visible(node.text)])
+        elif isinstance(node, ListItem):
+            indent = "  " * max(0, int(node.level or 0))
+            if node.checked is not None:
+                mark = "[x]" if node.checked else "[ ]"
+            else:
+                mark = "1." if node.ordered else "-"
+            rows.append(["list_item", f"{indent}{mark} {render_rich_visible(node.text)}"])
+        elif isinstance(node, Blockquote):
+            rows.append(["blockquote", "> " + _blockquote_text(node)])
+        elif isinstance(node, CodeBlock):
+            rows.append(["code_block", f"```{node.lang or ''}\n{node.content}\n```"])
+        elif isinstance(node, MathBlock):
+            rows.append(["math_block", f"$$ {node.content} $$"])
+        elif isinstance(node, HorizontalRule):
+            rows.append(["horizontal_rule", "---"])
+        elif isinstance(node, Footnote):
+            rows.append(["footnote", f"[^{node.id}]: {node.text}"])
+        elif isinstance(node, Image):
+            alt = (node.alt_text or "image").split("|", 1)[0]
+            rows.append(["image", f"[Image: {alt}]"])
+        elif isinstance(node, HtmlBlock):
+            import re
+
+            text = re.sub(r"<[^>]+>", "", node.content or "").strip()
+            if text:
+                rows.append(["html_block", text])
+        elif isinstance(node, Comment):
+            rows.append(["comment", f"[Comment {node.author}] {node.text}"])
+        elif isinstance(node, Revision):
+            tag = "ins" if node.change == "insert" else "del"
+            rows.append(["revision", f"[{tag} {node.author}] {node.text}"])
+        elif isinstance(node, ContentControl):
+            rows.append(
+                [
+                    "content_control",
+                    f"[ContentControl {node.tag}|{node.alias}|{node.control_type}] {node.text}",
+                ]
+            )
+        elif isinstance(node, TextBox):
+            src = (node.source or "").strip()
+            prefix = f"[TextBox|{src}]" if src else "[TextBox]"
+            rows.append(["text_box", f"{prefix} {node.text}"])
+        elif isinstance(node, PivotTable):
+            fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
+            rows.append(
+                [
+                    "pivot_table",
+                    f"[PivotTable {node.name}|{node.source_range}|{node.location}] {fields}",
+                ]
+            )
+        else:
+            plain = getattr(node, "plain_text", None)
+            if callable(plain):
+                text = plain()
+                if text:
+                    rows.append([type(node).__name__.lower(), str(text)])
+    if len(rows) <= 1:
+        return None
+    return (
+        "xl/worksheets/sheet_content.xml",
+        _sheet_xml(Table(rows=rows, header_rows=1)),
+        _META_CONTENT,
+    )
+
+
 def _meta_ast_sheets(model: DocumentModel) -> list[tuple[str, str, str]]:
     """Single _AST worksheet for document meta AST nodes (revision…math)."""
     revs = [n for n in model.nodes if isinstance(n, Revision)]
@@ -319,11 +531,29 @@ def _meta_ast_sheets(model: DocumentModel) -> list[tuple[str, str, str]]:
     paragraphs = [n for n in model.nodes if isinstance(n, Paragraph)]
     list_items = [n for n in model.nodes if isinstance(n, ListItem)]
     rules = [n for n in model.nodes if isinstance(n, HorizontalRule)]
+    from app.core.document_model import (
+        Bookmark,
+        FieldCode,
+        HeaderFooter,
+        Numbering,
+        PageSetup,
+        RunStyle,
+        Section,
+    )
+
+    sections = [n for n in model.nodes if isinstance(n, Section)]
+    page_setups = [n for n in model.nodes if isinstance(n, PageSetup)]
+    headers = [n for n in model.nodes if isinstance(n, HeaderFooter)]
+    fields = [n for n in model.nodes if isinstance(n, FieldCode)]
+    bookmarks = [n for n in model.nodes if isinstance(n, Bookmark)]
+    styles = [n for n in model.nodes if isinstance(n, RunStyle)]
+    numberings = [n for n in model.nodes if isinstance(n, Numbering)]
     span_cell_rows = _table_cell_ast_rows(model)
     if not (
         revs or ctrls or boxes or pivots or comments or footnotes or maths
         or images or html_blocks or codes or blockquotes or headings
         or paragraphs or list_items or rules or span_cell_rows
+        or sections or page_setups or headers or fields or bookmarks or styles or numberings
     ):
         return []
 
@@ -404,8 +634,12 @@ def _meta_ast_sheets(model: DocumentModel) -> list[tuple[str, str, str]]:
             ]
         )
     for para in paragraphs[:500]:
-        matrix.append(["paragraph", para.plain_text(), "", "", "", "", ""])
+        from app.exporters.rich_visible import render_rich_visible
+
+        matrix.append(["paragraph", render_rich_visible(para.text), "", "", "", "", ""])
     for li in list_items[:500]:
+        from app.exporters.rich_visible import render_rich_visible
+
         checked = ""
         if li.checked is not None:
             checked = "true" if li.checked else "false"
@@ -413,7 +647,7 @@ def _meta_ast_sheets(model: DocumentModel) -> list[tuple[str, str, str]]:
         matrix.append(
             [
                 "list_item",
-                li.plain_text(),
+                render_rich_visible(li.text),
                 "true" if li.ordered else "false",
                 str(li.level),
                 checked,
@@ -423,6 +657,34 @@ def _meta_ast_sheets(model: DocumentModel) -> list[tuple[str, str, str]]:
         )
     for _hr in rules[:500]:
         matrix.append(["horizontal_rule", "", "", "", "", "", ""])
+    for s in sections[:200]:
+        matrix.append(["section", s.title, str(s.props), "", "", "", ""])
+    for ps in page_setups[:200]:
+        matrix.append(
+            ["page_setup", ps.page_size, ps.orientation, str(ps.margins_mm), "", "", ""]
+        )
+    for hf in headers[:200]:
+        matrix.append(["header_footer", hf.kind, hf.text, "", "", "", ""])
+    for f in fields[:200]:
+        matrix.append(
+            ["field", f.field_type, f.instruction, f.result_text, "", "", ""]
+        )
+    for bm in bookmarks[:200]:
+        matrix.append(["bookmark", bm.name, bm.anchor, "", "", "", ""])
+    for st in styles[:200]:
+        matrix.append(["run_style", st.style_id, st.name, str(st.props), "", "", ""])
+    for num in numberings[:200]:
+        matrix.append(
+            [
+                "numbering",
+                num.num_id,
+                num.abstract_num_id,
+                str(len(num.levels)),
+                "",
+                "",
+                "",
+            ]
+        )
     matrix.extend(span_cell_rows[:2000])
     return [
         (
@@ -677,9 +939,16 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
         zf.close()
         raise InvalidDocumentError(f"不是有效的 XLSX: {filename}")
 
-    sheet_names = _workbook_sheet_names(zf)
-    shared = _load_shared_strings(zf)
+    from app.config import settings
+    from app.exporters.export_warnings import warn_export
+
+    budget = ZipInflateBudget()
+    sheet_names = _workbook_sheet_names(zf, budget)
+    shared = _load_shared_strings(zf, budget)
     sheets = sorted(n for n in names if re.match(r"xl/worksheets/sheet\d+\.xml$", n))
+    sheet_cap = max(1, min(255, int(getattr(settings, "xlsx_max_sheets", 64) or 64)))
+    truncated = max(0, len(sheets) - sheet_cap)
+    sheets = sheets[:sheet_cap]
     nodes: list = []
     revision_count = 0
     control_count = 0
@@ -698,10 +967,10 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
     rule_count = 0
     table_cell_count = 0
     pending_table_cells: dict[str, list[tuple[int, int, TableCell]]] = {}
-    for idx, sheet_path in enumerate(sheets[:8]):
+    for idx, sheet_path in enumerate(sheets):
         try:
-            root = ET.fromstring(zf.read(sheet_path))
-        except ET.ParseError:
+            root = xml_safe.fromstring(budget.read(zf, sheet_path))
+        except (ET.ParseError, Exception):
             continue
         rows, cells, has_formula = _parse_sheet(root, shared)
         if not rows:
@@ -968,20 +1237,65 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
                 )
                 textbox_count += 1
             continue
+        if sname == _META_CONTENT or (
+            rows
+            and _rows_match_header(rows[0], ["kind", "text"])
+        ):
+            for node in _nodes_from_content_sheet(rows):
+                nodes.append(node)
+                if isinstance(node, Heading):
+                    heading_count += 1
+                elif isinstance(node, Paragraph):
+                    paragraph_count += 1
+                elif isinstance(node, ListItem):
+                    list_item_count += 1
+                elif isinstance(node, CodeBlock):
+                    code_count += 1
+                elif isinstance(node, Blockquote):
+                    blockquote_count += 1
+                elif isinstance(node, Footnote):
+                    footnote_count += 1
+                elif isinstance(node, Comment):
+                    comment_count += 1
+                elif isinstance(node, Revision):
+                    revision_count += 1
+                elif isinstance(node, ContentControl):
+                    control_count += 1
+                elif isinstance(node, TextBox):
+                    textbox_count += 1
+                elif isinstance(node, HorizontalRule):
+                    rule_count += 1
+                elif isinstance(node, MathBlock):
+                    math_count += 1
+                elif isinstance(node, Image):
+                    image_count += 1
+                elif isinstance(node, HtmlBlock):
+                    html_count += 1
+            continue
+        use_cells = bool(cells) and (
+            has_formula
+            or any(
+                c.covered or c.row_span > 1 or c.col_span > 1 or (c.formula or "").strip()
+                for row in cells
+                for c in row
+            )
+        )
         tbl = Table(
             rows=rows,
-            cells=cells if has_formula else [],
+            cells=cells if use_cells else [],
             name=sname,
             header_rows=1 if len(rows) > 1 else 0,
         )
         nodes.append(tbl)
     existing_pivot_names = {n.name for n in nodes if isinstance(n, PivotTable) and n.name}
-    for p in _parse_pivot_tables(zf):
+    for p in _parse_pivot_tables(zf, budget):
         if p.name and p.name in existing_pivot_names:
             continue
         nodes.append(p)
         if p.name:
             existing_pivot_names.add(p.name)
+    for ch in _parse_charts(zf, budget):
+        nodes.append(ch)
     _apply_table_cell_ast(nodes, pending_table_cells)
     zf.close()
     pivot_names = [n.name for n in nodes if isinstance(n, PivotTable) and n.name]
@@ -1027,10 +1341,7 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
         note += f"；单元格 span: {table_cell_count} 行"
     if not nodes:
         raise CorruptedFileError(f"XLSX 无工作表数据: {filename}")
-    return DocumentModel(
-        title=Path(filename).stem,
-        nodes=nodes,
-        metadata={
+    meta: dict = {
             "importer": "xlsx",
             "export_policy": policy,
             "note": note,
@@ -1052,8 +1363,22 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             "list_items_imported": list_item_count,
             "horizontal_rules_imported": rule_count,
             "table_cells_imported": table_cell_count,
-        },
+            "xlsx_max_sheets": sheet_cap,
+    }
+    if truncated:
+        meta["sheets_truncated"] = truncated
+        meta["sheets_total"] = sheet_cap + truncated
+    model = DocumentModel(
+        title=Path(filename).stem,
+        nodes=nodes,
+        metadata=meta,
     )
+    if truncated:
+        warn_export(
+            model,
+            f"xlsx import: truncated {truncated} sheet(s) beyond xlsx_max_sheets={sheet_cap}",
+        )
+    return model
 
 
 def _parse_ast_row(row: list[str]):
@@ -1230,10 +1555,11 @@ def _row_bool(row: list[str], idx: int, default: bool) -> bool:
     return default
 
 
-def _workbook_sheet_names(zf: zipfile.ZipFile) -> list[str]:
+def _workbook_sheet_names(zf: zipfile.ZipFile, budget: ZipInflateBudget | None = None) -> list[str]:
     try:
-        root = ET.fromstring(zf.read("xl/workbook.xml"))
-    except ET.ParseError:
+        raw = budget.read(zf, "xl/workbook.xml") if budget else zf.read("xl/workbook.xml")
+        root = xml_safe.fromstring(raw)
+    except (ET.ParseError, KeyError, Exception):
         return []
     out: list[str] = []
     for sheet in root.findall("m:sheets/m:sheet", _NS):
@@ -1252,35 +1578,278 @@ def _table_value_matrix(table: Table) -> list[list[str]]:
     return [[""]]
 
 
-def _sheet_xml(table: Table) -> str:
+_NUM_CELL_RE = re.compile(r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$")
+_DATE_CELL_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$")
+
+
+def _sheet_cell_xml(ref: str, val: object, *, formula: str, style: str) -> str:
+    """Emit typed OOXML cell: formula / number / date-as-text / inlineStr."""
+    if formula:
+        return (
+            f'<c r="{ref}"{style}>'
+            f"<f>{escape(formula)}</f>"
+            f"<v>{escape(str(val))}</v></c>"
+        )
+    text = "" if val is None else str(val)
+    stripped = text.strip()
+    if stripped and _NUM_CELL_RE.match(stripped):
+        # Keep leading-zero IDs (011) as text; allow 0 / decimals / scientific.
+        leading_zero_id = (
+            stripped.startswith("0")
+            and len(stripped) > 1
+            and "." not in stripped
+            and "e" not in stripped.lower()
+        )
+        if not leading_zero_id:
+            return f'<c r="{ref}"{style}><v>{escape(stripped)}</v></c>'
+    if stripped and _DATE_CELL_RE.match(stripped):
+        return (
+            f'<c r="{ref}"{style} t="inlineStr">'
+            f"<is><t>{escape(stripped)}</t></is></c>"
+        )
+    return (
+        f'<c r="{ref}"{style} t="inlineStr"><is><t>{escape(text)}</t></is></c>'
+    )
+
+
+def _sheet_xml(table: Table, *, drawing_r_id: str | None = None) -> str:
     matrix = _table_value_matrix(table)
     header_rows = max(0, int(table.header_rows or 0))
     cell_grid = table.cells if table.cells else None
+    ncols = max((len(r) for r in matrix), default=1)
+    col_widths = [10.0] * ncols
+    for row in matrix:
+        for c_idx, val in enumerate(row):
+            if c_idx >= ncols:
+                break
+            w = min(48.0, max(8.0, len(str(val)) * 1.15 + 2.0))
+            if w > col_widths[c_idx]:
+                col_widths[c_idx] = w
+    cols_xml = "".join(
+        f'<col min="{i + 1}" max="{i + 1}" width="{w:.2f}" customWidth="1"/>'
+        for i, w in enumerate(col_widths)
+    )
+
     row_xml: list[str] = []
+    merges: list[str] = []
     for r_idx, row in enumerate(matrix, start=1):
         cells_xml: list[str] = []
         style = ' s="1"' if r_idx <= header_rows else ""
         for c_idx, val in enumerate(row):
             ref = f"{_col_name(c_idx)}{r_idx}"
             formula = ""
+            tc = None
             if cell_grid and r_idx - 1 < len(cell_grid) and c_idx < len(cell_grid[r_idx - 1]):
                 tc = cell_grid[r_idx - 1][c_idx]
-                formula = (tc.formula or "").strip()
-            if formula:
-                cells_xml.append(
-                    f'<c r="{ref}"{style}>'
-                    f"<f>{escape(formula)}</f>"
-                    f"<v>{escape(str(val))}</v></c>"
-                )
-            else:
-                cells_xml.append(
-                    f'<c r="{ref}"{style} t="inlineStr"><is><t>{escape(str(val))}</t></is></c>'
-                )
+                if tc is not None and tc.covered:
+                    continue
+                formula = (tc.formula or "").strip() if tc is not None else ""
+                if tc is not None:
+                    rs = max(1, int(tc.row_span or 1))
+                    cs = max(1, int(tc.col_span or 1))
+                    if rs > 1 or cs > 1:
+                        end = f"{_col_name(c_idx + cs - 1)}{r_idx + rs - 1}"
+                        merges.append(f"{ref}:{end}")
+            cells_xml.append(_sheet_cell_xml(ref, val, formula=formula, style=style))
         row_xml.append(f'<row r="{r_idx}">{"".join(cells_xml)}</row>')
+
+    merge_xml = ""
+    if merges:
+        # de-dupe while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for m in merges:
+            if m not in seen:
+                seen.add(m)
+                uniq.append(m)
+        merge_xml = (
+            f'<mergeCells count="{len(uniq)}">'
+            + "".join(f'<mergeCell ref="{m}"/>' for m in uniq)
+            + "</mergeCells>"
+        )
+    drawing_xml = ""
+    ns_r = ""
+    if drawing_r_id:
+        ns_r = f' xmlns:r="{_R}"'
+        drawing_xml = f'<drawing r:id="{escape(drawing_r_id)}"/>'
     return (
         '<?xml version="1.0" encoding="UTF-8"?>'
-        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        f'<sheetData>{"".join(row_xml)}</sheetData></worksheet>'
+        f'<worksheet xmlns="{_M}"{ns_r}>'
+        f"<cols>{cols_xml}</cols>"
+        f'<sheetData>{"".join(row_xml)}</sheetData>'
+        f"{merge_xml}"
+        f"{drawing_xml}"
+        "</worksheet>"
+    )
+
+
+def _sheet_drawing_rels() -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" '
+        'Target="../drawings/drawing1.xml"/>'
+        "</Relationships>"
+    )
+
+
+def _drawing_chart_rels(n: int) -> str:
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    ]
+    for i in range(1, n + 1):
+        parts.append(
+            f'<Relationship Id="rId{i}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" '
+            f'Target="../charts/chart{i}.xml"/>'
+        )
+    parts.append("</Relationships>")
+    return "".join(parts)
+
+
+def _charts_drawing_xml(n: int) -> str:
+    """Stack chart graphicFrames vertically on sheet1."""
+    xdr = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"
+    a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    c = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+    anchors: list[str] = []
+    for i in range(1, n + 1):
+        row0 = (i - 1) * 16
+        row1 = row0 + 14
+        anchors.append(
+            f'<xdr:twoCellAnchor>'
+            f'<xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff>'
+            f"<xdr:row>{row0}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>"
+            f'<xdr:to><xdr:col>8</xdr:col><xdr:colOff>0</xdr:colOff>'
+            f"<xdr:row>{row1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>"
+            f'<xdr:graphicFrame>'
+            f'<xdr:nvGraphicFramePr>'
+            f'<xdr:cNvPr id="{i}" name="Chart {i}"/>'
+            f"<xdr:cNvGraphicFramePr/>"
+            f"</xdr:nvGraphicFramePr>"
+            f"<xdr:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"0\" cy=\"0\"/></xdr:xfrm>"
+            f'<a:graphic><a:graphicData uri="{c}">'
+            f'<c:chart xmlns:c="{c}" xmlns:r="{_R}" r:id="rId{i}"/>'
+            f"</a:graphicData></a:graphic>"
+            f"</xdr:graphicFrame>"
+            f"<xdr:clientData/>"
+            f"</xdr:twoCellAnchor>"
+        )
+    return (
+        f'<?xml version="1.0" encoding="UTF-8"?>'
+        f'<xdr:wsDr xmlns:xdr="{xdr}" xmlns:a="{a}">'
+        f'{"".join(anchors)}</xdr:wsDr>'
+    )
+
+
+def _chart_series_values(ser: dict) -> list[str]:
+    raw = ser.get("values") if isinstance(ser, dict) else None
+    if raw is None and isinstance(ser, dict):
+        raw = ser.get("data")
+    if not isinstance(raw, (list, tuple)):
+        return ["0"]
+    out: list[str] = []
+    for v in raw:
+        try:
+            out.append(str(float(v)))
+        except (TypeError, ValueError):
+            out.append("0")
+    return out or ["0"]
+
+
+def _chart_space_xml(ch: Chart) -> str:
+    """Minimal DrawingML chart with literal caches (opens in Excel / LibreOffice)."""
+    c_ns = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+    a_ns = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    title = escape((ch.title or ch.chart_type or "Chart")[:120])
+    ctype = (ch.chart_type or "bar").lower().strip()
+    cats = [str(x) for x in (ch.categories or [])] or ["A", "B"]
+    series_list = list(ch.series or []) or [{"name": "Series1", "values": [1, 2]}]
+
+    cat_pts = "".join(
+        f'<c:pt idx="{i}"><c:v>{escape(cats[i] if i < len(cats) else f"C{i + 1}")}</c:v></c:pt>'
+        for i in range(len(cats))
+    )
+    cat_block = (
+        f"<c:cat><c:strLit><c:ptCount val=\"{len(cats)}\"/>{cat_pts}</c:strLit></c:cat>"
+    )
+
+    ser_xml: list[str] = []
+    for si, ser in enumerate(series_list[:12]):
+        if not isinstance(ser, dict):
+            continue
+        name = escape(str(ser.get("name") or f"S{si + 1}")[:80])
+        vals = _chart_series_values(ser)
+        # Align length with categories
+        while len(vals) < len(cats):
+            vals.append("0")
+        vals = vals[: max(len(cats), 1)]
+        val_pts = "".join(
+            f'<c:pt idx="{i}"><c:v>{escape(vals[i])}</c:v></c:pt>' for i in range(len(vals))
+        )
+        ser_xml.append(
+            f"<c:ser>"
+            f'<c:idx val="{si}"/><c:order val="{si}"/>'
+            f"<c:tx><c:v>{name}</c:v></c:tx>"
+            f"{cat_block}"
+            f"<c:val><c:numLit><c:ptCount val=\"{len(vals)}\"/>{val_pts}</c:numLit></c:val>"
+            f"</c:ser>"
+        )
+
+    grouping = "clustered"
+    if ctype in ("line",):
+        plot = (
+            f"<c:lineChart><c:grouping val=\"standard\"/>"
+            f'{"".join(ser_xml)}'
+            f'<c:axId val="1"/><c:axId val="2"/></c:lineChart>'
+        )
+    elif ctype in ("area",):
+        plot = (
+            f"<c:areaChart><c:grouping val=\"standard\"/>"
+            f'{"".join(ser_xml)}'
+            f'<c:axId val="1"/><c:axId val="2"/></c:areaChart>'
+        )
+    elif ctype in ("pie", "doughnut"):
+        # pie uses first series only
+        plot = (
+            f"<c:pieChart>{ser_xml[0] if ser_xml else ''}"
+            f"<c:firstSliceAng val=\"0\"/></c:pieChart>"
+        )
+    elif ctype in ("scatter", "xy"):
+        # degrade scatter to line with markers for literal cats
+        plot = (
+            f"<c:lineChart><c:grouping val=\"standard\"/>"
+            f'{"".join(ser_xml)}'
+            f'<c:axId val="1"/><c:axId val="2"/></c:lineChart>'
+        )
+    else:
+        plot = (
+            f'<c:barChart><c:barDir val="col"/><c:grouping val="{grouping}"/>'
+            f'{"".join(ser_xml)}'
+            f'<c:axId val="1"/><c:axId val="2"/></c:barChart>'
+        )
+
+    axes = ""
+    if ctype not in ("pie", "doughnut"):
+        axes = (
+            '<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
+            '<c:axPos val="b"/><c:crossAx val="2"/></c:catAx>'
+            '<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
+            '<c:axPos val="l"/><c:crossAx val="1"/></c:valAx>'
+        )
+
+    return (
+        f'<?xml version="1.0" encoding="UTF-8"?>'
+        f'<c:chartSpace xmlns:c="{c_ns}" xmlns:a="{a_ns}" xmlns:r="{_R}">'
+        f"<c:chart>"
+        f"<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>"
+        f'<a:p><a:pPr><a:defRPr/></a:pPr><a:r><a:t>{title}</a:t></a:r></a:p>'
+        f"</c:rich></c:tx><c:overlay val=\"0\"/></c:title>"
+        f"<c:plotArea><c:layout/>{plot}{axes}</c:plotArea>"
+        f"</c:chart>"
+        f"</c:chartSpace>"
     )
 
 
@@ -1293,17 +1862,146 @@ def _col_name(idx: int) -> str:
     return "".join(reversed(letters))
 
 
-def _load_shared_strings(zf: zipfile.ZipFile) -> list[str]:
+def _load_shared_strings(zf: zipfile.ZipFile, budget: ZipInflateBudget | None = None) -> list[str]:
     if "xl/sharedStrings.xml" not in zf.namelist():
         return []
     try:
-        root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
-    except ET.ParseError:
+        raw = (
+            budget.read(zf, "xl/sharedStrings.xml")
+            if budget
+            else zf.read("xl/sharedStrings.xml")
+        )
+        root = xml_safe.fromstring(raw)
+    except (ET.ParseError, KeyError, Exception):
         return []
     out: list[str] = []
     for si in root.findall("m:si", _NS):
         texts = [t.text or "" for t in si.findall(".//m:t", _NS)]
         out.append("".join(texts))
+    return out
+
+
+def _nodes_from_content_sheet(rows: list[list[str]]) -> list:
+    """Rebuild AST nodes from the visible Content sheet (kind/text columns)."""
+    data = rows
+    if data and _rows_match_header(data[0], ["kind", "text"]):
+        data = data[1:]
+    out: list = []
+    for row in data:
+        kind = _row_cell(row, 0, "").strip().lower()
+        text = _row_cell(row, 1, "")
+        if not kind and not text.strip():
+            continue
+        if kind in ("heading", "h1", "h2", "h3", "h4", "h5", "h6"):
+            level = 2
+            body = text
+            m = re.match(r"^(#{1,6})\s+(.*)$", text.strip())
+            if m:
+                level = len(m.group(1))
+                body = m.group(2)
+            elif kind.startswith("h") and kind[1:].isdigit():
+                level = max(1, min(6, int(kind[1:])))
+            out.append(Heading(level=level, text=body))
+        elif kind in ("paragraph", "p", ""):
+            if text.strip():
+                out.append(Paragraph(text=text))
+        elif kind in ("list_item", "list", "li"):
+            checked = None
+            ordered = False
+            body = text.strip()
+            m = re.match(r"^(\s*)(\[x\]|\[ \]|[-*+]|\d+\.)\s+(.*)$", body, re.I)
+            if m:
+                mark = m.group(2).lower()
+                body = m.group(3)
+                if mark in ("[x]", "[ ]"):
+                    checked = mark == "[x]"
+                elif mark.endswith("."):
+                    ordered = True
+            out.append(
+                ListItem(text=body, ordered=ordered, checked=checked, level=0)
+            )
+        elif kind in ("code_block", "code"):
+            lang = ""
+            content = text
+            if text.startswith("```"):
+                parts = text.split("\n", 1)
+                lang = parts[0].lstrip("`").strip()
+                content = parts[1] if len(parts) > 1 else ""
+                if content.endswith("```"):
+                    content = content[: -3].rstrip("\n")
+            out.append(CodeBlock(lang=lang, content=content))
+        elif kind in ("blockquote", "quote"):
+            body = re.sub(r"(?m)^>\s?", "", text).strip()
+            out.append(Blockquote(paragraphs=[body] if body else []))
+        elif kind in ("footnote",):
+            m = re.match(r"^\[\^([^\]]+)\]:\s*(.*)$", text.strip())
+            if m:
+                out.append(Footnote(id=m.group(1), text=m.group(2)))
+            elif text.strip():
+                out.append(Footnote(id="1", text=text.strip()))
+        elif kind in ("comment",):
+            m = re.match(r"^\[Comment\s+([^\]]*)\]\s*(.*)$", text.strip())
+            if m:
+                out.append(Comment(author=m.group(1).strip(), text=m.group(2)))
+            elif text.strip():
+                out.append(Comment(author="", text=text.strip()))
+        elif kind in ("revision",):
+            m = re.match(r"^\[(ins|del)\s+([^\]]*)\]\s*(.*)$", text.strip())
+            if m:
+                out.append(
+                    Revision(
+                        change="insert" if m.group(1) == "ins" else "delete",
+                        author=m.group(2).strip(),
+                        text=m.group(3),
+                    )
+                )
+        elif kind in ("text_box", "textbox"):
+            body = text.strip()
+            source = ""
+            m = re.match(r"^\[TextBox(?:\|([^\]]*))?\]\s*(.*)$", body)
+            if m:
+                source = (m.group(1) or "").strip()
+                body = m.group(2)
+            else:
+                body = re.sub(r"^\[TextBox\]\s*", "", body)
+            out.append(TextBox(text=body, source=source))
+        elif kind in ("horizontal_rule", "hr", "rule"):
+            out.append(HorizontalRule())
+        elif kind in ("math_block", "math"):
+            body = text.strip()
+            body = re.sub(r"^\$\$\s*", "", body)
+            body = re.sub(r"\s*\$\$$", "", body)
+            out.append(MathBlock(content=body))
+        elif kind in ("image",):
+            alt = text
+            m = re.match(r"^\[Image:\s*(.*)\]$", text.strip())
+            if m:
+                alt = m.group(1)
+            out.append(Image(data=b"", alt_text=alt, mime_type="image/png"))
+        elif kind in ("html_block", "html"):
+            out.append(HtmlBlock(content=text))
+        elif kind in ("content_control", "contentcontrol"):
+            body = text.strip()
+            tag, alias, ctype = "", "", ""
+            m = re.match(
+                r"^\[ContentControl\s+([^|\]]*)\|([^|\]]*)\|([^\]]*)\]\s*(.*)$",
+                body,
+            )
+            if m:
+                tag, alias, ctype, body = (
+                    m.group(1).strip(),
+                    m.group(2).strip(),
+                    m.group(3).strip(),
+                    m.group(4),
+                )
+            out.append(
+                ContentControl(tag=tag, alias=alias, control_type=ctype, text=body)
+            )
+        elif kind in ("pivot_table", "pivottable"):
+            # Pivot OOXML parts are authoritative; Content row is a searchable hint only.
+            continue
+        elif text.strip():
+            out.append(Paragraph(text=text))
     return out
 
 
@@ -1345,7 +2043,84 @@ def _parse_sheet(
             row_cells.append(TableCell(text=val, formula=formula, cell_kind=kind))
         result.append(row_vals)
         cell_grid.append(row_cells)
+
+    # Apply native <mergeCells> so span survives without _AST sidecar (v8 P1).
+    _apply_merge_cells(root, result, cell_grid)
     return result, cell_grid, has_formula
+
+
+def _col_letters_to_index(letters: str) -> int:
+    col = 0
+    for ch in letters.upper():
+        if "A" <= ch <= "Z":
+            col = col * 26 + (ord(ch) - 64)
+    return max(0, col - 1)
+
+
+def _parse_a1_cell(ref: str) -> tuple[int, int] | None:
+    m = re.match(r"^([A-Za-z]+)(\d+)$", (ref or "").strip())
+    if not m:
+        return None
+    return int(m.group(2)) - 1, _col_letters_to_index(m.group(1))
+
+
+def _apply_merge_cells(
+    root: ET.Element,
+    rows: list[list[str]],
+    cell_grid: list[list[TableCell]],
+) -> None:
+    """Mutate ``cell_grid`` / ``rows`` from worksheet ``<mergeCells>``."""
+    merges = root.findall(".//m:mergeCell", _NS) or root.findall(
+        ".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}mergeCell"
+    )
+    if not merges:
+        return
+    # Expand grid if merge refs go past current bounds
+    for mc in merges:
+        ref = mc.get("ref") or ""
+        if ":" not in ref:
+            continue
+        start_s, end_s = ref.split(":", 1)
+        start = _parse_a1_cell(start_s)
+        end = _parse_a1_cell(end_s)
+        if not start or not end:
+            continue
+        r0, c0 = start
+        r1, c1 = end
+        if r1 < r0:
+            r0, r1 = r1, r0
+        if c1 < c0:
+            c0, c1 = c1, c0
+        while len(cell_grid) <= r1:
+            width = max((len(r) for r in cell_grid), default=c1 + 1)
+            cell_grid.append([TableCell() for _ in range(width)])
+            rows.append([""] * width)
+        for r in range(len(cell_grid)):
+            while len(cell_grid[r]) <= c1:
+                cell_grid[r].append(TableCell())
+            while len(rows[r]) <= c1:
+                rows[r].append("")
+
+        row_span = r1 - r0 + 1
+        col_span = c1 - c0 + 1
+        origin = cell_grid[r0][c0]
+        origin.row_span = max(1, row_span)
+        origin.col_span = max(1, col_span)
+        origin.covered = False
+        origin.origin_row = 0
+        origin.origin_col = 0
+        for rr in range(r0, r1 + 1):
+            for cc in range(c0, c1 + 1):
+                if rr == r0 and cc == c0:
+                    continue
+                cell_grid[rr][cc].covered = True
+                cell_grid[rr][cc].row_span = 1
+                cell_grid[rr][cc].col_span = 1
+                cell_grid[rr][cc].origin_row = r0
+                cell_grid[rr][cc].origin_col = c0
+                # Prefer empty text on covered cells (Excel stores value on anchor)
+                if not (cell_grid[rr][cc].text or "").strip():
+                    rows[rr][cc] = ""
 
 
 def _pivot_table_names(*, zf_names: list[str]) -> list[str]:
@@ -1357,16 +2132,19 @@ def _pivot_table_names(*, zf_names: list[str]) -> list[str]:
     return sorted(out)[:20]
 
 
-def _parse_pivot_tables(zf: zipfile.ZipFile) -> list[PivotTable]:
+def _parse_pivot_tables(
+    zf: zipfile.ZipFile, budget: ZipInflateBudget | None = None
+) -> list[PivotTable]:
     """Parse xl/pivotTables/*.xml into PivotTable AST nodes."""
-    cache_sources = _pivot_cache_sources(zf)
+    cache_sources = _pivot_cache_sources(zf, budget)
     out: list[PivotTable] = []
     for path in sorted(zf.namelist()):
         if not path.startswith("xl/pivotTables/") or not path.endswith(".xml"):
             continue
         try:
-            root = ET.fromstring(zf.read(path))
-        except ET.ParseError:
+            raw = budget.read(zf, path) if budget else zf.read(path)
+            root = xml_safe.fromstring(raw)
+        except (ET.ParseError, KeyError, Exception):
             continue
         name = root.get("name") or Path(path).stem
         cache_id = root.get("cacheId") or ""
@@ -1409,15 +2187,18 @@ def _parse_pivot_tables(zf: zipfile.ZipFile) -> list[PivotTable]:
     return out[:20]
 
 
-def _pivot_cache_sources(zf: zipfile.ZipFile) -> dict[str, str]:
+def _pivot_cache_sources(
+    zf: zipfile.ZipFile, budget: ZipInflateBudget | None = None
+) -> dict[str, str]:
     """Map pivot cacheId → worksheet source ref from pivotCacheDefinition parts."""
     out: dict[str, str] = {}
     for path in zf.namelist():
         if not path.startswith("xl/pivotCache/pivotCacheDefinition") or not path.endswith(".xml"):
             continue
         try:
-            root = ET.fromstring(zf.read(path))
-        except ET.ParseError:
+            raw = budget.read(zf, path) if budget else zf.read(path)
+            root = xml_safe.fromstring(raw)
+        except (ET.ParseError, KeyError, Exception):
             continue
         m = re.search(r"pivotCacheDefinition(\d+)", path)
         if not m:
@@ -1446,3 +2227,62 @@ def _cell_value(cell: ET.Element, shared: list[str]) -> str:
         except (ValueError, IndexError):
             return v.text
     return v.text
+
+
+def _parse_charts(
+    zf: zipfile.ZipFile, budget: ZipInflateBudget | None = None
+) -> list[Chart]:
+    """Best-effort Chart AST from xl/charts/chart*.xml (literal caches + title)."""
+    out: list[Chart] = []
+    paths = sorted(
+        p
+        for p in zf.namelist()
+        if p.startswith("xl/charts/chart") and p.endswith(".xml")
+    )
+    for path in paths[:20]:
+        try:
+            raw_b = budget.read(zf, path) if budget else zf.read(path)
+            raw = raw_b.decode("utf-8", "ignore")
+        except Exception:
+            continue
+        title = ""
+        tm = re.search(r"<a:t>([^<]*)</a:t>", raw)
+        if tm:
+            title = tm.group(1).strip()
+        ctype = "bar"
+        if "<c:lineChart" in raw:
+            ctype = "line"
+        elif "<c:pieChart" in raw or "<c:doughnutChart" in raw:
+            ctype = "pie"
+        elif "<c:areaChart" in raw:
+            ctype = "area"
+        elif "<c:scatterChart" in raw:
+            ctype = "scatter"
+        elif "<c:barChart" in raw:
+            ctype = "bar"
+        cats = re.findall(r"<c:strLit>.*?</c:strLit>", raw, flags=re.DOTALL)
+        categories: list[str] = []
+        if cats:
+            categories = re.findall(r"<c:v>([^<]*)</c:v>", cats[0])
+        series: list[dict] = []
+        for ser in re.findall(r"<c:ser>.*?</c:ser>", raw, flags=re.DOTALL)[:12]:
+            nm = re.search(r"<c:tx>.*?<c:v>([^<]*)</c:v>", ser, flags=re.DOTALL)
+            name = nm.group(1) if nm else f"S{len(series) + 1}"
+            num = re.search(r"<c:numLit>(.*?)</c:numLit>", ser, flags=re.DOTALL)
+            values: list[float] = []
+            if num:
+                for v in re.findall(r"<c:v>([^<]*)</c:v>", num.group(1)):
+                    try:
+                        values.append(float(v))
+                    except ValueError:
+                        values.append(0.0)
+            series.append({"name": name, "values": values})
+        out.append(
+            Chart(
+                title=title or Path(path).stem,
+                chart_type=ctype,
+                categories=categories,
+                series=series,
+            )
+        )
+    return out

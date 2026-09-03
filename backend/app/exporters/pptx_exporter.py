@@ -16,6 +16,7 @@ from pptx.util import Emu, Inches, Pt
 
 from app.core.document_model import (
     Blockquote,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
@@ -27,20 +28,34 @@ from app.core.document_model import (
     Image,
     ListItem,
     MathBlock,
+    OleObject,
     Paragraph,
     PivotTable,
     Revision,
+    SmartArt,
+    SpeakerNote,
     Table,
     TextBox,
     ensure_rich_text,
 )
+from app.exporters.export_warnings import warn_export
 from app.exporters.table_span import table_flat_matrix, table_has_span_cells
 
 _MAX_CHARS_PER_SLIDE = 900
 _MAX_TABLE_ROWS = 16
 _MAX_TABLE_COLS = 10
 # Rendered on dedicated meta slides — excluded from content-slide buckets.
-_META_SLIDE_NODE_TYPES = (Comment, Footnote, Revision, ContentControl, PivotTable)
+_META_SLIDE_NODE_TYPES = (
+    Comment,
+    Footnote,
+    Revision,
+    ContentControl,
+    PivotTable,
+    SpeakerNote,
+    Chart,
+    SmartArt,
+    OleObject,
+)
 
 
 def export_pptx(model: DocumentModel) -> bytes:
@@ -107,9 +122,31 @@ def export_pptx(model: DocumentModel) -> bytes:
     if pivots:
         _add_pivot_tables_slide(prs, pivots)
 
+    charts = [n for n in model.nodes if isinstance(n, Chart)]
+    if charts:
+        _add_charts_slide(prs, charts)
+
+    smartarts = [n for n in model.nodes if isinstance(n, SmartArt)]
+    if smartarts:
+        _add_smartart_slide(prs, smartarts)
+        warn_export(
+            model,
+            f"pptx: {len(smartarts)} SmartArt → caption slide (no native diagram tree)",
+        )
+
+    oles = [n for n in model.nodes if isinstance(n, OleObject)]
+    if oles:
+        _add_ole_slide(prs, oles)
+        warn_export(
+            model,
+            f"pptx: {len(oles)} OleObject → caption slide (no binary embed)",
+        )
+
     anims = (model.metadata or {}).get("pptx_animations")
     if isinstance(anims, list) and anims:
         _add_animations_slide(prs, anims)
+
+    _apply_speaker_notes(prs, model)
 
     buf = BytesIO()
     prs.save(buf)
@@ -257,6 +294,101 @@ def _add_pivot_tables_slide(prs: Presentation, pivots: list[PivotTable]) -> None
     _add_meta_textbox_slide(prs, "Pivot tables", lines, font_size=12)
 
 
+def _add_charts_slide(prs: Presentation, charts: list[Chart]) -> None:
+    """Emit native PowerPoint charts (DrawingML), not text captions."""
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+
+    type_map = {
+        "bar": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "line": XL_CHART_TYPE.LINE,
+        "pie": XL_CHART_TYPE.PIE,
+        "area": XL_CHART_TYPE.AREA,
+        "scatter": XL_CHART_TYPE.XY_SCATTER,
+    }
+    blank = prs.slide_layouts[6] if len(prs.slide_layouts) > 6 else prs.slide_layouts[-1]
+    for ch in charts[:12]:
+        slide = prs.slides.add_slide(blank)
+        # Title
+        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.5))
+        tp = title_box.text_frame.paragraphs[0]
+        tp.text = (ch.title or ch.chart_type or "Chart")[:120]
+        tp.font.size = Pt(18)
+        tp.font.bold = True
+
+        cats = [str(c) for c in (ch.categories or [])] or ["A", "B"]
+        series_list = list(ch.series or []) or [{"name": "Series1", "values": [1, 2]}]
+        data = CategoryChartData()
+        data.categories = cats
+        for ser in series_list[:8]:
+            if not isinstance(ser, dict):
+                continue
+            name = str(ser.get("name") or "S")
+            raw = ser.get("values") if "values" in ser else ser.get("data")
+            vals: list[float] = []
+            if isinstance(raw, (list, tuple)):
+                for v in raw:
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        vals.append(0.0)
+            while len(vals) < len(cats):
+                vals.append(0.0)
+            data.add_series(name[:80], tuple(vals[: len(cats)]))
+
+        xl_type = type_map.get((ch.chart_type or "bar").lower(), XL_CHART_TYPE.COLUMN_CLUSTERED)
+        slide.shapes.add_chart(
+            xl_type, Inches(0.5), Inches(0.9), Inches(9), Inches(5.5), data
+        )
+
+
+def _add_smartart_slide(prs: Presentation, arts: list[SmartArt]) -> None:
+    lines: list[str] = []
+    for art in arts:
+        lines.append(art.plain_text())
+        for it in (art.items or [])[:12]:
+            lines.append(f"  • {it}")
+    _add_meta_textbox_slide(prs, "SmartArt", lines, color=RGBColor(0x5B, 0x21, 0xB6))
+
+
+def _add_ole_slide(prs: Presentation, oles: list[OleObject]) -> None:
+    lines: list[str] = []
+    for ole in oles:
+        nbytes = len(ole.data or b"")
+        extra = f" ({nbytes} bytes)" if nbytes else ""
+        lines.append(f"{ole.plain_text()}{extra}")
+    _add_meta_textbox_slide(prs, "OLE objects", lines, color=RGBColor(0x9A, 0x34, 0x12))
+
+
+def _apply_speaker_notes(prs: Presentation, model: DocumentModel) -> None:
+    """Write SpeakerNote nodes onto notesSlide of content slides (skip title = index 0)."""
+    notes = [n for n in model.nodes if isinstance(n, SpeakerNote)]
+    if not notes:
+        return
+    # Map 1-based content slide index → note text (title slide is prs.slides[0])
+    by_idx: dict[int, list[str]] = {}
+    for note in notes:
+        idx = max(1, int(note.slide_index or 1))
+        text = (note.text or "").strip()
+        if not text:
+            continue
+        by_idx.setdefault(idx, []).append(text)
+    for content_idx, texts in by_idx.items():
+        slide_pos = content_idx  # title at 0; content slide 1 → slides[1]
+        if slide_pos >= len(prs.slides):
+            slide_pos = len(prs.slides) - 1
+        if slide_pos < 1:
+            slide_pos = 1 if len(prs.slides) > 1 else 0
+        slide = prs.slides[slide_pos]
+        try:
+            notes_slide = slide.notes_slide
+            tf = notes_slide.notes_text_frame
+            tf.text = "\n\n".join(texts)[:4000]
+        except Exception:
+            continue
+
+
 def _add_footnotes_slide(prs: Presentation, footnotes: list[Footnote]) -> None:
     layout = prs.slide_layouts[1]
     slide = prs.slides.add_slide(layout)
@@ -366,6 +498,13 @@ def _add_content_slide(prs: Presentation, title: str, nodes: list) -> None:
 
 
 def _add_textbox_block(slide, lines: list[tuple[str, int, object]], left, top, width) -> Emu:
+    """Emit textboxes with real ``a:rPr`` bold/italic runs (v6/T2-#9 / D-11).
+
+    Previously dumped ``render_rich_visible`` markdown markers (``**bold**``)
+    as literal slide text.
+    """
+    from app.core.document_model import InlineMarkType, ensure_rich_text
+
     height = Inches(min(2.8, 0.28 * max(1, len(lines)) + 0.15))
     box = slide.shapes.add_textbox(left, top, width, height)
     tf = box.text_frame
@@ -374,16 +513,85 @@ def _add_textbox_block(slide, lines: list[tuple[str, int, object]], left, top, w
     for line, level, node in lines:
         p = tf.paragraphs[0] if first else tf.add_paragraph()
         first = False
-        p.text = line[:500]
+        p.clear()
         p.level = min(level, 4)
-        p.font.size = Pt(16 if level == 0 else 14)
-        if isinstance(node, Heading):
-            p.font.bold = True
-            p.font.color.rgb = RGBColor(0x1A, 0x56, 0xDB)
-        if isinstance(node, (CodeBlock, MathBlock)):
-            p.font.name = "Courier New"
-            p.font.size = Pt(12)
+        # Prefer structured rich text when the source node carries marks
+        rich = None
+        if isinstance(node, Paragraph):
+            rich = ensure_rich_text(node.text)
+        elif isinstance(node, ListItem):
+            rich = ensure_rich_text(node.text)
+        elif isinstance(node, Heading):
+            rich = ensure_rich_text(node.text)
+
+        if rich is not None and rich.marks:
+            _apply_rich_runs(p, rich)
+        else:
+            run = p.add_run()
+            run.text = (line or "")[:500]
+            run.font.size = Pt(16 if level == 0 else 14)
+            if isinstance(node, Heading):
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(0x1A, 0x56, 0xDB)
+            if isinstance(node, (CodeBlock, MathBlock)):
+                run.font.name = "Courier New"
+                run.font.size = Pt(12)
+        if isinstance(node, Heading) and not (rich and rich.marks):
+            pass
+        elif isinstance(node, Heading):
+            for run in p.runs:
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(0x1A, 0x56, 0xDB)
+                run.font.size = Pt(16 if level == 0 else 14)
     return top + height + Inches(0.12)
+
+
+def _apply_rich_runs(paragraph, rich) -> None:
+    """Split RichText into PPTX runs with bold/italic/strike (no markdown glyphs)."""
+    from app.core.document_model import InlineMarkType
+
+    text = rich.text or ""
+    if not text:
+        run = paragraph.add_run()
+        run.text = ""
+        return
+    boundaries = {0, len(text)}
+    for mark in rich.marks or []:
+        boundaries.add(max(0, min(mark.start, len(text))))
+        boundaries.add(max(0, min(mark.end, len(text))))
+    points = sorted(boundaries)
+    for start, end in zip(points, points[1:]):
+        if start == end:
+            continue
+        segment = text[start:end]
+        active = [m for m in (rich.marks or []) if m.start <= start and m.end >= end]
+        types = {m.type for m in active}
+        run = paragraph.add_run()
+        run.text = segment[:500]
+        run.font.size = Pt(14)
+        if InlineMarkType.BOLD in types:
+            run.font.bold = True
+        if InlineMarkType.ITALIC in types:
+            run.font.italic = True
+        if InlineMarkType.CODE in types:
+            run.font.name = "Courier New"
+        if InlineMarkType.STRIKETHROUGH in types:
+            # python-pptx Font has no strikethrough API — set DrawingML attr.
+            try:
+                rPr = run._r.get_or_add_rPr()
+                rPr.set("strike", "sngStrike")
+            except Exception:
+                pass
+        if InlineMarkType.LINK in types:
+            href = next(
+                (m.href for m in active if m.type == InlineMarkType.LINK and m.href),
+                None,
+            )
+            if href:
+                try:
+                    run.hyperlink.address = href
+                except Exception:
+                    pass
 
 
 def _table_matrix(node: Table) -> list[list[str]]:
@@ -455,39 +663,50 @@ def _add_table_shape(slide, node: Table, left, top, width) -> Emu:
 
 
 def _add_image_shape(slide, node: Image, left, top, width) -> Emu:
+    alt = node.alt_text.split("|", 1)[0] if node.alt_text else "image"
+    caption = f"[Image: {alt}]"
     try:
         stream = BytesIO(node.data)
-        # Keep aspect roughly within slide body
         pic_width = min(width, Inches(8))
         pic = slide.shapes.add_picture(stream, left, top, width=pic_width)
-        return top + pic.height + Inches(0.2)
+        top = top + pic.height + Inches(0.08)
     except Exception:
-        # Fall back to alt text line via a tiny text box
-        box = slide.shapes.add_textbox(left, top, width, Inches(0.4))
-        alt = node.alt_text.split("|", 1)[0] if node.alt_text else "image"
-        box.text_frame.text = f"[Image: {alt}]"
-        return top + Inches(0.5)
+        pass
+    # Always emit searchable alt caption (matrix / accessibility)
+    box = slide.shapes.add_textbox(left, top, width, Inches(0.4))
+    box.text_frame.text = caption[:500]
+    return top + Inches(0.5)
 
 
 def _node_lines(node) -> list[tuple[str, int]]:
+    """Plain fallback lines — rich marks applied later in ``_add_textbox_block``.
+
+    v6/T2-#9: do NOT inject markdown ``**`` glyphs; PPTX uses real runs.
+    """
     if isinstance(node, Heading):
         return [(node.plain_text(), 0)]
     if isinstance(node, Paragraph):
-        return [(ensure_rich_text(node.text).text, 0)]
+        return [(node.plain_text(), 0)]
     if isinstance(node, ListItem):
         prefix = ""
         if node.checked is not None:
-            prefix = "☑ " if node.checked else "☐ "
-        text = prefix + ensure_rich_text(node.text).text
+            prefix = "[x] " if node.checked else "[ ] "
+        text = prefix + node.plain_text()
         lines = [(text, max(0, node.level))]
         for child in getattr(node, "children", None) or []:
             if isinstance(child, Paragraph):
-                lines.append((ensure_rich_text(child.text).text, max(0, node.level) + 1))
+                lines.append((child.plain_text(), max(0, node.level) + 1))
         return lines
     if isinstance(node, Blockquote):
-        return [("「" + ensure_rich_text(p).text + "」", 0) for p in node.paragraphs]
+        out = []
+        for p in node.paragraphs:
+            if hasattr(p, "plain_text"):
+                out.append(("> " + p.plain_text(), 0))
+            else:
+                out.append(("> " + str(p), 0))
+        return out
     if isinstance(node, HorizontalRule):
-        return [("—" * 20, 0)]
+        return [("---", 0)]
     if isinstance(node, CodeBlock):
         return [(node.content[:800], 0)]
     if isinstance(node, MathBlock):
@@ -512,7 +731,6 @@ def _node_lines(node) -> list[tuple[str, int]]:
         fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
         return [(f"[Pivot {node.name}] {fields}", 0)]
     if isinstance(node, Table):
-        # Fallback text path if shape placement is skipped
         out = []
         for row in _table_matrix(node)[:12]:
             out.append((" | ".join(row), 0))
@@ -525,4 +743,15 @@ def _node_lines(node) -> list[tuple[str, int]]:
 
         text = re.sub(r"<[^>]+>", "", node.content).strip()
         return [(text[:400], 0)] if text else []
+    if isinstance(node, SmartArt):
+        lines = [(node.plain_text(), 0)]
+        for it in (node.items or [])[:20]:
+            lines.append((f"• {it}", 1))
+        return lines
+    if isinstance(node, OleObject):
+        return [(node.plain_text(), 0)]
+    if isinstance(node, Chart):
+        return [(node.plain_text(), 0)]
+    if isinstance(node, SpeakerNote):
+        return [(f"[SpeakerNote s{node.slide_index}] {node.text}", 0)]
     return []

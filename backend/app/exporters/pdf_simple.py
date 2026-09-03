@@ -24,6 +24,7 @@ from pathlib import Path
 from app.config import settings
 from app.core.document_model import (
     Blockquote,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
@@ -31,11 +32,14 @@ from app.core.document_model import (
     Footnote,
     Heading,
     HorizontalRule,
+    HtmlBlock,
+    Image,
     ListItem,
     MathBlock,
     Paragraph,
     PivotTable,
     Revision,
+    SpeakerNote,
     Table,
     TextBox,
 )
@@ -44,6 +48,27 @@ from app.core.exceptions import ExportError
 _log = logging.getLogger("mdbridge.pdf_simple")
 
 _LINES_PER_PAGE = 45
+# Soft-wrap width for the simple text PDF path (letter page ≈ 72 chars @ 11pt).
+_WRAP_WIDTH = 72
+
+
+def _wrap_text(text: str, width: int = _WRAP_WIDTH) -> list[str]:
+    """Word-wrap without discarding content (replaces hard [:110] truncation)."""
+    text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    out: list[str] = []
+    for para in text.split("\n"):
+        if not para:
+            out.append("")
+            continue
+        # Prefer wrap at spaces; otherwise hard-slice long tokens.
+        while len(para) > width:
+            cut = para.rfind(" ", 0, width + 1)
+            if cut <= 0:
+                cut = width
+            out.append(para[:cut].rstrip())
+            para = para[cut:].lstrip()
+        out.append(para)
+    return out or [""]
 
 
 class CJKFontUnavailable(Exception):
@@ -120,7 +145,7 @@ def _find_cjk_font() -> tuple[str, int] | None:
 # Subsetting a 20–55 MB CJK font costs ~0.1–0.3 s, so cache aggressively.
 # Keyed by (font path, face index, sha256 of the sorted character set).
 _SUBSET_CACHE: "dict[tuple[str, int, str], dict]" = {}
-_SUBSET_CACHE_MAX = 16
+_SUBSET_CACHE_MAX = 4
 
 
 class _Subset:
@@ -173,9 +198,9 @@ def _load_face(path: str, face_index: int):
     from fontTools.ttLib import TTFont, TTCollection
 
     if path.lower().endswith(".ttc"):
-        faces = TTCollection(path, lazy=False).fonts
+        faces = TTCollection(path, lazy=True).fonts
         return faces[min(face_index, len(faces) - 1)]
-    return TTFont(path, lazy=False)
+    return TTFont(path, lazy=True)
 
 
 def _subset_font(chars: frozenset[str]) -> _Subset:
@@ -193,14 +218,12 @@ def _subset_font(chars: frozenset[str]) -> _Subset:
 
     try:
         from fontTools import subset
+        from fontTools.ttLib import TTFont
     except ImportError as exc:  # pragma: no cover - fontTools is a soft dep
         raise CJKFontUnavailable("未安装 fontTools，无法嵌入 CJK 字体") from exc
 
-    font = _load_face(path, idx)
-    # Subsetter mutates the font in place — work on a copy.
-    import copy
-
-    working = copy.deepcopy(font)
+    # Fresh TTFont load — lazy parse to cut peak RSS vs full 20–55MB face.
+    working = TTFont(path, fontNumber=idx, lazy=True)
 
     opts = subset.Options()
     opts.drop_tables += ["DSIG"]
@@ -258,6 +281,11 @@ def _subset_font(chars: frozenset[str]) -> _Subset:
         stem_v=80,
         glyph_order=list(glyph_order),
     )
+    try:
+        working.close()
+    except Exception:
+        pass
+    del working
 
     if len(_SUBSET_CACHE) >= _SUBSET_CACHE_MAX:
         _SUBSET_CACHE.clear()
@@ -276,21 +304,31 @@ def export_pdf_simple(model: DocumentModel) -> bytes:
     Uses Helvetica for pure-ASCII documents and an embedded CJK subset
     otherwise.  Raises :class:`ExportError` when CJK text is present but
     cannot be rendered, rather than silently producing mojibake.
+
+    Sets ``model.metadata["pdf_engine"] = "pdf_simple"`` and
+    ``model.metadata["pdf_degraded"] = True`` so callers can surface the
+    WeasyPrint fallback to API clients.
     """
+    meta = model.metadata if isinstance(model.metadata, dict) else {}
+    meta = dict(meta)
+    meta["pdf_engine"] = "pdf_simple"
+    meta["pdf_degraded"] = True
+    model.metadata = meta
+
     lines = _model_lines(model)
     if not lines:
         lines = ["(empty)"]
 
     if not _needs_cjk(lines):
-        return _export_ascii(lines)
+        return _append_ast_sidecar(_export_ascii(lines), model)
 
     fallback = (getattr(settings, "pdf_cjk_fallback", "error") or "error").strip().lower()
     try:
-        return _export_cjk(lines)
+        return _append_ast_sidecar(_export_cjk(lines), model)
     except CJKFontUnavailable as exc:
         if fallback == "ascii":
             _log.warning("CJK 渲染不可用，按配置降级为 ASCII：%s", exc)
-            return _export_ascii(lines)
+            return _append_ast_sidecar(_export_ascii(lines), model)
         raise ExportError(
             f"文档包含非 ASCII 字符（如中文），但当前环境无法嵌入 CJK 字体：{exc}。"
             "请安装 fontTools 并配置中文字体（MDBRIDGE_PDF_CJK_FONT_PATH），"
@@ -300,8 +338,58 @@ def export_pdf_simple(model: DocumentModel) -> bytes:
     except Exception as exc:  # pragma: no cover - defensive
         _log.warning("CJK PDF 渲染失败：%s", exc)
         if fallback == "ascii":
-            return _export_ascii(lines)
+            return _append_ast_sidecar(_export_ascii(lines), model)
         raise ExportError(f"PDF 渲染失败: {exc}") from exc
+
+
+_AST_BEGIN = b"\n%%MDBRIDGE-AST-v1\n"
+_AST_END = b"\n%%MDBRIDGE-AST-END\n"
+
+
+def _append_ast_sidecar(pdf_bytes: bytes, model: DocumentModel) -> bytes:
+    """Embed a JSON AST sidecar after %%EOF (v6/T2-#11 / D-13).
+
+    PDF readers stop at EOF; our importer recovers the model for round-trip.
+    Default off (`MDBRIDGE_PDF_AST_SIDECAR=0`) — not layout fidelity.
+    """
+    from app.config import settings
+
+    if not bool(getattr(settings, "pdf_ast_sidecar", False)):
+        return pdf_bytes
+    try:
+        from app.exporters.json_exporter import export_json
+        import base64
+
+        payload = export_json(model).encode("utf-8")
+        # Cap sidecar size so pathological trees don't explode PDF downloads
+        if len(payload) > 2_000_000:
+            return pdf_bytes
+        return pdf_bytes + _AST_BEGIN + base64.b64encode(payload) + _AST_END
+    except Exception as exc:
+        _log.debug("pdf AST sidecar skipped: %s", exc)
+        return pdf_bytes
+
+
+def extract_ast_sidecar(pdf_bytes: bytes) -> DocumentModel | None:
+    """Recover DocumentModel from an embedded AST sidecar, if present."""
+    try:
+        start = pdf_bytes.rfind(_AST_BEGIN)
+        end = pdf_bytes.rfind(_AST_END)
+        if start < 0 or end < 0 or end <= start:
+            return None
+        import base64
+
+        from app.exporters.json_exporter import import_json
+
+        b64 = pdf_bytes[start + len(_AST_BEGIN) : end]
+        raw = base64.b64decode(b64)
+        model = import_json(raw, "sidecar.json")
+        meta = dict(model.metadata or {})
+        meta["pdf_ast_sidecar"] = True
+        model.metadata = meta
+        return model
+    except Exception:
+        return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -317,24 +405,84 @@ def _export_ascii(lines: list[str]) -> bytes:
 
     n = len(pages)
     font_id = 3 + 2 * n
+    widget_id = font_id + 1
+    annot_id = font_id + 2
+    acro_id = font_id + 3
     kids = [f"{3 + 2 * i} 0 R" for i in range(n)]
 
     objects: list[bytes] = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
+        f"<< /Type /Catalog /Pages 2 0 R /AcroForm {acro_id} 0 R >>".encode(),
         f"<< /Type /Pages /Kids [{' '.join(kids)}] /Count {n} >>".encode(),
     ]
     for i, body in enumerate(content_bodies):
+        annots = ""
+        if i == 0:
+            annots = f" /Annots [ {widget_id} 0 R {annot_id} 0 R ]"
         objects.append(
             (
                 f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
                 f"/Contents {4 + 2 * i} 0 R "
-                f"/Resources<< /Font<< /F1 {font_id} 0 R >> >> >>"
+                f"/Resources<< /Font<< /F1 {font_id} 0 R >> >>"
+                f"{annots} >>"
             ).encode()
         )
         objects.append(f"<< /Length {len(body)} >>stream\n".encode() + body + b"\nendstream")
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    objects.extend(
+        _pdf_form_annot_objects(
+            widget_id=widget_id,
+            annot_id=annot_id,
+            acro_id=acro_id,
+            contents=_annot_contents_from_lines(lines),
+        )
+    )
 
     return _assemble(objects)
+
+
+def _pdf_escape_literal(text: str) -> str:
+    return (
+        (text or "")
+        .replace("\\", "\\\\")
+        .replace("(", "\\(")
+        .replace(")", "\\)")
+        .encode("latin-1", "replace")
+        .decode("latin-1")
+    )
+
+
+def _annot_contents_from_lines(lines: list[str]) -> str:
+    """Prefer first Comment-like line; fallback to sentinel for Annot gate."""
+    for line in lines:
+        if "[Comment" in line:
+            return _pdf_escape_literal(line[:180])
+    return "mdbridge-pdf-annot"
+
+
+def _pdf_form_annot_objects(
+    *,
+    widget_id: int,
+    annot_id: int,
+    acro_id: int,
+    contents: str = "mdbridge-pdf-annot",
+) -> list[bytes]:
+    """Minimal AcroForm text field + Text sticky annotation on page 1."""
+    # Widget (text field) — Parent page is always object 3 (first page)
+    widget = (
+        b"<< /Type /Annot /Subtype /Widget /FT /Tx /T (mdbridge_field) "
+        b"/V (md-bridge) /DV (md-bridge) "
+        b"/Rect [72 720 300 744] /F 4 /P 3 0 R "
+        b"/DA (/Helv 10 Tf 0 g) >>"
+    )
+    # Sticky note annotation — Contents carry Comment text when present
+    safe = _pdf_escape_literal(contents)[:200] or "mdbridge-pdf-annot"
+    text_annot = (
+        f"<< /Type /Annot /Subtype /Text /Name /Comment "
+        f"/Contents ({safe}) /Rect [500 740 520 760] "
+        f"/C [1 0.8 0] /F 4 /P 3 0 R >>"
+    ).encode()
+    acro = f"<< /Fields [ {widget_id} 0 R ] /NeedAppearances true >>".encode()
+    return [widget, text_annot, acro]
 
 
 def _pdf_escape(text: str) -> str:
@@ -349,7 +497,7 @@ def _pdf_escape(text: str) -> str:
             ascii_parts.append(" ")
         else:
             ascii_parts.append("?")
-    return "".join(ascii_parts)[:110]
+    return "".join(ascii_parts)
 
 
 def _ascii_page_stream(lines: list[str]) -> bytes:
@@ -425,7 +573,7 @@ def _export_cjk(lines: list[str]) -> bytes:
     bbox_str = f"[{bbox[0]} {bbox[1]} {bbox[2]} {bbox[3]}]"
 
     objects: list[bytes] = [
-        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Catalog /Pages 2 0 R >>",  # patched below after object count known
         f"<< /Type /Pages /Kids [{' '.join(f'{3 + 2 * i} 0 R' for i in range(n))}] "
         f"/Count {n} >>".encode(),
     ]
@@ -478,6 +626,29 @@ def _export_cjk(lines: list[str]) -> bytes:
         f"<< /Length {len(tounicode)} >>stream\n".encode() + tounicode + b"\nendstream"
     )
 
+    # Append AcroForm + Annot after font stack; rewrite Catalog + page 1 Annots
+    widget_id = len(objects) + 1
+    annot_id = widget_id + 1
+    acro_id = annot_id + 1
+    objects[0] = f"<< /Type /Catalog /Pages 2 0 R /AcroForm {acro_id} 0 R >>".encode()
+    # Patch first page (object index 2 = id 3) to include Annots
+    page0 = objects[2].decode("latin-1")
+    if "/Annots" not in page0:
+        page0 = page0.replace(
+            ">>",
+            f" /Annots [ {widget_id} 0 R {annot_id} 0 R ] >>",
+            1,
+        )
+        objects[2] = page0.encode("latin-1")
+    objects.extend(
+        _pdf_form_annot_objects(
+            widget_id=widget_id,
+            annot_id=annot_id,
+            acro_id=acro_id,
+            contents=_annot_contents_from_lines(lines),
+        )
+    )
+
     return _assemble(objects)
 
 
@@ -522,7 +693,7 @@ def _cjk_page_stream(lines: list[str], gid_of) -> bytes:
 
 def _line_to_hex(line: str, gid_of) -> str:
     out: list[str] = []
-    for ch in line[:110]:
+    for ch in line:
         if ch in ("\n", "\r", "\t"):
             gid = gid_of(" ") or 32
             out.append(f"{gid:04X}")
@@ -568,8 +739,10 @@ def _build_tounicode(glyph_cache: dict[str, int]) -> bytes:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _assemble(objects: list[bytes]) -> bytes:
+def _assemble(objects: list[bytes], *, engine: str = "pdf_simple") -> bytes:
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    out.extend(f"% mdbridge-pdf-engine: {engine}\n".encode())
+    out.extend(b"% mdbridge-pdf-degraded: true\n")
     offsets = [0]
     for i, body in enumerate(objects, 1):
         offsets.append(len(out))
@@ -589,64 +762,136 @@ def _assemble(objects: list[bytes]) -> bytes:
 def _model_lines(model: DocumentModel) -> list[str]:
     lines: list[str] = []
     footnotes: list[Footnote] = []
+    ordered_counters: dict[int, int] = {}
     if model.title:
-        lines.append(model.title)
+        lines.extend(_wrap_text(model.title))
         lines.append("")
     for node in model.nodes:
         if isinstance(node, Heading):
-            lines.append("#" * node.level + " " + node.plain_text())
+            lines.extend(_wrap_text("#" * node.level + " " + node.plain_text()))
         elif isinstance(node, Paragraph):
-            lines.append(node.plain_text())
+            from app.exporters.rich_visible import render_rich_visible
+
+            lines.extend(_wrap_text(render_rich_visible(node.text)))
         elif isinstance(node, ListItem):
-            mark = "- "
+            from app.exporters.rich_visible import render_rich_visible
+
+            level = max(0, int(node.level or 0))
             if node.checked is True:
                 mark = "[x] "
             elif node.checked is False:
                 mark = "[ ] "
             elif node.ordered:
-                mark = "1. "
-            lines.append(("  " * node.level) + mark + node.plain_text())
+                ordered_counters[level] = ordered_counters.get(level, 0) + 1
+                for k in list(ordered_counters):
+                    if k > level:
+                        del ordered_counters[k]
+                mark = f"{ordered_counters[level]}. "
+            else:
+                for k in list(ordered_counters):
+                    if k >= level:
+                        del ordered_counters[k]
+                mark = "- "
+            prefix = ("  " * level) + mark
+            body = render_rich_visible(node.text)
+            wrapped = _wrap_text(body, width=max(20, _WRAP_WIDTH - len(prefix)))
+            lines.append(prefix + (wrapped[0] if wrapped else ""))
+            for cont in wrapped[1:]:
+                lines.append((" " * len(prefix)) + cont)
         elif isinstance(node, CodeBlock):
             lines.append("```" + (node.lang or ""))
-            lines.extend((node.content or "").splitlines() or [""])
+            for raw in (node.content or "").splitlines() or [""]:
+                lines.extend(_wrap_text(raw, width=_WRAP_WIDTH))
             lines.append("```")
         elif isinstance(node, Blockquote):
             for p in node.paragraphs:
                 t = p if isinstance(p, str) else getattr(p, "text", str(p))
-                lines.append("> " + str(t))
+                for w in _wrap_text(str(t)):
+                    lines.append("> " + w)
         elif isinstance(node, HorizontalRule):
             lines.append("---")
         elif isinstance(node, MathBlock):
-            lines.append("$$ " + (node.content or "") + " $$")
+            lines.extend(_wrap_text("$$ " + (node.content or "") + " $$"))
+        elif isinstance(node, Image):
+            alt = node.alt_text.split("|", 1)[0] if node.alt_text else "image"
+            note = f"[Image: {alt}]"
+            if node.data:
+                note += f" ({len(node.data)} bytes)"
+            lines.extend(_wrap_text(note))
+        elif isinstance(node, Chart):
+            lines.extend(_wrap_text(node.plain_text()))
+        elif isinstance(node, SpeakerNote):
+            lines.extend(_wrap_text(f"[SpeakerNote s{node.slide_index}] {node.text}"))
+        elif isinstance(node, HtmlBlock):
+            import re
+
+            text = re.sub(r"<[^>]+>", "", node.content or "").strip()
+            if text:
+                lines.extend(_wrap_text(text))
         elif isinstance(node, Footnote):
             footnotes.append(node)
         elif isinstance(node, Comment):
             anchor = f" ({node.anchor})" if node.anchor else ""
-            lines.append(f"[Comment {node.author}{anchor}] {node.text}")
+            lines.extend(_wrap_text(f"[Comment {node.author}{anchor}] {node.text}"))
         elif isinstance(node, Revision):
             if node.change == "delete":
-                lines.append(f"[-del {node.author}] {node.text}")
+                lines.extend(_wrap_text(f"[-del {node.author}] {node.text}"))
             else:
-                lines.append(f"[+ins {node.author}] {node.text}")
+                lines.extend(_wrap_text(f"[+ins {node.author}] {node.text}"))
         elif isinstance(node, ContentControl):
             label = node.alias or node.tag or "control"
-            lines.append(f"[控件:{label}] {node.text}")
+            lines.extend(_wrap_text(f"[Control:{label}] {node.text}"))
         elif isinstance(node, TextBox):
             src = f" ({node.source})" if node.source else ""
-            lines.append(f"[文本框{src}] {node.text}")
+            lines.extend(_wrap_text(f"[TextBox{src}] {node.text}"))
         elif isinstance(node, PivotTable):
             fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
-            lines.append(f"[PivotTable {node.name}] {fields}")
+            lines.extend(_wrap_text(f"[PivotTable {node.name}] {fields}"))
         elif isinstance(node, Table):
-            for row in node.rows:
-                lines.append(" | ".join(str(c) for c in row))
+            if node.rows:
+                for row in node.rows:
+                    lines.extend(_wrap_text(" | ".join(str(c) for c in row)))
+            elif getattr(node, "cells", None):
+                from app.exporters.export_warnings import warn_export
+
+                warn_export(model, "pdf_simple: Table.cells flattened without span layout")
+                for crow in node.cells:
+                    texts = [getattr(c, "text", str(c)) for c in crow]
+                    lines.extend(_wrap_text(" | ".join(texts)))
+            else:
+                from app.exporters.export_warnings import placeholder_line, warn_export
+
+                warn_export(model, "pdf_simple: empty Table → placeholder")
+                lines.append(placeholder_line("Table", "(empty)"))
         else:
             plain = getattr(node, "plain_text", None)
             if callable(plain):
-                lines.append(plain())
+                text = plain()
+                if text:
+                    lines.extend(_wrap_text(text))
+                else:
+                    from app.exporters.export_warnings import (
+                        node_type_name,
+                        placeholder_line,
+                        warn_export,
+                    )
+
+                    kind = node_type_name(node)
+                    warn_export(model, f"pdf_simple: empty {kind} → placeholder")
+                    lines.append(placeholder_line(kind))
+            else:
+                from app.exporters.export_warnings import (
+                    node_type_name,
+                    placeholder_line,
+                    warn_export,
+                )
+
+                kind = node_type_name(node)
+                warn_export(model, f"pdf_simple: unhandled {kind} → placeholder")
+                lines.append(placeholder_line(kind))
     if footnotes:
         lines.append("")
         lines.append("--- Footnotes ---")
         for fn in footnotes:
-            lines.append(f"[^{fn.id}]: {fn.text}")
+            lines.extend(_wrap_text(f"[^{fn.id}]: {fn.text}"))
     return lines

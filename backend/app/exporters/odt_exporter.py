@@ -8,6 +8,7 @@ from xml.sax.saxutils import escape
 
 from app.core.document_model import (
     Blockquote,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
@@ -15,19 +16,84 @@ from app.core.document_model import (
     Footnote,
     Heading,
     HorizontalRule,
+    HtmlBlock,
+    Image,
     ListItem,
+    MathBlock,
     Paragraph,
     PivotTable,
     Revision,
+    SpeakerNote,
     Table,
     TableCell,
     TextBox,
-    ensure_rich_text,
 )
+from app.exporters.export_warnings import node_type_name, placeholder_line, warn_export
+from app.exporters.rich_visible import list_item_children
+
+
+def _odt_inline(value) -> str:
+    """Escape rich text with markdown-visible marks and real ``text:a`` hyperlinks."""
+    from app.core.document_model import InlineMarkType, ensure_rich_text
+
+    rich = ensure_rich_text(value)
+    if not rich.marks:
+        return escape(rich.text)
+
+    boundaries = {0, len(rich.text)}
+    for mark in rich.marks:
+        boundaries.add(max(0, min(mark.start, len(rich.text))))
+        boundaries.add(max(0, min(mark.end, len(rich.text))))
+    points = sorted(boundaries)
+    parts: list[str] = []
+    for start, end in zip(points, points[1:]):
+        if start == end:
+            continue
+        segment = escape(rich.text[start:end])
+        active = [m for m in rich.marks if m.start <= start and m.end >= end]
+        types = {m.type for m in active}
+        if InlineMarkType.BOLD in types:
+            segment = f"**{segment}**"
+        if InlineMarkType.ITALIC in types:
+            segment = f"*{segment}*"
+        if InlineMarkType.CODE in types:
+            segment = f"`{segment}`"
+        if InlineMarkType.STRIKETHROUGH in types:
+            segment = f"~~{segment}~~"
+        if InlineMarkType.LINK in types:
+            href = next((m.href for m in active if m.type == InlineMarkType.LINK), "") or ""
+            href_esc = escape(href, {"\"": "&quot;"})
+            segment = f'<text:a xlink:href="{href_esc}">{segment}</text:a>'
+        parts.append(segment)
+    return "".join(parts)
+
+
+def _image_ext(mime: str) -> str:
+    m = (mime or "").lower()
+    if "jpeg" in m or "jpg" in m:
+        return ".jpg"
+    if "gif" in m:
+        return ".gif"
+    if "svg" in m:
+        return ".svg"
+    return ".png"
+
+
+def _mathml_block(tex: str) -> str:
+    safe = escape((tex or "")[:800])
+    return (
+        "<math:math>"
+        "<math:semantics>"
+        f"<math:mrow><math:mtext>{safe}</math:mtext></math:mrow>"
+        f'<math:annotation encoding="application/x-tex">{safe}</math:annotation>'
+        "</math:semantics>"
+        "</math:math>"
+    )
 
 
 def export_odt(model: DocumentModel) -> bytes:
     body_parts: list[str] = []
+    media: list[tuple[str, bytes, str]] = []  # href, data, mime
     for node in model.nodes:
         if isinstance(node, Heading):
             lv = max(1, min(6, node.level))
@@ -35,19 +101,76 @@ def export_odt(model: DocumentModel) -> bytes:
                 f'<text:h text:outline-level="{lv}">{escape(node.plain_text())}</text:h>'
             )
         elif isinstance(node, Paragraph):
-            body_parts.append(f"<text:p>{escape(node.plain_text())}</text:p>")
+            body_parts.append(f"<text:p>{_odt_inline(node.text)}</text:p>")
         elif isinstance(node, ListItem):
-            prefix = "• " if not node.ordered else f"{node.level}. "
-            body_parts.append(f"<text:p>{escape(prefix + node.plain_text())}</text:p>")
+            if node.checked is not None:
+                prefix = "[x] " if node.checked else "[ ] "
+            else:
+                prefix = "- " if not node.ordered else "1. "
+            indent = "  " * max(0, int(node.level or 0))
+            body_parts.append(
+                f"<text:p>{escape(indent + prefix)}{_odt_inline(node.text)}</text:p>"
+            )
+            # v6/T1-#3: keep multi-paragraph / fenced-code content inside the
+            # list item instead of dropping it silently.
+            for is_code, text in list_item_children(node):
+                if not text:
+                    continue
+                pad = escape(indent + "  ")
+                if is_code:
+                    for line in text.splitlines() or [""]:
+                        body_parts.append(f"<text:p>{pad}{escape(line)}</text:p>")
+                else:
+                    body_parts.append(f"<text:p>{pad}{escape(text)}</text:p>")
         elif isinstance(node, Table):
             body_parts.append(_table_xml(node))
         elif isinstance(node, HorizontalRule):
             body_parts.append("<text:p>---</text:p>")
         elif isinstance(node, CodeBlock):
+            body_parts.append(f"<text:p>{escape('```' + (node.lang or ''))}</text:p>")
             body_parts.append(f"<text:p>{escape(node.content)}</text:p>")
+            body_parts.append("<text:p>```</text:p>")
         elif isinstance(node, Blockquote):
             for p in node.paragraphs:
-                body_parts.append(f"<text:p>{escape('「' + ensure_rich_text(p).text + '」')}</text:p>")
+                body_parts.append(f"<text:p>&gt; {_odt_inline(p)}</text:p>")
+        elif isinstance(node, Image):
+            alt = (node.alt_text or "image").split("|", 1)[0]
+            if node.data:
+                idx = len(media) + 1
+                ext = _image_ext(node.mime_type)
+                href = f"Pictures/image{idx}{ext}"
+                mime = node.mime_type or "image/png"
+                media.append((href, node.data, mime))
+                body_parts.append(
+                    "<text:p>"
+                    f'<draw:frame draw:name="img{idx}" text:anchor-type="paragraph" '
+                    'svg:width="12cm" svg:height="9cm">'
+                    f'<draw:image xlink:href="{escape(href)}" xlink:type="simple" '
+                    'xlink:show="embed" xlink:actuate="onLoad"/>'
+                    "</draw:frame>"
+                    f"{escape(alt)}"
+                    "</text:p>"
+                )
+            else:
+                warn_export(model, "odt: Image missing binary → placeholder")
+                body_parts.append(
+                    f"<text:p>{escape(placeholder_line('Image', alt))}</text:p>"
+                )
+        elif isinstance(node, Chart):
+            body_parts.append(f"<text:p>{escape(node.plain_text())}</text:p>")
+        elif isinstance(node, SpeakerNote):
+            body_parts.append(
+                f"<text:p>{escape(f'[SpeakerNote s{node.slide_index}] {node.text}')}</text:p>"
+            )
+        elif isinstance(node, MathBlock):
+            # Basic MathML wrapper with TeX annotation (not a full ODF Formula object).
+            warn_export(model, "odt: MathBlock → MathML annotation (TeX encoding)")
+            body_parts.append(f"<text:p>{_mathml_block(node.content)}</text:p>")
+        elif isinstance(node, HtmlBlock):
+            warn_export(model, "odt: HtmlBlock stripped to text")
+            body_parts.append(
+                f"<text:p>{escape(placeholder_line('HtmlBlock', (node.content or '')[:200]))}</text:p>"
+            )
         elif isinstance(node, Comment):
             anchor = f" ({node.anchor})" if node.anchor else ""
             author = node.author or "reviewer"
@@ -55,7 +178,7 @@ def export_odt(model: DocumentModel) -> bytes:
                 f"<text:p>{escape(f'[Comment {author}{anchor}] {node.text}')}</text:p>"
             )
         elif isinstance(node, Footnote):
-            body_parts.append(f"<text:p>{escape(f'[^{node.id}] {node.text}')}</text:p>")
+            body_parts.append(f"<text:p>{escape(f'[^{node.id}]: {node.text}')}</text:p>")
         elif isinstance(node, Revision):
             tag = "ins" if node.change == "insert" else "del"
             body_parts.append(
@@ -79,6 +202,12 @@ def export_odt(model: DocumentModel) -> bytes:
             text = getattr(node, "plain_text", lambda: "")()
             if text:
                 body_parts.append(f"<text:p>{escape(str(text))}</text:p>")
+            else:
+                kind = node_type_name(node)
+                warn_export(model, f"odt: unhandled node {kind} → placeholder")
+                body_parts.append(
+                    f"<text:p>{escape(placeholder_line(kind))}</text:p>"
+                )
 
     if not body_parts:
         body_parts.append("<text:p></text:p>")
@@ -88,6 +217,10 @@ def export_odt(model: DocumentModel) -> bytes:
  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+ xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+ xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:math="http://www.w3.org/1998/Math/MathML"
  office:version="1.2">
  <office:body>
   <office:text>
@@ -96,17 +229,36 @@ def export_odt(model: DocumentModel) -> bytes:
  </office:body>
 </office:document-content>
 """
-    manifest = """<?xml version="1.0" encoding="UTF-8"?>
-<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">
- <manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>
- <manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>
-</manifest:manifest>
-"""
+    manifest_entries = [
+        '<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>',
+        '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>',
+    ]
+    if media:
+        manifest_entries.append(
+            '<manifest:file-entry manifest:full-path="Pictures/" manifest:media-type="application/binary"/>'
+        )
+        for href, _data, mime in media:
+            manifest_entries.append(
+                f'<manifest:file-entry manifest:full-path="{escape(href)}" '
+                f'manifest:media-type="{escape(mime)}"/>'
+            )
+    manifest = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0">\n'
+        + "\n".join(f" {e}" for e in manifest_entries)
+        + "\n</manifest:manifest>\n"
+    )
     buf = BytesIO()
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("mimetype", "application/vnd.oasis.opendocument.text", compress_type=zipfile.ZIP_STORED)
+        zf.writestr(
+            "mimetype",
+            "application/vnd.oasis.opendocument.text",
+            compress_type=zipfile.ZIP_STORED,
+        )
         zf.writestr("META-INF/manifest.xml", manifest)
         zf.writestr("content.xml", content)
+        for href, data, _mime in media:
+            zf.writestr(href, data)
     return buf.getvalue()
 
 

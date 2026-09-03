@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import tempfile
@@ -9,6 +10,8 @@ from pathlib import Path
 
 from app.core.document_model import DocumentModel, Paragraph
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
+
+_log = logging.getLogger("mdbridge.doc")
 
 
 def import_doc(source_bytes: bytes, filename: str = "input.doc") -> DocumentModel:
@@ -32,9 +35,14 @@ def import_doc(source_bytes: bytes, filename: str = "input.doc") -> DocumentMode
             result = get_office_converter().convert(str(tmp_path))
             return docling_document_to_model(result.document, title=Path(filename).stem)
     except ImportError:
-        pass
-    except Exception:
-        pass
+        _log.info("docling office converter unavailable for %s; using OLE text scrape", filename)
+    except Exception as exc:
+        _log.warning(
+            "docling DOC import failed for %s (%s: %s); falling back to OLE text",
+            filename,
+            type(exc).__name__,
+            exc,
+        )
 
     text = _ole_extract_text(source_bytes)
     if not text.strip():
@@ -44,7 +52,10 @@ def import_doc(source_bytes: bytes, filename: str = "input.doc") -> DocumentMode
     nodes = [Paragraph(text=p.strip()) for p in re.split(r"\n\s*\n", text) if p.strip()]
     if not nodes:
         nodes = [Paragraph(text=text.strip())]
-    return DocumentModel(title=Path(filename).stem, nodes=nodes)
+    model = DocumentModel(title=Path(filename).stem, nodes=nodes)
+    model.metadata["importer"] = "doc_ole_text"
+    model.metadata["degraded"] = True
+    return model
 
 
 def _ole_extract_text(data: bytes) -> str:

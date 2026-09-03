@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import zipfile
 from datetime import datetime, timezone
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 from app.core.document_model import Comment
 
@@ -38,7 +38,9 @@ def inject_word_comments(docx_bytes: bytes, comments: list[Comment]) -> bytes:
         cid = i
         anchor = escape(c.anchor or c.text[:40] or f"comment-{cid}")
         text = escape(c.text)
-        author = escape(c.author or "reviewer")
+        author_raw = c.author or "reviewer"
+        author_attr = quoteattr(author_raw)  # includes surrounding quotes
+        initials_attr = quoteattr((author_raw[:2] if author_raw else "rv"))
         comment_paras.append(
             f'<w:p xmlns:w="{_NS_W}">'
             f'<w:commentRangeStart w:id="{cid}"/>'
@@ -51,7 +53,7 @@ def inject_word_comments(docx_bytes: bytes, comments: list[Comment]) -> bytes:
             f"</w:p>"
         )
         comment_entries.append(
-            f'<w:comment w:id="{cid}" w:author="{author}" w:date="{now}" w:initials="{author[:2]}">'
+            f'<w:comment w:id="{cid}" w:author={author_attr} w:date="{now}" w:initials={initials_attr}>'
             f"<w:p><w:r><w:t>{text}</w:t></w:r></w:p>"
             f"</w:comment>"
         )

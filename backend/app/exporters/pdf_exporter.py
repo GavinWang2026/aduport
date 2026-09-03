@@ -102,7 +102,12 @@ def export_pdf(
     except (OSError, ImportError):
         from app.exporters.pdf_simple import export_pdf_simple
 
-        return export_pdf_simple(model)
+        out = export_pdf_simple(model)
+        meta = model.metadata if isinstance(model.metadata, dict) else {}
+        meta["pdf_engine"] = "pdf_simple"
+        meta["pdf_engine_reason"] = "weasyprint_unavailable"
+        model.metadata = meta
+        return out
 
     safe_font = sanitize_font_family(font_family, settings.pdf_font_family)
     raw_css = custom_css if custom_css is not None else settings.pdf_custom_css
@@ -120,18 +125,32 @@ def export_pdf(
         toc=toc,
     )
     try:
-        return HTML(string=html_content, url_fetcher=_blocked_fetcher).write_pdf()
+        pdf = HTML(string=html_content, url_fetcher=_blocked_fetcher).write_pdf()
+        meta = model.metadata if isinstance(model.metadata, dict) else {}
+        meta["pdf_engine"] = "weasyprint"
+        model.metadata = meta
+        return pdf
     except OSError:
         from app.exporters.pdf_simple import export_pdf_simple
 
-        return export_pdf_simple(model)
+        out = export_pdf_simple(model)
+        meta = model.metadata if isinstance(model.metadata, dict) else {}
+        meta["pdf_engine"] = "pdf_simple"
+        meta["pdf_engine_reason"] = "weasyprint_oserror"
+        model.metadata = meta
+        return out
     except Exception as exc:
         # Shared-library load failures often surface as generic Exception
         msg = str(exc).lower()
         if "pango" in msg or "gobject" in msg or "cairo" in msg or "cannot load" in msg:
             from app.exporters.pdf_simple import export_pdf_simple
 
-            return export_pdf_simple(model)
+            out = export_pdf_simple(model)
+            meta = model.metadata if isinstance(model.metadata, dict) else {}
+            meta["pdf_engine"] = "pdf_simple"
+            meta["pdf_engine_reason"] = "weasyprint_native_libs"
+            model.metadata = meta
+            return out
         raise ExportError(f"PDF 渲染失败: {exc}") from exc
 
 

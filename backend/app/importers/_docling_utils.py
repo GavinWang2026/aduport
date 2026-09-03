@@ -16,6 +16,7 @@ from app.core.document_model import (
     Paragraph,
     RichText,
     Table,
+    TableCell,
 )
 
 
@@ -83,7 +84,11 @@ def _table_from_item(item: Any) -> Table | None:
 
     if not rows:
         return None
-    return Table(rows=rows)
+    cells = [
+        [TableCell(text=c, origin_row=r, origin_col=j) for j, c in enumerate(row)]
+        for r, row in enumerate(rows)
+    ]
+    return Table(rows=rows, cells=cells)
 
 
 def _cell_text(cell: Any) -> str:
@@ -189,7 +194,9 @@ def _markdown_fallback(md: str, title: str) -> DocumentModel:
         heading_match = re.match(r"^(#{1,6})\s+(.+)$", line)
         if heading_match:
             level = len(heading_match.group(1))
-            model.nodes.append(Heading(level=level, text=heading_match.group(2)))
+            model.nodes.append(
+                Heading(level=level, text=RichText(text=heading_match.group(2)))
+            )
             i += 1
             continue
 
@@ -210,7 +217,7 @@ def _markdown_fallback(md: str, title: str) -> DocumentModel:
             indent = len(list_match.group(1))
             model.nodes.append(
                 ListItem(
-                    text=list_match.group(3),
+                    text=RichText(text=list_match.group(3)),
                     ordered=ordered,
                     level=indent // 2,
                 )
@@ -225,7 +232,7 @@ def _markdown_fallback(md: str, title: str) -> DocumentModel:
                 mime = img_match.group(2).split(";")[0].replace("data:", "")
                 model.nodes.append(Image(data=data, alt_text=img_match.group(1), mime_type=mime))
             except Exception:
-                model.nodes.append(Paragraph(text=line))
+                model.nodes.append(Paragraph(text=RichText(text=line)))
             i += 1
             continue
 
@@ -240,10 +247,17 @@ def _markdown_fallback(md: str, title: str) -> DocumentModel:
                 cells = [c.strip() for c in tl.strip("|").split("|")]
                 rows.append(cells)
             if rows:
-                model.nodes.append(Table(rows=rows))
+                cells = [
+                    [
+                        TableCell(text=c, origin_row=r, origin_col=j)
+                        for j, c in enumerate(row)
+                    ]
+                    for r, row in enumerate(rows)
+                ]
+                model.nodes.append(Table(rows=rows, cells=cells))
             continue
 
-        model.nodes.append(Paragraph(text=line))
+        model.nodes.append(Paragraph(text=RichText(text=line)))
         i += 1
 
     return model

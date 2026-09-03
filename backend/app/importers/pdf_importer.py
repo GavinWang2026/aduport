@@ -14,7 +14,7 @@ from app.core.document_model import DocumentModel
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError, OcrUnavailableError
 from app.importers._docling_utils import docling_document_to_model
 from app.importers.docling_ready import docling_models_ready
-from app.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
+from app.importers.pdf_text_fallback import extract_pdf_text_model
 
 _log = logging.getLogger("mdbridge.pdf")
 _docling_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="docling-cvt")
@@ -90,44 +90,115 @@ def _import_with_docling(source_bytes: bytes, filename: str) -> DocumentModel:
 
 def import_pdf_via_docling(source_bytes: bytes, filename: str) -> DocumentModel:
     """Public entry used by OCR router ``docling`` engine."""
-    return _import_with_docling(source_bytes, filename)
+    return _stamp_pdf_pipeline(_import_with_docling(source_bytes, filename), "docling")
+
+
+def _normalize_pdf_engine(raw: str | None) -> str:
+    """Map product aliases onto the tri-state + legacy engine names."""
+    engine = (raw or "auto").lower().strip()
+    if engine in ("scan", "scanned"):
+        return "ocr"
+    return engine or "auto"
+
+
+def pdf_tristate_summary() -> dict[str, str]:
+    """Machine-readable PDF pipeline contract (v8 §B)."""
+    return {
+        "text": "pypdfium2 embedded text layer (MDBRIDGE_PDF_ENGINE=text)",
+        "docling": "optional Docling layout/AI (MDBRIDGE_PDF_ENGINE=docling)",
+        "ocr": "enterprise scan OCR MinerU/Paddle (MDBRIDGE_PDF_ENGINE=ocr|mineru|paddleocr_vl)",
+        "auto": "text richness gate → OCR (if enabled) → docling → text",
+        "active": _normalize_pdf_engine(settings.pdf_engine),
+    }
+
+
+def _stamp_pdf_pipeline(model: DocumentModel, pipeline: str) -> DocumentModel:
+    if model.metadata is None:
+        model.metadata = {}
+    model.metadata["pdf_pipeline"] = pipeline
+    model.metadata.setdefault("pdf_engine", _normalize_pdf_engine(settings.pdf_engine))
+    return model
 
 
 def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentModel:
     if b"%PDF" not in source_bytes[:1024]:
         raise InvalidDocumentError(f"文件不是有效的 PDF: {filename}")
 
-    engine = (settings.pdf_engine or "auto").lower().strip()
+    # v6/T2-#11: prefer embedded AST sidecar when present (true round-trip).
+    try:
+        from app.exporters.pdf_simple import extract_ast_sidecar
+
+        sidecar = extract_ast_sidecar(source_bytes)
+        if sidecar is not None and sidecar.nodes:
+            _log.info("PDF AST sidecar hit: %s (%s nodes)", filename, len(sidecar.nodes))
+            return sidecar
+    except Exception as exc:
+        _log.debug("PDF sidecar probe failed: %s", exc)
+
+    engine = _normalize_pdf_engine(settings.pdf_engine)
 
     if engine == "text":
-        return extract_pdf_text_model(source_bytes, filename)
+        return _stamp_pdf_pipeline(extract_pdf_text_model(source_bytes, filename), "text")
 
     # Explicit OCR engines (ignore text-layer short-circuit)
-    if engine in ("mineru", "paddleocr_vl"):
+    if engine in ("ocr", "mineru", "paddleocr_vl"):
         from app.importers.ocr_engine import import_pdf_with_ocr
 
-        return import_pdf_with_ocr(source_bytes, filename, force_engine=engine)
+        force = None if engine == "ocr" else engine
+        model = import_pdf_with_ocr(source_bytes, filename, force_engine=force)
+        return _stamp_pdf_pipeline(model, "ocr")
+
+    if engine == "docling":
+        model = _import_with_docling(source_bytes, filename)
+        return _stamp_pdf_pipeline(model, "docling")
 
     if engine == "auto":
-        chars = pdf_text_char_count(source_bytes)
-        if chars >= settings.pdf_text_min_chars:
-            _log.info("PDF text-layer fallback (%s chars): %s", chars, filename)
-            try:
-                return extract_pdf_text_model(source_bytes, filename)
-            except Exception as exc:
-                _log.warning("text fallback failed, trying structured import: %s", exc)
+        # Single PDF open: extract once, gate on text richness (T20).
+        weak_model: DocumentModel | None = None
+        chars = 0
+        try:
+            weak_model = extract_pdf_text_model(source_bytes, filename)
+            chars = int((weak_model.metadata or {}).get("pdf_text_chars") or 0)
+            if chars >= settings.pdf_text_min_chars:
+                _log.info("PDF text-layer fallback (%s chars): %s", chars, filename)
+                return _stamp_pdf_pipeline(weak_model, "text")
+            _log.info(
+                "PDF text layer weak (%s < %s chars), trying OCR/docling: %s",
+                chars,
+                settings.pdf_text_min_chars,
+                filename,
+            )
+            if weak_model.metadata is None:
+                weak_model.metadata = {}
+            weak_model.metadata["ocr_required"] = True
+            weak_model.metadata["pdf_text_chars"] = chars
+        except Exception as exc:
+            _log.warning("text fallback failed, trying structured import: %s", exc)
 
         # Scanned / weak text: optional OCR chain (MinerU / PaddleOCR-VL / docling)
         if settings.ocr_enabled:
             try:
                 from app.importers.ocr_engine import import_pdf_with_ocr
 
-                return import_pdf_with_ocr(source_bytes, filename)
+                return _stamp_pdf_pipeline(
+                    import_pdf_with_ocr(source_bytes, filename), "ocr"
+                )
             except OcrUnavailableError:
                 # No engine installed — fall through to text/docling with clear terminal error
                 _log.warning("OCR unavailable for %s; trying text/docling fallback", filename)
             except Exception as exc:
                 _log.warning("OCR chain failed, falling back to docling/text: %s", exc)
+        elif chars < settings.pdf_text_min_chars:
+            # OCR off + weak/empty text layer → explicit machine-readable signal
+            if chars <= 0 or not weak_model or not weak_model.nodes:
+                raise OcrUnavailableError(
+                    f"PDF 文本层不足（{chars} < {settings.pdf_text_min_chars} chars）且 OCR 未启用: {filename}。"
+                    "请设置 MDBRIDGE_OCR_ENABLED=true 并安装 "
+                    "pip install 'md-bridge[ocr-mineru]' 或 'md-bridge[ocr-paddle]'；"
+                    "纯文本 PDF 可设 MDBRIDGE_PDF_ENGINE=text。"
+                )
+            # Keep partial text but stamp ocr_required for callers
+            return _stamp_pdf_pipeline(weak_model, "text")
 
     # Fast-fail: no local models → never block on Hub (P0-2)
     if not docling_models_ready():
@@ -136,7 +207,9 @@ def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentMode
             filename,
         )
         try:
-            return extract_pdf_text_model(source_bytes, filename)
+            return _stamp_pdf_pipeline(
+                extract_pdf_text_model(source_bytes, filename), "text"
+            )
         except InvalidDocumentError as exc:
             if settings.ocr_enabled:
                 raise OcrUnavailableError(
@@ -154,14 +227,16 @@ def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentMode
 
     # docling path (engine=docling or auto after weak/no text)
     try:
-        return _import_with_docling(source_bytes, filename)
+        return _stamp_pdf_pipeline(_import_with_docling(source_bytes, filename), "docling")
     except (InvalidDocumentError, CorruptedFileError):
         raise
     except Exception as exc:
         if _is_hub_network_error(exc):
             _log.warning("docling Hub/network error, falling back to text: %s", exc)
             try:
-                return extract_pdf_text_model(source_bytes, filename)
+                return _stamp_pdf_pipeline(
+                extract_pdf_text_model(source_bytes, filename), "text"
+            )
             except InvalidDocumentError:
                 raise CorruptedFileError(
                     f"PDF 解析失败：无法从 Hugging Face 下载 docling 模型（网络超时），"

@@ -7,21 +7,32 @@ from pathlib import Path
 
 from app.core.document_model import (
     Blockquote,
+    Bookmark,
     CodeBlock,
     Comment,
     ContentControl,
     DocumentModel,
+    FieldCode,
     Footnote,
+    HeaderFooter,
     Heading,
     HorizontalRule,
     HtmlBlock,
     Image,
     ListItem,
     MathBlock,
+    Numbering,
+    PageSetup,
     Paragraph,
     PivotTable,
     Revision,
     RichText,
+    RunStyle,
+    Section,
+    Chart,
+    SpeakerNote,
+    SmartArt,
+    OleObject,
     Table,
     TableCell,
     TextBox,
@@ -29,7 +40,7 @@ from app.core.document_model import (
 )
 from app.core.exceptions import InvalidDocumentError
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.2"
 
 
 def _rich_to_dict(rich: RichText | str) -> dict:
@@ -78,6 +89,14 @@ def _node_to_dict(node) -> dict:
             "ordered": node.ordered,
             "level": node.level,
             **({"checked": node.checked} if node.checked is not None else {}),
+            # v6/T1-#3: a multi-paragraph list item keeps extra paragraphs and
+            # fenced code content in `children`. Omitting it here meant the AST
+            # JSON round-trip (md -> json -> md) silently dropped that content.
+            **(
+                {"children": [_node_to_dict(c) for c in node.children]}
+                if node.children
+                else {}
+            ),
         }
     if isinstance(node, Table):
         block: dict = {"type": "table", "rows": node.rows}
@@ -104,7 +123,7 @@ def _node_to_dict(node) -> dict:
             "paragraphs": [_rich_to_dict(p) for p in node.paragraphs],
         }
     if isinstance(node, HorizontalRule):
-        return {"type": "horizontal_rule"}
+        return {"type": "horizontal_rule", "marker": "---"}
     if isinstance(node, MathBlock):
         return {"type": "math_block", "content": node.content, "display": node.display}
     if isinstance(node, Footnote):
@@ -154,6 +173,80 @@ def _node_to_dict(node) -> dict:
         }
     if isinstance(node, HtmlBlock):
         return {"type": "html_block", "content": node.content}
+    if isinstance(node, Section):
+        return {"type": "section", "title": node.title, "props": dict(node.props or {})}
+    if isinstance(node, PageSetup):
+        return {
+            "type": "page_setup",
+            "page_size": node.page_size,
+            "orientation": node.orientation,
+            "margins_mm": dict(node.margins_mm or {}),
+        }
+    if isinstance(node, HeaderFooter):
+        return {"type": "header_footer", "kind": node.kind, "text": node.text}
+    if isinstance(node, FieldCode):
+        return {
+            "type": "field",
+            "field_type": node.field_type,
+            "instruction": node.instruction,
+            "result_text": node.result_text,
+        }
+    if isinstance(node, Bookmark):
+        return {"type": "bookmark", "name": node.name, "anchor": node.anchor}
+    if isinstance(node, RunStyle):
+        return {
+            "type": "run_style",
+            "style_id": node.style_id,
+            "name": node.name,
+            "props": dict(node.props or {}),
+        }
+    if isinstance(node, Numbering):
+        return {
+            "type": "numbering",
+            "num_id": node.num_id,
+            "abstract_num_id": node.abstract_num_id,
+            "levels": list(node.levels or []),
+        }
+    if isinstance(node, Chart):
+        import base64
+
+        block: dict = {
+            "type": "chart",
+            "title": node.title,
+            "chart_type": node.chart_type,
+            "categories": list(node.categories or []),
+            "series": list(node.series or []),
+        }
+        if node.preview_data:
+            block["preview_mime"] = node.preview_mime or "image/png"
+            block["preview_b64"] = base64.b64encode(node.preview_data).decode("ascii")
+        return block
+    if isinstance(node, SpeakerNote):
+        return {
+            "type": "speaker_note",
+            "text": node.text,
+            "slide_index": int(node.slide_index or 1),
+        }
+    if isinstance(node, SmartArt):
+        return {
+            "type": "smartart",
+            "layout": node.layout,
+            "title": node.title,
+            "items": list(node.items or []),
+        }
+    if isinstance(node, OleObject):
+        import base64
+
+        block = {
+            "type": "ole_object",
+            "prog_id": node.prog_id,
+            "label": node.label,
+            "relationship_id": node.relationship_id,
+        }
+        if node.data:
+            block["data_b64"] = base64.b64encode(node.data).decode("ascii")
+            block["mime_type"] = node.mime_type or ""
+        return block
     return {"type": getattr(node, "type", "unknown")}
 
 
@@ -208,11 +301,25 @@ def _block_to_node(b: dict):
     if t == "paragraph":
         return Paragraph(text=_dict_to_rich(b.get("text")))
     if t == "list_item":
+        # v6/T1-#3: restore `children` so round-trips keep list-item content.
+        # `children` is typed list[Paragraph]; coerce anything else defensively.
+        kids: list = []
+        for raw in b.get("children") or []:
+            if not isinstance(raw, dict):
+                continue
+            kid = _block_to_node(raw)
+            if isinstance(kid, (Paragraph, CodeBlock)):
+                kids.append(kid)
+            elif kid is not None:
+                text = getattr(kid, "content", None) or getattr(kid, "text", None)
+                if text is not None:
+                    kids.append(Paragraph(text=text))
         return ListItem(
             text=_dict_to_rich(b.get("text")),
             ordered=bool(b.get("ordered")),
             level=int(b.get("level") or 0),
             checked=b.get("checked"),
+            children=kids,
         )
     if t == "table":
         cells_raw = b.get("cells")
@@ -293,6 +400,90 @@ def _block_to_node(b: dict):
         )
     if t == "html_block":
         return HtmlBlock(content=str(b.get("content") or ""))
+    if t == "section":
+        return Section(title=str(b.get("title") or ""), props=dict(b.get("props") or {}))
+    if t == "page_setup":
+        orient = b.get("orientation") or "portrait"
+        if orient not in ("portrait", "landscape"):
+            orient = "portrait"
+        return PageSetup(
+            page_size=str(b.get("page_size") or "A4"),
+            orientation=orient,
+            margins_mm=dict(b.get("margins_mm") or {}),
+        )
+    if t == "header_footer":
+        kind = b.get("kind") or "header"
+        if kind not in ("header", "footer"):
+            kind = "header"
+        return HeaderFooter(kind=kind, text=str(b.get("text") or ""))
+    if t == "field":
+        return FieldCode(
+            field_type=str(b.get("field_type") or ""),
+            instruction=str(b.get("instruction") or ""),
+            result_text=str(b.get("result_text") or ""),
+        )
+    if t == "bookmark":
+        return Bookmark(name=str(b.get("name") or ""), anchor=str(b.get("anchor") or ""))
+    if t == "run_style":
+        return RunStyle(
+            style_id=str(b.get("style_id") or ""),
+            name=str(b.get("name") or ""),
+            props=dict(b.get("props") or {}),
+        )
+    if t == "numbering":
+        return Numbering(
+            num_id=str(b.get("num_id") or ""),
+            abstract_num_id=str(b.get("abstract_num_id") or ""),
+            levels=list(b.get("levels") or []),
+        )
+    if t == "chart":
+        import base64
+
+        preview = b""
+        b64 = b.get("preview_b64") or b.get("preview_data")
+        if isinstance(b64, str) and b64:
+            try:
+                preview = base64.b64decode(b64)
+            except Exception:
+                preview = b""
+        return Chart(
+            title=str(b.get("title") or ""),
+            chart_type=str(b.get("chart_type") or "bar"),
+            categories=[str(c) for c in (b.get("categories") or [])],
+            series=list(b.get("series") or []),
+            preview_mime=str(b.get("preview_mime") or ""),
+            preview_data=preview,
+        )
+    if t == "speaker_note":
+        try:
+            idx = int(b.get("slide_index") or 1)
+        except (TypeError, ValueError):
+            idx = 1
+        return SpeakerNote(text=str(b.get("text") or ""), slide_index=max(1, idx))
+    if t == "smartart":
+        items = b.get("items") or []
+        return SmartArt(
+            layout=str(b.get("layout") or ""),
+            title=str(b.get("title") or ""),
+            items=[str(x) for x in items] if isinstance(items, list) else [],
+        )
+    if t == "ole_object":
+        import base64
+
+        raw = b""
+        b64 = b.get("data_b64") or ""
+        if isinstance(b64, str) and b64:
+            try:
+                raw = base64.b64decode(b64)
+            except Exception:
+                raw = b""
+        return OleObject(
+            prog_id=str(b.get("prog_id") or ""),
+            label=str(b.get("label") or ""),
+            relationship_id=str(b.get("relationship_id") or ""),
+            data=raw,
+            mime_type=str(b.get("mime_type") or ""),
+        )
     if t == "image":
         return Paragraph(text=f"[Image: {b.get('alt_text') or 'image'}]")
     return None

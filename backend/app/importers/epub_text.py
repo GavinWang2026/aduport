@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import re
-import uuid
 import zipfile
 from io import BytesIO
 from xml.etree import ElementTree as ET
 
 from app.config import settings
+from app.core import xml_safe
 from app.core.document_model import DocumentModel
+from app.core.exceptions import FileTooLargeError
+from app.core.safe_zip import ZipInflateBudget
 from app.importers.html_importer import import_html
 
 _IDPF_FONT_NS = "http://www.idpf.org/2008/embedding"
@@ -24,21 +26,22 @@ def try_extract_epub_model(data: bytes, *, title: str = "") -> DocumentModel | N
         zf.close()
         return None
 
-    opf_path = _find_opf(zf)
+    budget = ZipInflateBudget()
+    opf_path = _find_opf(zf, budget)
     if not opf_path:
         zf.close()
         return None
 
     try:
-        opf = ET.fromstring(zf.read(opf_path))
-    except ET.ParseError:
+        opf = xml_safe.fromstring(budget.read(zf, opf_path))
+    except (ET.ParseError, FileTooLargeError, KeyError):
         zf.close()
         return None
 
     opf_dir = opf_path.rsplit("/", 1)[0] + "/" if "/" in opf_path else ""
     hrefs = _spine_hrefs(opf)
     epub_id = _epub_identifier(opf)
-    encrypted_paths = _encrypted_resource_paths(zf)
+    encrypted_paths = _encrypted_resource_paths(zf, budget)
     drm_algorithms = list(encrypted_paths.values())
     deobfuscated: list[str] = []
 
@@ -55,8 +58,8 @@ def try_extract_epub_model(data: bytes, *, title: str = "") -> DocumentModel | N
                 continue
             path = matches[0]
         try:
-            raw_bytes = zf.read(path)
-        except KeyError:
+            raw_bytes = budget.read(zf, path)
+        except (KeyError, FileTooLargeError):
             continue
         if path in encrypted_paths:
             deob = _try_deobfuscate(raw_bytes, epub_id, encrypted_paths[path])
@@ -133,11 +136,13 @@ def _epub_drm_meta(names: set[str], *, deobfuscated: list[str] = [], algorithms:
     return {}
 
 
-def _encrypted_resource_paths(zf: zipfile.ZipFile) -> dict[str, str]:
+def _encrypted_resource_paths(
+    zf: zipfile.ZipFile, budget: ZipInflateBudget
+) -> dict[str, str]:
     """Map encrypted resource URI → algorithm URI from encryption.xml."""
     try:
-        root = ET.fromstring(zf.read("META-INF/encryption.xml"))
-    except (KeyError, ET.ParseError):
+        root = xml_safe.fromstring(budget.read(zf, "META-INF/encryption.xml"))
+    except (KeyError, ET.ParseError, FileTooLargeError):
         return {}
     out: dict[str, str] = {}
     for data_ref in root.iter():
@@ -157,7 +162,11 @@ def _encrypted_resource_paths(zf: zipfile.ZipFile) -> dict[str, str]:
 
 
 def _try_deobfuscate(data: bytes, epub_id: str, algorithm: str) -> bytes | None:
-    """Reverse IDPF font obfuscation (not Adobe DRM)."""
+    """Reverse IDPF font obfuscation (not Adobe DRM).
+
+    IDPF key = SHA-1(unique-identifier) → 20 bytes; XOR first min(1040, len) bytes
+    with key[i % 20]. See EPUB Open Container Format §3.2.
+    """
     if not epub_id or not algorithm:
         return None
     if algorithm != _IDPF_FONT_NS and "idpf.org" not in algorithm:
@@ -165,13 +174,15 @@ def _try_deobfuscate(data: bytes, epub_id: str, algorithm: str) -> bytes | None:
     if len(data) < 20:
         return None
     try:
-        key = uuid.UUID(epub_id).bytes[:20]
-    except ValueError:
-        key = uuid.uuid5(uuid.NAMESPACE_URL, epub_id).bytes[:20]
-    out = bytearray(data)
-    for i in range(min(20, len(out))):
-        out[i] ^= key[i]
-    return bytes(out)
+        import hashlib
+
+        key = hashlib.sha1(epub_id.encode("utf-8")).digest()  # noqa: S324 — IDPF mandated
+        out = bytearray(data)
+        for i in range(min(1040, len(out))):
+            out[i] ^= key[i % 20]
+        return bytes(out)
+    except Exception:
+        return None
 
 
 def _epub_identifier(opf: ET.Element) -> str:
@@ -187,10 +198,10 @@ def _epub_identifier(opf: ET.Element) -> str:
     return ""
 
 
-def _find_opf(zf: zipfile.ZipFile) -> str | None:
+def _find_opf(zf: zipfile.ZipFile, budget: ZipInflateBudget) -> str | None:
     try:
-        root = ET.fromstring(zf.read("META-INF/container.xml"))
-    except (KeyError, ET.ParseError):
+        root = xml_safe.fromstring(budget.read(zf, "META-INF/container.xml"))
+    except (KeyError, ET.ParseError, FileTooLargeError):
         for n in zf.namelist():
             if n.endswith(".opf"):
                 return n

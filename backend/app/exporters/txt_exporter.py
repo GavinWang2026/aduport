@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.core.document_model import (
     Blockquote,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
@@ -18,10 +19,13 @@ from app.core.document_model import (
     Paragraph,
     PivotTable,
     Revision,
+    SpeakerNote,
+    SmartArt,
+    OleObject,
     Table,
     TextBox,
-    ensure_rich_text,
 )
+from app.exporters.rich_visible import render_rich_visible
 
 
 def export_txt(model: DocumentModel) -> str:
@@ -38,11 +42,11 @@ def export_txt(model: DocumentModel) -> str:
             lines.append(("-" if node.level > 1 else "=") * min(40, max(3, len(text))))
             lines.append("")
         elif isinstance(node, Paragraph):
-            lines.append(ensure_rich_text(node.text).text)
+            lines.append(render_rich_visible(node.text))
             lines.append("")
         elif isinstance(node, Blockquote):
             for p in node.paragraphs:
-                for line in ensure_rich_text(p).text.splitlines() or [""]:
+                for line in render_rich_visible(p).splitlines() or [""]:
                     lines.append(f"> {line}")
             lines.append("")
         elif isinstance(node, HorizontalRule):
@@ -54,7 +58,19 @@ def export_txt(model: DocumentModel) -> str:
                 mark = "[x]" if node.checked else "[ ]"
             else:
                 mark = "1." if node.ordered else "-"
-            lines.append(f"{indent}{mark} {ensure_rich_text(node.text).text}")
+            lines.append(f"{indent}{mark} {render_rich_visible(node.text)}")
+            # v6/T1-#3: a multi-paragraph list item carries its extra paragraphs
+            # and fenced code blocks in `children`. Rendering only `node.text`
+            # silently dropped that content from txt/html/json output.
+            for child in node.children:
+                if isinstance(child, CodeBlock):
+                    lines.append(f"{indent}  ```{child.lang or ''}")
+                    for line in child.content.splitlines() or [""]:
+                        lines.append(f"{indent}  {line}")
+                    lines.append(f"{indent}  ```")
+                elif isinstance(child, Paragraph):
+                    for line in render_rich_visible(child.text).splitlines() or [""]:
+                        lines.append(f"{indent}  {line}")
         elif isinstance(node, Table):
             from app.exporters.table_span import (
                 render_table_html,
@@ -73,10 +89,25 @@ def export_txt(model: DocumentModel) -> str:
                 lines.append(" | ".join(row))
             lines.append("")
         elif isinstance(node, Image):
-            lines.append(f"[Image: {node.alt_text}]")
+            alt = node.alt_text or "image"
+            lines.append(f"[Image: {alt}]")
+            lines.append("")
+        elif isinstance(node, Chart):
+            lines.append(node.plain_text())
+            lines.append("")
+        elif isinstance(node, SpeakerNote):
+            lines.append(f"[SpeakerNote s{node.slide_index}] {node.text}")
+            lines.append("")
+        elif isinstance(node, SmartArt):
+            lines.append(node.plain_text())
+            for it in node.items[:50]:
+                lines.append(f"- {it}")
+            lines.append("")
+        elif isinstance(node, OleObject):
+            lines.append(node.plain_text())
             lines.append("")
         elif isinstance(node, MathBlock):
-            lines.append(node.content)
+            lines.append(f"$$ {node.content} $$" if node.display else f"$ {node.content} $")
             lines.append("")
         elif isinstance(node, Footnote):
             lines.append(f"[^{node.id}]: {node.text}")
@@ -109,7 +140,18 @@ def export_txt(model: DocumentModel) -> str:
             lines.append(re.sub(r"<[^>]+>", "", node.content).strip())
             lines.append("")
         elif isinstance(node, CodeBlock):
+            fence = f"```{node.lang or ''}"
+            lines.append(fence)
             lines.append(node.content)
+            lines.append("```")
             lines.append("")
+        else:
+            # v6/T2-#8: layout chrome (Section/HeaderFooter/FieldCode/…) must
+            # not vanish on TXT the way ListItem.children used to.
+            plain = getattr(node, "plain_text", None)
+            text = plain() if callable(plain) else ""
+            if text:
+                lines.append(text)
+                lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"

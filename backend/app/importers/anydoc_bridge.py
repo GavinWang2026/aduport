@@ -84,14 +84,15 @@ _FORMAT_MAP: dict[str, str] = {
 #   KEEP OUT  : xlsx (native header-row), pdf (no anydoc model; OCR/docling)
 #   ENABLED   : epub, csv — default allowlist (P2-4); native fallback when anydoc declines
 ANYDOC_ONLY_SIBLINGS: dict[str, str | None] = {
-    "ppt": None,
-    "pps": None,
-    "pot": None,
-    "xls": None,
-    "xlsb": None,
+    # value = native sibling importer format (None → dedicated native below)
+    "ppt": "ppt",
+    "pps": "pps",
+    "pot": "pot",
+    "xls": "xls",
+    "xlsb": "xlsb",
     "xlsm": "xlsx",
-    "ods": None,
-    "odp": None,
+    "ods": "ods",
+    "odp": "odp",
     "docm": "docx",
     "pptm": "pptx",
     "ppsx": "pptx",
@@ -216,10 +217,14 @@ def sniff_format(data: bytes) -> str | None:
     return _SNIFF_MAP.get(detected) if detected else None
 
 
-def _translate_error(exc: Exception, filename: str) -> Exception:
-    """Map an anydoc ConvertError onto md-bridge's error contract."""
+def _translate_error(exc: BaseException, filename: str) -> Exception:
+    """Map an anydoc ConvertError / PanicException onto md-bridge's error contract."""
     name = type(exc).__name__
     label = filename or "文档"
+    # PyO3 panics become PanicException(BaseException), not Exception — must map
+    # here so callers' `except Exception` paths and native fallbacks still work.
+    if name == "PanicException":
+        return AnydocFallback(f"anydoc native panic: {exc}", code="panic")
     if name == "UnsupportedError":
         return AnydocFallback(f"anydoc 不支持该格式: {exc}", code="unsupported")
     if name == "NeedsOcrError":
@@ -245,6 +250,13 @@ def _translate_error(exc: Exception, filename: str) -> Exception:
     return AnydocFallback(f"anydoc 转换失败: {exc}", code="unknown")
 
 
+def _reraise_or_map_native(exc: BaseException, filename: str) -> Exception:
+    """Re-raise process control signals; map everything else including panics."""
+    if isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit)):
+        raise exc
+    return _translate_error(exc, filename)
+
+
 # --------------------------------------------------------------------------
 # Fast channel: straight to Markdown
 # --------------------------------------------------------------------------
@@ -267,6 +279,8 @@ def markdown_via_anydoc(data: bytes, fmt: str, filename: str = "") -> str:
         raise CorruptedFileError(f"无法读取文档: {filename or fmt} — {exc}") from exc
     except Exception as exc:
         raise _translate_error(exc, filename) from exc
+    except BaseException as exc:
+        raise _reraise_or_map_native(exc, filename) from exc
 
 
 # --------------------------------------------------------------------------
@@ -569,6 +583,8 @@ def import_via_anydoc(data: bytes, filename: str = "", fmt: str = "") -> Documen
         raise CorruptedFileError(f"无法读取文档: {filename or fmt} — {exc}") from exc
     except Exception as exc:
         raise _translate_error(exc, filename) from exc
+    except BaseException as exc:
+        raise _reraise_or_map_native(exc, filename) from exc
 
     assets = {a.id: a for a in doc.assets}
     nodes: list[Any] = []

@@ -15,6 +15,7 @@ from app.core.document_model import (
     Footnote,
     Heading,
     HorizontalRule,
+    Image,
     InlineMark,
     InlineMarkType,
     ListItem,
@@ -89,7 +90,17 @@ class _HTMLDocParser(HTMLParser):
             self._stack.append(tag)
             self._reset_buf()
         elif tag in ("ul", "ol"):
-            self._flush_text_as_para()
+            # Nested list inside <li>: flush parent item text before descending
+            if self._stack and self._stack[-1] == "li":
+                rich = self._take_rich()
+                if rich.text.strip() or rich.marks:
+                    ordered = self._list_stack[-1] if self._list_stack else False
+                    level = max(0, len(self._list_stack) - 1)
+                    self.nodes.append(
+                        ListItem(text=rich, ordered=ordered, level=level)
+                    )
+            else:
+                self._flush_text_as_para()
             self._list_stack.append(tag == "ol")
             self._stack.append(tag)
         elif tag == "li":
@@ -97,6 +108,8 @@ class _HTMLDocParser(HTMLParser):
             if self._in_footnotes_section():
                 self._footnote_li = {k.lower(): v for k, v in attrs}
             self._stack.append(tag)
+        elif tag == "img":
+            self._handle_img(attrs)
         elif tag == "table":
             self._flush_text_as_para()
             self._table_rows = []
@@ -173,6 +186,47 @@ class _HTMLDocParser(HTMLParser):
             self._stack.append(tag)
         elif tag == "code" and self._in_pre:
             self._stack.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs) -> None:
+        """Self-closing tags (img/br) — HTMLParser may not call handle_starttag."""
+        tag = tag.lower()
+        if self._skip_depth:
+            return
+        if tag == "br":
+            self._append_text("\n")
+        elif tag == "img":
+            self._handle_img(attrs)
+        elif tag == "hr":
+            self._flush_text_as_para()
+            self.nodes.append(HorizontalRule())
+
+    def _handle_img(self, attrs) -> None:
+        src = ""
+        alt = ""
+        for k, v in attrs:
+            kl = k.lower()
+            if kl == "src" and v:
+                src = str(v).strip()
+            elif kl == "alt" and v:
+                alt = str(v)
+        if not src or src.lower().startswith("javascript:"):
+            return
+        # Flush surrounding text so image sits as its own node
+        if self._stack and self._stack[-1] in ("p", "li"):
+            pass  # keep inline context; still emit Image as sibling block
+        else:
+            self._flush_text_as_para()
+        mime = "image/png"
+        lower = src.lower().split("?", 1)[0]
+        if lower.endswith(".jpg") or lower.endswith(".jpeg"):
+            mime = "image/jpeg"
+        elif lower.endswith(".gif"):
+            mime = "image/gif"
+        elif lower.endswith(".webp"):
+            mime = "image/webp"
+        elif lower.endswith(".svg"):
+            mime = "image/svg+xml"
+        self.nodes.append(Image(data=b"", alt_text=alt, mime_type=mime, url=src))
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()

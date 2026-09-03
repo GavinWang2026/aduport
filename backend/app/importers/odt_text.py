@@ -7,6 +7,7 @@ import zipfile
 from io import BytesIO
 from xml.etree import ElementTree as ET
 
+from app.core import xml_safe
 from app.core.document_model import (
     Comment,
     ContentControl,
@@ -20,6 +21,8 @@ from app.core.document_model import (
     TableCell,
     TextBox,
 )
+from app.core.exceptions import FileTooLargeError
+from app.core.safe_zip import ZipInflateBudget
 
 _NS = {
     "office": "urn:oasis:names:tc:opendocument:xmlns:office:1.0",
@@ -38,8 +41,9 @@ def try_extract_odt_model(data: bytes, *, title: str = "") -> DocumentModel | No
         zf.close()
         return None
     try:
-        root = ET.fromstring(zf.read("content.xml"))
-    except ET.ParseError:
+        budget = ZipInflateBudget()
+        root = xml_safe.fromstring(budget.read(zf, "content.xml"))
+    except (ET.ParseError, FileTooLargeError, KeyError):
         zf.close()
         return None
     zf.close()

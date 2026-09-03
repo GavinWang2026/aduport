@@ -10,6 +10,7 @@ from html.parser import HTMLParser
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from app.config import settings
 from app.core.document_model import (
     Blockquote,
     CodeBlock,
@@ -26,6 +27,7 @@ from app.core.document_model import (
     Paragraph,
     RichText,
     Table,
+    TableCell,
 )
 from app.core.exceptions import InvalidDocumentError
 
@@ -36,6 +38,30 @@ _DATA_URI_RE = re.compile(
 _TASK_RE = re.compile(r"^\[([ xX])\]\s+(.*)$", re.DOTALL)
 _FOOTNOTE_DEF_RE = re.compile(r"^\[\^([^\]]+)\]:\s*(.*)$", re.MULTILINE)
 _DISPLAY_MATH_RE = re.compile(r"\$\$([\s\S]+?)\$\$")
+
+# v6/T1-#5: browsers strip leading C0 controls and spaces before parsing a URL,
+# so `<a href=" javascript:...">` slipped straight past a startswith()
+# blacklist (HTMLParser already decodes `&#9;` into a real tab). Strip first,
+# then match a positive allowlist -- blacklists against URL schemes never win.
+_URL_LEAD_WS = "".join(chr(c) for c in range(0x00, 0x21))
+_URL_SAFE_PREFIXES = ("http://", "https://", "mailto:", "tel:", "#", "/")
+_URL_RELATIVE_RE = re.compile(r"^[\w./?=&%~+\-]+$")
+
+
+def _strip_url_leading_ws(value: str) -> str:
+    """Drop leading controls/space (and embedded NUL) before URL checks."""
+    return value.replace("\x00", "").lstrip(_URL_LEAD_WS)
+
+
+def _is_safe_url(value: str) -> bool:
+    """Positive allowlist for href/src attributes."""
+    if not value:
+        return False
+    low = value.lower()
+    if low.startswith(_URL_SAFE_PREFIXES):
+        return True
+    # bare relative path / anchor / query form without a leading slash
+    return bool(_URL_RELATIVE_RE.match(value))
 _SAFE_HTML_TAGS = frozenset(
     {
         "p",
@@ -68,7 +94,21 @@ _SAFE_HTML_TAGS = frozenset(
         "img",
         "span",
         "div",
+        "figure",
+        "figcaption",
+        "video",
+        "details",
+        "summary",
+        "aside",
+        "nav",
+        "article",
     }
+)
+
+# D-26: tags the AST mapper cannot represent — keep as HtmlBlock.
+_OPAQUE_HTML_RE = re.compile(
+    r"<\s*(figure|figcaption|video|details|summary|aside|nav|article)\b",
+    re.I,
 )
 
 
@@ -175,7 +215,8 @@ def _postprocess_inline_semantics(model: DocumentModel, footnote_ids: set[str]) 
             node.text = _enrich_rich(ensure_rich(node.text), footnote_ids)
             if isinstance(node, ListItem):
                 for child in node.children:
-                    child.text = _enrich_rich(ensure_rich(child.text), footnote_ids)
+                    if isinstance(child, Paragraph):
+                        child.text = _enrich_rich(ensure_rich(child.text), footnote_ids)
         elif isinstance(node, Blockquote):
             node.paragraphs = [
                 _enrich_rich(ensure_rich(p), footnote_ids) for p in node.paragraphs
@@ -234,24 +275,155 @@ def _overlaps_protected(marks: list[InlineMark], start: int, end: int) -> bool:
 
 
 def _extract_footnotes(text: str) -> tuple[str, list[Footnote]]:
+    fences = _code_protected_ranges(text)
     footnotes: list[Footnote] = []
     for match in _FOOTNOTE_DEF_RE.finditer(text):
+        if _pos_in_ranges(match.start(), fences):
+            continue
         footnotes.append(Footnote(id=match.group(1), text=match.group(2).strip()))
-    cleaned = _FOOTNOTE_DEF_RE.sub("", text)
-    # Collapse excessive blank lines left by removal
-    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip() + ("\n" if text.endswith("\n") else "")
+
+    def _sub_fn(m: re.Match[str]) -> str:
+        if _pos_in_ranges(m.start(), fences):
+            return m.group(0)
+        return ""
+
+    cleaned = _FOOTNOTE_DEF_RE.sub(_sub_fn, text)
+    # Collapse excessive blank lines left by removal — do NOT .strip():
+    # leading 4-space / tab indentation marks CommonMark indented code (P0 #10).
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    if text.endswith("\n"):
+        cleaned = cleaned.rstrip("\n") + "\n"
+    else:
+        cleaned = cleaned.rstrip("\n")
     return cleaned, footnotes
 
 
 def _protect_display_math(text: str) -> str:
+    # History P0 #10: protect fences + 4-space indented code + inline `code`.
+    fences = _code_protected_ranges(text)
+
     def repl(m: re.Match[str]) -> str:
+        if _pos_in_ranges(m.start(), fences):
+            return m.group(0)
         body = m.group(1).strip()
         return f"\n```math\n{body}\n```\n"
 
     return _DISPLAY_MATH_RE.sub(repl, text)
 
 
-def _parse_blockquote(tokens: list[Token], start: int) -> tuple[Blockquote | None, int]:
+_FENCE_OPEN_RE = re.compile(r"^( {0,3})(`{3,}|~{3,})")
+_INDENTED_CODE_LINE_RE = re.compile(r"^(?: {4,}|\t)")
+
+
+def _fenced_code_ranges(text: str) -> list[tuple[int, int]]:
+    """Return [start, end) ranges of fenced code blocks (``` / ~~~)."""
+    ranges: list[tuple[int, int]] = []
+    pos = 0
+    lines = text.splitlines(keepends=True)
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = _FENCE_OPEN_RE.match(line)
+        if not m:
+            pos += len(line)
+            i += 1
+            continue
+        fence = m.group(2)[0]
+        fence_len = len(m.group(2))
+        start = pos
+        pos += len(line)
+        i += 1
+        while i < len(lines):
+            close = lines[i]
+            pos += len(close)
+            i += 1
+            cm = re.match(r"^( {0,3})(`{3,}|~{3,})\s*$", close)
+            if (
+                cm
+                and cm.group(2)[0] == fence
+                and len(cm.group(2)) >= fence_len
+            ):
+                break
+        ranges.append((start, pos))
+    return ranges
+
+
+def _indented_code_line_ranges(text: str) -> list[tuple[int, int]]:
+    """CommonMark indented code: lines starting with ≥4 spaces or a tab."""
+    ranges: list[tuple[int, int]] = []
+    pos = 0
+    for line in text.splitlines(keepends=True):
+        if _INDENTED_CODE_LINE_RE.match(line):
+            ranges.append((pos, pos + len(line)))
+        pos += len(line)
+    return ranges
+
+
+def _inline_code_ranges(text: str) -> list[tuple[int, int]]:
+    """Backtick-delimited inline code spans (matching opener length)."""
+    ranges: list[tuple[int, int]] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "`":
+            i += 1
+            continue
+        j = i
+        while j < n and text[j] == "`":
+            j += 1
+        opener = j - i
+        k = j
+        found = False
+        while k < n:
+            if text[k] != "`":
+                k += 1
+                continue
+            end = k
+            while end < n and text[end] == "`":
+                end += 1
+            if end - k == opener:
+                ranges.append((i, end))
+                i = end
+                found = True
+                break
+            k = end
+        if not found:
+            i = j
+    return ranges
+
+
+def _code_protected_ranges(text: str) -> list[tuple[int, int]]:
+    """Union of fenced / indented / inline code — skip $$ and footnote rewrites."""
+    return (
+        _fenced_code_ranges(text)
+        + _indented_code_line_ranges(text)
+        + _inline_code_ranges(text)
+    )
+
+
+def _pos_in_ranges(pos: int, ranges: list[tuple[int, int]]) -> bool:
+    return any(a <= pos < b for a, b in ranges)
+
+
+_MAX_BLOCKQUOTE_DEPTH = 32
+
+
+def _skip_blockquote(tokens: list[Token], start: int) -> int:
+    """Index after the blockquote_close matching tokens[start] (a blockquote_open)."""
+    i = start + 1
+    depth = 1
+    while i < len(tokens) and depth:
+        if tokens[i].type == "blockquote_open":
+            depth += 1
+        elif tokens[i].type == "blockquote_close":
+            depth -= 1
+        i += 1
+    return i
+
+
+def _parse_blockquote(
+    tokens: list[Token], start: int, depth: int = 0
+) -> tuple[Blockquote | None, int]:
     paragraphs: list[RichText | str] = []
     i = start + 1
     while i < len(tokens) and tokens[i].type != "blockquote_close":
@@ -266,8 +438,11 @@ def _parse_blockquote(tokens: list[Token], start: int) -> tuple[Blockquote | Non
             i += 3
             continue
         if tokens[i].type == "blockquote_open":
-            # Nested quote: flatten paragraphs
-            nested, consumed = _parse_blockquote(tokens, i)
+            # D-29: cap recursion; skip deeper nests instead of overflowing the stack.
+            if depth + 1 >= _MAX_BLOCKQUOTE_DEPTH:
+                i = _skip_blockquote(tokens, i)
+                continue
+            nested, consumed = _parse_blockquote(tokens, i, depth + 1)
             if nested:
                 paragraphs.extend(nested.paragraphs)
             i += consumed
@@ -300,6 +475,10 @@ def _nodes_from_html(raw: str) -> list:
                 return doc.nodes
         except Exception:
             pass
+    # D-26: opaque HTML (figure/video/…) used to be flattened to nothing.
+    if _OPAQUE_HTML_RE.search(raw):
+        frag = _sanitize_html_fragment(raw)
+        return [HtmlBlock(content=frag)] if frag else []
     # Reject dangerous constructs; keep a sanitized fragment for round-trip
     lower = raw.lower()
     if "<script" in lower or "<iframe" in lower or "javascript:" in lower:
@@ -321,35 +500,61 @@ def _nodes_from_html(raw: str) -> list:
 def _sanitize_html_fragment(raw: str) -> str:
     """Strip disallowed tags/attrs; keep a conservative subset."""
 
+    _SKIP_TAGS = frozenset(
+        {"script", "iframe", "object", "embed", "svg", "math", "link", "style", "meta"}
+    )
+
     class _San(HTMLParser):
         def __init__(self) -> None:
             super().__init__(convert_charrefs=True)
             self.out: list[str] = []
+            self._skip_depth = 0
 
         def handle_starttag(self, tag: str, attrs) -> None:
-            if tag not in _SAFE_HTML_TAGS:
+            tag_l = tag.lower()
+            if self._skip_depth or tag_l in _SKIP_TAGS:
+                if tag_l in _SKIP_TAGS:
+                    self._skip_depth += 1
+                return
+            if tag_l not in _SAFE_HTML_TAGS:
                 return
             safe_attrs = []
             for k, v in attrs:
-                if k.lower() in ("href", "src", "alt", "title") and v and not v.lower().startswith(
-                    ("javascript:", "data:text")
+                kl = k.lower()
+                if kl.startswith("on"):
+                    continue
+                if kl in ("href", "src") and v and _is_safe_url(
+                    _strip_url_leading_ws(v)
                 ):
-                    safe_attrs.append(f'{k}="{html_lib.escape(v, quote=True)}"')
+                    safe_attrs.append(
+                        f'{kl}="{html_lib.escape(_strip_url_leading_ws(v), quote=True)}"'
+                    )
+                elif kl in ("alt", "title") and v:
+                    # not a URL -- escaping alone is sufficient
+                    safe_attrs.append(f'{kl}="{html_lib.escape(v, quote=True)}"')
             attr_s = (" " + " ".join(safe_attrs)) if safe_attrs else ""
-            if tag == "br":
+            if tag_l == "br":
                 self.out.append("<br/>")
-            elif tag == "hr":
+            elif tag_l == "hr":
                 self.out.append("<hr/>")
-            elif tag == "img":
+            elif tag_l == "img":
                 self.out.append(f"<img{attr_s}/>")
             else:
-                self.out.append(f"<{tag}{attr_s}>")
+                self.out.append(f"<{tag_l}{attr_s}>")
 
         def handle_endtag(self, tag: str) -> None:
-            if tag in _SAFE_HTML_TAGS and tag not in ("br", "hr", "img"):
-                self.out.append(f"</{tag}>")
+            tag_l = tag.lower()
+            if tag_l in _SKIP_TAGS and self._skip_depth:
+                self._skip_depth -= 1
+                return
+            if self._skip_depth:
+                return
+            if tag_l in _SAFE_HTML_TAGS and tag_l not in ("br", "hr", "img"):
+                self.out.append(f"</{tag_l}>")
 
         def handle_data(self, data: str) -> None:
+            if self._skip_depth:
+                return
             self.out.append(html_lib.escape(data))
 
     san = _San()
@@ -503,6 +708,99 @@ class _SafeHTMLToNodes(HTMLParser):
             self.nodes.append(Paragraph(text=rich))
 
 
+def _parse_inline_tokens(tokens: list[Token]) -> tuple[str, list[InlineMark]]:
+    """Stack-friendly inline token walk — preserves nested strong/em/s/link marks.
+
+    v6/T2-#7 (D-01): the old path only accumulated text inside an open mark,
+    silently dropping nested format tokens.
+    """
+    parts: list[str] = []
+    marks: list[InlineMark] = []
+    offset = 0
+    idx = 0
+    close_map = {
+        "strong_open": "strong_close",
+        "em_open": "em_close",
+        "s_open": "s_close",
+        "link_open": "link_close",
+    }
+    mark_map = {
+        "strong_open": InlineMarkType.BOLD,
+        "em_open": InlineMarkType.ITALIC,
+        "s_open": InlineMarkType.STRIKETHROUGH,
+        "link_open": InlineMarkType.LINK,
+    }
+    while idx < len(tokens):
+        tok = tokens[idx]
+        t = tok.type
+        if t == "text":
+            parts.append(tok.content or "")
+            offset += len(tok.content or "")
+            idx += 1
+            continue
+        if t == "code_inline":
+            start = offset
+            parts.append(tok.content or "")
+            offset += len(tok.content or "")
+            marks.append(InlineMark(type=InlineMarkType.CODE, start=start, end=offset))
+            idx += 1
+            continue
+        if t == "softbreak":
+            parts.append(" ")
+            offset += 1
+            idx += 1
+            continue
+        if t == "hardbreak":
+            parts.append("\n")
+            offset += 1
+            idx += 1
+            continue
+        if t in close_map:
+            close_type = close_map[t]
+            mark_type = mark_map[t]
+            href = tok.attrGet("href") if t == "link_open" else None
+            start = offset
+            idx += 1
+            inner_start = idx
+            depth = 1
+            while idx < len(tokens):
+                c = tokens[idx]
+                if c.type == t:
+                    depth += 1
+                elif c.type == close_type:
+                    depth -= 1
+                    if depth == 0:
+                        idx += 1
+                        break
+                idx += 1
+            inner_text, inner_marks = _parse_inline_tokens(tokens[inner_start : idx - 1])
+            parts.append(inner_text)
+            for m in inner_marks:
+                marks.append(
+                    InlineMark(
+                        type=m.type,
+                        start=start + m.start,
+                        end=start + m.end,
+                        href=m.href,
+                    )
+                )
+            end = start + len(inner_text)
+            offset = end
+            marks.append(InlineMark(type=mark_type, start=start, end=end, href=href))
+            continue
+        if t in ("strong_close", "em_close", "s_close", "link_close"):
+            idx += 1
+            continue
+        if t == "image":
+            alt = tok.content or tok.attrGet("alt") or ""
+            parts.append(alt)
+            offset += len(alt)
+            idx += 1
+            continue
+        idx += 1
+    return "".join(parts), marks
+
+
 def _nodes_from_inline(
     inline: Token,
     *,
@@ -574,6 +872,8 @@ def _nodes_from_inline(
             continue
 
         if t in ("strong_open", "em_open", "s_open", "link_open"):
+            # v6/T2-#7 / D-01: nest marks with a stack — previously only
+            # text/code_inline were collected, so **_bold italic_** lost italic.
             close_map = {
                 "strong_open": "strong_close",
                 "em_open": "em_close",
@@ -591,33 +891,30 @@ def _nodes_from_inline(
             href = child.attrGet("href") if t == "link_open" else None
             start = offset
             idx += 1
-            inner_parts: list[str] = []
+            inner_start = idx
             depth = 1
             while idx < len(children):
                 c = children[idx]
                 if c.type == t:
                     depth += 1
-                    idx += 1
-                    continue
-                if c.type == close_type:
+                elif c.type == close_type:
                     depth -= 1
-                    idx += 1
                     if depth == 0:
+                        idx += 1
                         break
-                    continue
-                if c.type in ("text", "code_inline"):
-                    inner_parts.append(c.content)
-                elif c.type == "softbreak":
-                    inner_parts.append(" ")
-                elif c.type == "hardbreak":
-                    inner_parts.append("\n")
-                elif c.type == "image":
-                    alt = c.content or c.attrGet("alt") or ""
-                    inner_parts.append(alt)
                 idx += 1
-            inner = "".join(inner_parts)
-            parts.append(inner)
-            end = start + len(inner)
+            inner_text, inner_marks = _parse_inline_tokens(children[inner_start : idx - 1])
+            parts.append(inner_text)
+            for m in inner_marks:
+                marks.append(
+                    InlineMark(
+                        type=m.type,
+                        start=start + m.start,
+                        end=start + m.end,
+                        href=m.href,
+                    )
+                )
+            end = start + len(inner_text)
             offset = end
             marks.append(InlineMark(type=mark_type, start=start, end=end, href=href))
             continue
@@ -714,7 +1011,7 @@ def _parse_list(
             i += 1
             item_text: RichText | str | None = None
             item_checked: bool | None = None
-            item_children: list[Paragraph] = []
+            item_children: list[Paragraph | CodeBlock] = []
             while i < len(tokens) and tokens[i].type != "list_item_close":
                 if tokens[i].type == "paragraph_open":
                     inline = tokens[i + 1]
@@ -758,11 +1055,13 @@ def _parse_list(
                     i += consumed
                     continue
                 if tokens[i].type == "fence":
+                    lang = (tokens[i].info or "").split()[0] if tokens[i].info else ""
                     content = tokens[i].content.rstrip("\n")
+                    # V-E: keep fenced code as CodeBlock (not Paragraph) so
+                    # txt/html/json round-trips preserve a real code node.
                     if item_text is None:
-                        item_text = content
-                    else:
-                        item_children.append(Paragraph(text=content))
+                        item_text = ""
+                    item_children.append(CodeBlock(lang=lang, content=content))
                     i += 1
                     continue
                 i += 1
@@ -790,20 +1089,42 @@ def _parse_table(tokens: list[Token], start: int) -> tuple[Table | None, int]:
     rows: list[list[str]] = []
     i = start + 1
     current_row: list[str] = []
+    header_rows = 0
+    in_thead = False
     while i < len(tokens) and tokens[i].type != "table_close":
         t = tokens[i]
         if t.type == "tr_open":
             current_row = []
             i += 1
             continue
-        if t.type in ("thead_open", "tbody_open", "thead_close", "tbody_close"):
+        if t.type == "thead_open":
+            in_thead = True
+            i += 1
+            continue
+        if t.type == "thead_close":
+            in_thead = False
+            i += 1
+            continue
+        if t.type in ("tbody_open", "tbody_close"):
             i += 1
             continue
         if t.type in ("th_open", "td_open"):
             close_type = "th_close" if t.type == "th_open" else "td_close"
             cell = ""
             if i + 1 < len(tokens) and tokens[i + 1].type == "inline":
-                cell = tokens[i + 1].content
+                inline = tokens[i + 1]
+                # Prefer structured inline (drops literal ** / * markers)
+                rich_nodes = _nodes_from_inline(inline, wrap="paragraph")
+                for n in rich_nodes:
+                    if isinstance(n, Paragraph):
+                        cell = (
+                            n.text.text
+                            if isinstance(n.text, RichText)
+                            else str(n.text or "")
+                        )
+                        break
+                if not cell:
+                    cell = inline.content or ""
                 i += 2
             else:
                 i += 1
@@ -814,10 +1135,23 @@ def _parse_table(tokens: list[Token], start: int) -> tuple[Table | None, int]:
         if t.type == "tr_close":
             if current_row:
                 rows.append(current_row)
+                if in_thead:
+                    header_rows += 1
             current_row = []
             i += 1
             continue
         i += 1
     if i < len(tokens) and tokens[i].type == "table_close":
         i += 1
-    return (Table(rows=rows) if rows else None), i - start
+    if rows and header_rows == 0 and settings.table_first_row_header:
+        # GFM convention: first row is header when thead markers absent
+        header_rows = 1
+    if not rows:
+        return None, i - start
+    # v6/T3-#21 / D-25: always emit TableCell so merge metadata / HTML
+    # colspan round-trips instead of flattening to list[str] only.
+    cells = [
+        [TableCell(text=c, origin_row=r, origin_col=j) for j, c in enumerate(row)]
+        for r, row in enumerate(rows)
+    ]
+    return Table(rows=rows, cells=cells, header_rows=header_rows), i - start

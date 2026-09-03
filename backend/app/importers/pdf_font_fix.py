@@ -75,10 +75,21 @@ def _translate_math_font(text: str) -> str:
     return "".join(out)
 
 
+def _looks_like_pep_math_font(text: str) -> bool:
+    """Heuristic: textbook math fonts emit many remappable CJK codepoints."""
+    if not text:
+        return False
+    hits = sum(1 for ch in text if ch in _PEP_MATH_FONT_MAP)
+    if hits >= 3:
+        return True
+    # Dense short labels like 「犃犅犆」
+    return hits >= 2 and hits / max(1, len(text.strip())) >= 0.15
+
+
 def normalize_pdf_text(text: str) -> str:
     """
     Normalize extracted PDF text for Chinese textbooks:
-    - math-font CJK → Latin
+    - math-font CJK → Latin (settings flag or dense-PEP heuristic)
     - fullwidth alphanumerics → ASCII (NFKC)
     - PUA separators → '-'
     - drop decorative garbage-only lines / control chars
@@ -88,7 +99,14 @@ def normalize_pdf_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     # Strip C0 controls except tab/newline
     text = "".join(ch for ch in text if ch in "\t\n" or ord(ch) >= 32)
-    text = _translate_math_font(text)
+    # PEP textbook remap is destructive on normal CJK (犇→D). Default off unless
+    # explicitly enabled or the page looks like math-font garbage.
+    from app.config import settings
+
+    if getattr(settings, "pdf_pep_font_fix", False) or _looks_like_pep_math_font(text):
+        text = _translate_math_font(text)
+    else:
+        text = "".join(_PUA_REPLACEMENTS.get(ch, ch) for ch in text)
     text = unicodedata.normalize("NFKC", text)
     lines: list[str] = []
     for line in text.split("\n"):

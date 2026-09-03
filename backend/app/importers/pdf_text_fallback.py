@@ -14,7 +14,7 @@ import threading
 from io import BytesIO
 
 from app.config import settings
-from app.core.document_model import DocumentModel, Heading, Paragraph, RichText
+from app.core.document_model import DocumentModel, HorizontalRule, Paragraph, RichText
 from app.core.exceptions import CorruptedFileError, InvalidDocumentError
 from app.importers.pdf_font_fix import normalize_pdf_text
 
@@ -130,22 +130,113 @@ def _require_pdfium():
 
 def _extract_all_page_texts(source_bytes: bytes) -> list[str]:
     """Return stripped text for every page. Must hold `_PDFIUM_LOCK`."""
+    texts, _, _ = _analyze_pdf_once(source_bytes, layout=False, multicolumn=False)
+    return texts
+
+
+def _analyze_pdf_once(
+    source_bytes: bytes,
+    *,
+    layout: bool = True,
+    multicolumn: bool = True,
+    max_layout_pages: int = 3,
+    max_blocks: int = 200,
+) -> tuple[list[str], int, list[dict[str, object]]]:
+    """Single PdfDocument open for text + multicolumn count + layout blocks (P1 #18)."""
     pdfium = _require_pdfium()
     doc = pdfium.PdfDocument(BytesIO(source_bytes))
+    texts: list[str] = []
+    multi_count = 0
+    blocks: list[dict[str, object]] = []
     try:
-        texts: list[str] = []
-        for i in range(len(doc)):
+        n_pages = len(doc)
+        want_multi = bool(multicolumn and settings.pdf_text_multicolumn)
+        for i in range(n_pages):
             page = doc[i]
             try:
                 textpage = page.get_textpage()
                 try:
                     raw = _page_text_with_columns(page, textpage) or ""
+                    texts.append((raw or "").strip())
+                    if want_multi:
+                        try:
+                            full = (textpage.get_text_bounded() or "").strip()
+                            width = float(page.get_width())
+                            height = float(page.get_height())
+                            mid = width / 2.0
+                            gap = width * 0.02
+                            left = (
+                                textpage.get_text_bounded(
+                                    left=0, bottom=0, right=mid - gap, top=height
+                                )
+                                or ""
+                            ).strip()
+                            right = (
+                                textpage.get_text_bounded(
+                                    left=mid + gap, bottom=0, right=width, top=height
+                                )
+                                or ""
+                            ).strip()
+                            if len(left) >= 80 and len(right) >= 80:
+                                merged = left + "\n\n" + right
+                                if merged != full and len(merged) > len(full) * 0.85:
+                                    multi_count += 1
+                        except Exception:
+                            pass
+                    if layout and i < max_layout_pages and len(blocks) < max_blocks:
+                        try:
+                            n = textpage.count_chars()
+                            if n > 0:
+                                chars: list[tuple[float, float, float, float, str]] = []
+                                for ci in range(n):
+                                    box = textpage.get_charbox(ci)
+                                    ch = textpage.get_text_range(ci, 1) or ""
+                                    if not ch.strip() and ch != " ":
+                                        continue
+                                    left, bottom, right, top = box
+                                    chars.append((left, bottom, right, top, ch))
+                                if chars:
+                                    page_h = float(page.get_height())
+                                    lines: list[
+                                        list[tuple[float, float, float, float, str]]
+                                    ] = []
+                                    for c in chars:
+                                        placed = False
+                                        for line in lines:
+                                            if abs(line[0][1] - c[1]) < 3.0:
+                                                line.append(c)
+                                                placed = True
+                                                break
+                                        if not placed:
+                                            lines.append([c])
+                                    for line in sorted(lines, key=lambda ln: -ln[0][1]):
+                                        left = min(x[0] for x in line)
+                                        bottom = min(x[1] for x in line)
+                                        right = max(x[2] for x in line)
+                                        top = max(x[3] for x in line)
+                                        text = "".join(
+                                            x[4] for x in sorted(line, key=lambda x: x[0])
+                                        )
+                                        blocks.append(
+                                            {
+                                                "page": i + 1,
+                                                "left": round(left, 2),
+                                                "bottom": round(bottom, 2),
+                                                "right": round(right, 2),
+                                                "top": round(top, 2),
+                                                "y_from_top": round(page_h - top, 2),
+                                                "text": text.strip(),
+                                            }
+                                        )
+                                        if len(blocks) >= max_blocks:
+                                            break
+                        except Exception:
+                            pass
                 finally:
                     textpage.close()
             finally:
                 page.close()
-            texts.append((raw or "").strip())
-        return texts
+        return texts, multi_count, blocks
     finally:
         doc.close()
 
@@ -190,9 +281,9 @@ def extract_pdf_text_model(source_bytes: bytes, filename: str = "input.pdf") -> 
 
     try:
         with _PDFIUM_LOCK:
-            page_texts = _extract_all_page_texts(source_bytes)
-            multicolumn_pages = _count_multicolumn_pages(source_bytes)
-            layout_blocks = _extract_layout_blocks(source_bytes)
+            page_texts, multicolumn_pages, layout_blocks = _analyze_pdf_once(
+                source_bytes
+            )
     except InvalidDocumentError:
         raise
     except Exception as exc:
@@ -213,8 +304,9 @@ def extract_pdf_text_model(source_bytes: bytes, filename: str = "input.pdf") -> 
         if not text.strip():
             continue
         total_chars += len(text)
-        if page_count > 1:
-            nodes.append(Heading(level=2, text=RichText(text=f"第 {i + 1} 页")))
+        # Page separators — do not forge H2 "第 N 页" into the outline (P1 #8)
+        if page_count > 1 and nodes:
+            nodes.append(HorizontalRule())
         for para in _page_to_paragraphs(text):
             nodes.append(Paragraph(text=RichText(text=para)))
 
@@ -233,11 +325,16 @@ def extract_pdf_text_model(source_bytes: bytes, filename: str = "input.pdf") -> 
         "full_layout": bool(layout_blocks),
         "pixel_mode": "charbox_v1",
         "blocks": layout_blocks,
+        "page_breaks": page_count - 1 if page_count > 1 else 0,
     }
     return DocumentModel(
         title=title,
         nodes=nodes,
-        metadata={"pdf_layout": layout_meta, "importer": "pdf_text"},
+        metadata={
+            "pdf_layout": layout_meta,
+            "importer": "pdf_text",
+            "pdf_text_chars": total_chars,
+        },
     )
 
 

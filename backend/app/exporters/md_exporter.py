@@ -13,11 +13,15 @@ from app.exporters.table_span import (
 )
 from app.core.document_model import (
     Blockquote,
+    Bookmark,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
     DocumentModel,
+    FieldCode,
     Footnote,
+    HeaderFooter,
     Heading,
     HorizontalRule,
     HtmlBlock,
@@ -26,14 +30,22 @@ from app.core.document_model import (
     InlineMarkType,
     ListItem,
     MathBlock,
+    Numbering,
+    OleObject,
+    PageSetup,
+    Paragraph,
     PivotTable,
     Revision,
-    Paragraph,
     RichText,
+    RunStyle,
+    Section,
+    SmartArt,
+    SpeakerNote,
     Table,
     TextBox,
     ensure_rich_text,
 )
+from app.exporters.export_warnings import node_type_name, placeholder_line, warn_export
 
 
 def export_md(model: DocumentModel) -> str:
@@ -71,8 +83,23 @@ def export_md(model: DocumentModel) -> str:
                 marker = "1." if node.ordered else "-"
             lines.append(f"{indent}{marker} {_render_rich(ensure_rich_text(node.text))}")
             for child in node.children:
-                # Continuation paragraphs indented under the item
-                lines.append(f"{indent}  {_render_rich(ensure_rich_text(child.text))}")
+                if isinstance(child, CodeBlock):
+                    fence = child.lang or ""
+                    lines.append(f"{indent}  ```{fence}")
+                    for line in child.content.splitlines() or [""]:
+                        lines.append(f"{indent}  {line}")
+                    lines.append(f"{indent}  ```")
+                elif isinstance(child, Paragraph):
+                    # Continuation paragraphs indented under the item
+                    lines.append(f"{indent}  {_render_rich(ensure_rich_text(child.text))}")
+                else:
+                    plain = getattr(child, "plain_text", None)
+                    if callable(plain):
+                        lines.append(f"{indent}  {plain()}")
+                    elif hasattr(child, "text"):
+                        lines.append(
+                            f"{indent}  {_render_rich(ensure_rich_text(child.text))}"
+                        )
         elif isinstance(node, Comment):
             anchor = f' "{node.anchor}"' if node.anchor else ""
             lines.append(f"<!-- comment:{node.author}{anchor} {node.text} -->")
@@ -101,6 +128,23 @@ def export_md(model: DocumentModel) -> str:
                 lines.append(f"- cols: {', '.join(node.col_fields)}")
             if node.data_fields:
                 lines.append(f"- values: {', '.join(node.data_fields)}")
+            lines.append("")
+        elif isinstance(node, Chart):
+            lines.append(f"<!-- chart:{node.chart_type} -->")
+            lines.append(f"**{node.plain_text()}**")
+            if node.categories:
+                lines.append(f"- categories: {', '.join(node.categories[:20])}")
+            lines.append("")
+        elif isinstance(node, SpeakerNote):
+            lines.append(f"> **[SpeakerNote s{node.slide_index}]** {node.text}")
+            lines.append("")
+        elif isinstance(node, SmartArt):
+            lines.append(f"**{node.plain_text()}**")
+            for it in node.items[:50]:
+                lines.append(f"- {it}")
+            lines.append("")
+        elif isinstance(node, OleObject):
+            lines.append(f"*{node.plain_text()}*")
             lines.append("")
         elif isinstance(node, TextBox):
             src = f" ({node.source})" if node.source else ""
@@ -132,6 +176,22 @@ def export_md(model: DocumentModel) -> str:
             lines.append(node.content)
             lines.append("```")
             lines.append("")
+        elif isinstance(
+            node,
+            (Section, PageSetup, HeaderFooter, FieldCode, Bookmark, RunStyle, Numbering),
+        ):
+            kind = node_type_name(node)
+            detail = node.plain_text() if hasattr(node, "plain_text") else kind
+            warn_export(model, f"md: {kind} → placeholder (layout not native in MD)")
+            lines.append(f"<!-- {placeholder_line(kind, detail)} -->")
+            lines.append("")
+        else:
+            kind = node_type_name(node)
+            plain = getattr(node, "plain_text", None)
+            detail = plain() if callable(plain) else kind
+            warn_export(model, f"md: unhandled node {kind} → placeholder")
+            lines.append(f"<!-- {placeholder_line(kind, str(detail)[:200])} -->")
+            lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 
@@ -148,29 +208,104 @@ def _render_image(node: Image) -> str:
     return f"![{node.alt_text}]()"
 
 
+# Outer → inner open order. Close in reverse. Keeps nested MD like
+# **粗体里套*斜体*结束** instead of segment-wise **a****_b_****c**.
+_MARK_OUTER_RANK = {
+    InlineMarkType.LINK: 0,
+    InlineMarkType.STRIKETHROUGH: 1,
+    InlineMarkType.BOLD: 2,
+    InlineMarkType.ITALIC: 3,
+    InlineMarkType.CODE: 4,
+}
+
+
 def _render_rich(rich: RichText) -> str:
+    """Serialize RichText to Markdown with true nested delimiters (D-01 / V-A)."""
     if not rich.marks:
         return rich.text
 
+    text = rich.text
+    n = len(text)
+    opens_at: dict[int, list[InlineMark]] = {}
+    closes_at: dict[int, list[InlineMark]] = {}
+    for mark in rich.marks:
+        start = max(0, min(mark.start, n))
+        end = max(0, min(mark.end, n))
+        if start >= end:
+            continue
+        opens_at.setdefault(start, []).append(mark)
+        closes_at.setdefault(end, []).append(mark)
+
+    for pos, marks in opens_at.items():
+        marks.sort(key=lambda m: (_MARK_OUTER_RANK.get(m.type, 99), -(m.end - m.start)))
+    for pos, marks in closes_at.items():
+        marks.sort(key=lambda m: (-_MARK_OUTER_RANK.get(m.type, 99), m.end - m.start))
+
     parts: list[str] = []
-    for segment, active_marks in _split_by_marks(rich):
-        types = {m.type for m in active_marks}
-        if InlineMarkType.LINK in types:
-            href = next((m.href for m in active_marks if m.type == InlineMarkType.LINK), "") or ""
-            segment = f"[{segment}]({href})"
-        if InlineMarkType.BOLD in types:
-            segment = f"**{segment}**"
-        if InlineMarkType.ITALIC in types:
-            segment = f"*{segment}*"
-        if InlineMarkType.CODE in types:
-            segment = f"`{segment}`"
-        if InlineMarkType.STRIKETHROUGH in types:
-            segment = f"~~{segment}~~"
-        parts.append(segment)
+    stack: list[tuple[InlineMark, str]] = []  # (mark, close_token)
+
+    def _open(mark: InlineMark) -> None:
+        if mark.type == InlineMarkType.LINK:
+            parts.append("[")
+            stack.append((mark, f"]({mark.href or ''})"))
+            return
+        if mark.type == InlineMarkType.BOLD:
+            parts.append("**")
+            stack.append((mark, "**"))
+            return
+        if mark.type == InlineMarkType.ITALIC:
+            # Coextensive bold+italic → **_x_** (ASCII-safe). Nested inside bold with
+            # CJK needs * delimiters: **粗体里套*斜体*结束** (_ is not emphasis mid-CJK).
+            bold_open = next((m for m, _ in stack if m.type == InlineMarkType.BOLD), None)
+            if (
+                bold_open is not None
+                and bold_open.start == mark.start
+                and bold_open.end == mark.end
+            ):
+                delim = "_"
+            else:
+                delim = "*"
+            parts.append(delim)
+            stack.append((mark, delim))
+            return
+        if mark.type == InlineMarkType.CODE:
+            parts.append("`")
+            stack.append((mark, "`"))
+            return
+        if mark.type == InlineMarkType.STRIKETHROUGH:
+            parts.append("~~")
+            stack.append((mark, "~~"))
+            return
+
+    def _close(mark: InlineMark) -> None:
+        # Close through to this mark (handles rare crossed ranges).
+        pending: list[tuple[InlineMark, str]] = []
+        while stack:
+            top, tok = stack.pop()
+            parts.append(tok)
+            if top is mark:
+                break
+            pending.append((top, tok))
+        for m, _tok in reversed(pending):
+            _open(m)
+
+    for i, ch in enumerate(text):
+        for mark in closes_at.get(i, ()):
+            _close(mark)
+        for mark in opens_at.get(i, ()):
+            _open(mark)
+        parts.append(ch)
+    for mark in closes_at.get(n, ()):
+        _close(mark)
+    # Safety: close any leftovers.
+    while stack:
+        _m, tok = stack.pop()
+        parts.append(tok)
     return "".join(parts)
 
 
 def _split_by_marks(rich: RichText) -> list[tuple[str, list[InlineMark]]]:
+    """Segment split kept for callers/tests; nested export uses event walk above."""
     boundaries = {0, len(rich.text)}
     for mark in rich.marks:
         boundaries.add(max(0, min(mark.start, len(rich.text))))

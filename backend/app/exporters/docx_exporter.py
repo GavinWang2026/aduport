@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from io import BytesIO
 
 from docx import Document
+from docx.enum.section import WD_ORIENT, WD_SECTION
+from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -13,11 +17,15 @@ from docx.shared import Inches, Mm, Pt, RGBColor
 from app.config import settings
 from app.core.document_model import (
     Blockquote,
+    Bookmark,
+    Chart,
     CodeBlock,
     Comment,
     ContentControl,
     DocumentModel,
+    FieldCode,
     Footnote,
+    HeaderFooter,
     Heading,
     HorizontalRule,
     HtmlBlock,
@@ -26,19 +34,54 @@ from app.core.document_model import (
     InlineMarkType,
     ListItem,
     MathBlock,
+    Numbering,
+    OleObject,
+    PageSetup,
     PivotTable,
     Paragraph,
     Revision,
+    RunStyle,
+    Section,
+    SmartArt,
+    SpeakerNote,
     Table,
     TableCell,
     TextBox,
     ensure_rich_text,
 )
 
+_log = logging.getLogger("mdbridge.docx")
+
+_PAGE_SIZES_MM = {
+    "a4": (210.0, 297.0),
+    "letter": (215.9, 279.4),
+    "legal": (215.9, 355.6),
+    "a3": (297.0, 420.0),
+    "a5": (148.0, 210.0),
+}
+
 _THEMES = {
-    "default": {"heading": RGBColor(0x1A, 0x56, 0xDB), "normal_size": 11, "font": "Calibri"},
-    "academic": {"heading": RGBColor(0x2C, 0x3E, 0x50), "normal_size": 12, "font": "Times New Roman"},
-    "minimal": {"heading": RGBColor(0x22, 0x22, 0x22), "normal_size": 11, "font": "Arial"},
+    "default": {
+        "heading": RGBColor(0x1A, 0x56, 0xDB),
+        "normal_size": 11,
+        "font": "Calibri",
+        "accent": "1A56DB",
+        "theme_name": "md-bridge-default",
+    },
+    "academic": {
+        "heading": RGBColor(0x2C, 0x3E, 0x50),
+        "normal_size": 12,
+        "font": "Times New Roman",
+        "accent": "2C3E50",
+        "theme_name": "md-bridge-academic",
+    },
+    "minimal": {
+        "heading": RGBColor(0x22, 0x22, 0x22),
+        "normal_size": 11,
+        "font": "Arial",
+        "accent": "222222",
+        "theme_name": "md-bridge-minimal",
+    },
 }
 
 
@@ -56,22 +99,112 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
     theme_key = (theme or settings.docx_theme or "default").lower().strip()
     theme_cfg = _THEMES.get(theme_key, _THEMES["default"])
     _apply_theme(doc, theme_cfg)
-    _setup_header_footer(doc, model.title or "md-bridge")
-    _apply_section_props(doc, model)
+
+    page_setups = [n for n in model.nodes if isinstance(n, PageSetup)]
+    sections = [n for n in model.nodes if isinstance(n, Section)]
+    headers_footers = [n for n in model.nodes if isinstance(n, HeaderFooter)]
+    run_styles = [n for n in model.nodes if isinstance(n, RunStyle)]
+    numberings = [n for n in model.nodes if isinstance(n, Numbering)]
+
+    # First section chrome (subsequent Section nodes open mid-body sectPr breaks).
+    _apply_page_setup(doc, page_setups[0] if page_setups else None, model)
+    _apply_section_ast_props(doc, sections[0] if sections else None, model)
+    _setup_header_footer(
+        doc,
+        model.title or "md-bridge",
+        headers_footers=headers_footers,
+    )
+    _patch_theme_part(doc, theme_key, theme_cfg)
+    for rs in run_styles[:50]:
+        _add_run_style(doc, rs)
+    for num in numberings[:50]:
+        _add_numbering_definition(doc, num)
 
     comments: list[Comment] = []
     footnotes: list[Footnote] = []
+    smartarts_out: list[SmartArt] = []
+    oles_out: list[OleObject] = []
+    charts_out: list[Chart] = []
     if model.title:
         doc.add_heading(model.title, level=0)
+
+    has_headings = any(isinstance(n, Heading) for n in model.nodes)
+    has_explicit_toc = any(
+        isinstance(n, FieldCode) and (n.field_type or "").upper() == "TOC" for n in model.nodes
+    )
+    if getattr(settings, "docx_auto_toc", True) and has_headings and not has_explicit_toc:
+        _add_toc_field(doc)
 
     body = doc.element.body
     from app.exporters.docx_oxml_fast import FastBody
 
-    fast = FastBody(body)
+    fast = FastBody(body, doc=doc)
+    bookmark_id = 0
+    section_i = 0
     try:
         for node in model.nodes:
+            if isinstance(
+                node, (PageSetup, HeaderFooter, RunStyle, Numbering)
+            ):
+                # Applied in pre-pass / paired with Section breaks.
+                continue
+            if isinstance(node, Section):
+                if section_i > 0:
+                    fast.flush()
+                    break_key = str((node.props or {}).get("break") or "new_page").lower()
+                    start = {
+                        "continuous": WD_SECTION.CONTINUOUS,
+                        "new_column": WD_SECTION.NEW_COLUMN,
+                        "even_page": WD_SECTION.EVEN_PAGE,
+                        "odd_page": WD_SECTION.ODD_PAGE,
+                    }.get(break_key, WD_SECTION.NEW_PAGE)
+                    new_sec = doc.add_section(start)
+                    page = page_setups[section_i] if section_i < len(page_setups) else None
+                    _configure_section(new_sec, page, node)
+                if node.title:
+                    fast.flush()
+                    doc.add_heading(node.title, level=1)
+                section_i += 1
+                continue
             if isinstance(node, Heading):
                 fast.heading(node.plain_text(), node.level)
+            elif isinstance(node, FieldCode):
+                fast.flush()
+                if (node.field_type or "").upper() == "TOC" or "TOC" in (
+                    node.instruction or ""
+                ).upper():
+                    _add_toc_field(doc, instruction=node.instruction or None)
+                else:
+                    _add_generic_field(
+                        doc,
+                        node.instruction or node.field_type or "PAGE",
+                        result=node.result_text,
+                    )
+            elif isinstance(node, Bookmark):
+                fast.flush()
+                bookmark_id += 1
+                _add_bookmark(doc, node, bookmark_id)
+            elif isinstance(node, Chart):
+                fast.flush()
+                charts_out.append(node)
+                from app.exporters.docx_chart import chart_placeholder
+
+                doc.add_paragraph(chart_placeholder(len(charts_out)))
+            elif isinstance(node, SpeakerNote):
+                fast.flush()
+                p = doc.add_paragraph(
+                    f"[SpeakerNote s{node.slide_index}] {node.text}"
+                )
+                if p.runs:
+                    p.runs[0].italic = True
+            elif isinstance(node, SmartArt):
+                fast.flush()
+                smartarts_out.append(node)
+                _add_smartart(doc, node)
+            elif isinstance(node, OleObject):
+                fast.flush()
+                oles_out.append(node)
+                _add_ole_object(doc, node)
             elif isinstance(node, Paragraph):
                 rich = ensure_rich_text(node.text)
                 if rich.marks:
@@ -84,11 +217,28 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
                 for para in node.paragraphs:
                     p = doc.add_paragraph()
                     p.paragraph_format.left_indent = Inches(0.25)
+                    # v6/T2-#10 / D-12: do NOT force italic — that corrupted
+                    # blockquote → italic round-trips. Indent alone marks quote.
                     _apply_rich_to_paragraph(p, ensure_rich_text(para))
-                    if p.runs:
-                        p.runs[0].italic = True
             elif isinstance(node, HorizontalRule):
-                fast.plain("─" * 20)
+                # v6/T2-#10: real bottom-border para (not a visible "---" glyph).
+                # Keep a vanished "---" run so AST×exporter sentinels stay greppable.
+                fast.flush()
+                p = doc.add_paragraph()
+                pPr = p._p.get_or_add_pPr()
+                from docx.oxml import OxmlElement
+                from docx.oxml.ns import qn
+
+                pBdr = OxmlElement("w:pBdr")
+                bottom = OxmlElement("w:bottom")
+                bottom.set(qn("w:val"), "single")
+                bottom.set(qn("w:sz"), "6")
+                bottom.set(qn("w:space"), "1")
+                bottom.set(qn("w:color"), "auto")
+                pBdr.append(bottom)
+                pPr.append(pBdr)
+                marker = p.add_run("---")
+                marker.font.hidden = True
             elif isinstance(node, ListItem):
                 rich = ensure_rich_text(node.text)
                 if rich.marks:
@@ -96,16 +246,18 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
                     style = "List Number" if node.ordered else "List Bullet"
                     p = doc.add_paragraph(style=style)
                     if node.checked is not None:
-                        p.add_run("☑ " if node.checked else "☐ ")
+                        p.add_run("[x] " if node.checked else "[ ] ")
                     _apply_rich_to_paragraph(p, rich)
                     level = max(0, min(int(node.level), 8))
                     if level > 0:
                         p.paragraph_format.left_indent = Inches(0.25 * level)
                 else:
-                    if node.ordered:
-                        fast.plain(("  " * node.level) + f"1. {rich.text}")
-                    else:
-                        fast.bullet(rich.text, level=node.level, checked=node.checked)
+                    fast.bullet(
+                        rich.text,
+                        level=node.level,
+                        checked=node.checked,
+                        ordered=bool(node.ordered),
+                    )
                 for child in node.children:
                     cr = ensure_rich_text(child.text)
                     if cr.marks:
@@ -124,9 +276,16 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
             elif isinstance(node, MathBlock):
                 fast.flush()
                 p = doc.add_paragraph()
-                run = p.add_run(node.content)
-                run.font.name = "Courier New"
-                run.italic = True
+                try:
+                    from app.exporters.omml import append_math_to_paragraph
+
+                    append_math_to_paragraph(
+                        p, node.content or "", display=bool(node.display)
+                    )
+                except Exception:
+                    run = p.add_run(node.content)
+                    run.font.name = "Courier New"
+                    run.italic = True
             elif isinstance(node, Footnote):
                 footnotes.append(node)
             elif isinstance(node, Comment):
@@ -158,22 +317,87 @@ def export_docx(model: DocumentModel, *, theme: str | None = None) -> bytes:
     finally:
         fast.finish()
 
-    if footnotes:
-        doc.add_heading("Footnotes", level=2)
-        for fn in footnotes:
-            p = doc.add_paragraph()
-            ref = p.add_run(f"[{fn.id}] ")
-            ref.font.superscript = True
-            p.add_run(fn.text)
-
     buf = BytesIO()
     doc.save(buf)
     data = buf.getvalue()
+    data = _rewrite_theme_in_docx(data, theme_key, theme_cfg)
+    if smartarts_out:
+        from app.exporters.docx_diagram import inject_smartart_package
+
+        data = inject_smartart_package(data, smartarts_out)
+    if oles_out:
+        from app.exporters.docx_diagram import inject_ole_embeddings
+
+        data = inject_ole_embeddings(data, oles_out)
     if comments and settings.docx_export_comments:
         from app.exporters.docx_comments import inject_word_comments
 
         data = inject_word_comments(data, comments)
+    if footnotes:
+        from app.exporters.docx_footnotes import inject_word_footnotes
+
+        data = inject_word_footnotes(data, footnotes)
+    if charts_out:
+        from app.exporters.docx_chart import inject_word_charts
+
+        data = inject_word_charts(data, charts_out)
     return data
+
+
+def _rewrite_theme_in_docx(data: bytes, theme_key: str, cfg: dict) -> bytes:
+    """Post-save ZIP rewrite of theme1.xml (python-docx ignores in-memory theme blob)."""
+    try:
+        from io import BytesIO as _BIO
+        import zipfile as _zf
+
+        name = cfg.get("theme_name") or f"md-bridge-{theme_key}"
+        accent = (cfg.get("accent") or "1A56DB").upper()
+        src = _zf.ZipFile(_BIO(data), "r")
+        out_buf = _BIO()
+        with _zf.ZipFile(out_buf, "w", compression=_zf.ZIP_DEFLATED) as dst:
+            for info in src.infolist():
+                raw = src.read(info.filename)
+                if info.filename.endswith("theme1.xml") and "theme" in info.filename:
+                    text = raw.decode("utf-8", "ignore")
+                    text, n = re.subn(
+                        r'(<a:theme\b[^>]*\bname=")([^"]*)(")',
+                        r"\g<1>" + name + r"\g<3>",
+                        text,
+                        count=1,
+                    )
+                    if n == 0:
+                        text = text.replace(
+                            "<a:theme ", f'<a:theme name="{name}" ', 1
+                        )
+                    text, _ = re.subn(
+                        r'(<a:accent1>\s*<a:srgbClr\s+val=")([0-9A-Fa-f]{6})(")',
+                        r"\g<1>" + accent + r"\g<3>",
+                        text,
+                        count=1,
+                    )
+                    font = str(cfg.get("font") or "Calibri")
+                    # major/minor latin in fontScheme (first two latin typefaces)
+                    latin_i = 0
+
+                    def _latin_sub(m: re.Match[str]) -> str:
+                        nonlocal latin_i
+                        latin_i += 1
+                        if latin_i <= 4:
+                            return m.group(1) + font + m.group(3)
+                        return m.group(0)
+
+                    text = re.sub(
+                        r'(<a:latin\s+typeface=")([^"]*)(")',
+                        _latin_sub,
+                        text,
+                    )
+                    raw = text.encode("utf-8")
+                # Write by name — avoid stale ZipInfo.file_size/CRC truncating new blob
+                dst.writestr(info.filename, raw)
+        src.close()
+        return out_buf.getvalue()
+    except Exception:
+        return data
 
 
 def _apply_theme(doc: Document, cfg: dict) -> None:
@@ -181,22 +405,169 @@ def _apply_theme(doc: Document, cfg: dict) -> None:
         normal = doc.styles["Normal"]
         normal.font.name = cfg["font"]
         normal.font.size = Pt(cfg["normal_size"])
-    except Exception:
-        pass
+    except Exception as exc:
+        _log.warning("docx theme: Normal style apply failed: %s", exc)
     for i in range(1, 7):
         try:
             style = doc.styles[f"Heading {i}"]
             style.font.color.rgb = cfg["heading"]
             style.font.name = cfg["font"]
-        except Exception:
-            pass
+        except Exception as exc:
+            _log.debug("docx theme: Heading %s style apply failed: %s", i, exc)
+    # Ensure a named body style exists for theme catalog depth
+    try:
+        names = {s.name for s in doc.styles}
+        if "MdBridge Body" not in names:
+            body = doc.styles.add_style("MdBridge Body", WD_STYLE_TYPE.PARAGRAPH)
+            body.font.name = cfg["font"]
+            body.font.size = Pt(cfg["normal_size"])
+    except Exception as exc:
+        _log.warning("docx theme: MdBridge Body style create failed: %s", exc)
 
 
-def _setup_header_footer(doc: Document, title: str) -> None:
+def _patch_theme_part(doc: Document, theme_key: str, cfg: dict) -> None:
+    """No-op placeholder kept for call-site compatibility; real write is post-save."""
+    return
+
+
+def _configure_section(section, page: PageSetup | None, section_node: Section | None) -> None:
+    """Apply PageSetup + Section.props onto an existing python-docx Section."""
+    if page is not None:
+        key = (page.page_size or "A4").strip().lower()
+        size = _PAGE_SIZES_MM.get(key)
+        if size:
+            w_mm, h_mm = size
+            if page.orientation == "landscape":
+                w_mm, h_mm = h_mm, w_mm
+            section.page_width = Mm(w_mm)
+            section.page_height = Mm(h_mm)
+            section.orientation = (
+                WD_ORIENT.LANDSCAPE if page.orientation == "landscape" else WD_ORIENT.PORTRAIT
+            )
+        if page.margins_mm:
+            for side in ("top", "right", "bottom", "left"):
+                raw = page.margins_mm.get(side)
+                if raw is not None:
+                    try:
+                        setattr(section, f"{side}_margin", Mm(float(raw)))
+                    except (TypeError, ValueError):
+                        pass
+    if section_node is not None:
+        _write_cols(section._sectPr, section_node.props or {})
+
+
+def _write_cols(sect_pr, props: dict) -> None:
+    cols_num = props.get("cols")
+    if cols_num is None:
+        return
+    try:
+        n = int(cols_num)
+    except (TypeError, ValueError):
+        return
+    if n < 2:
+        return
+    for old in sect_pr.xpath("./w:cols"):
+        sect_pr.remove(old)
+    cols = OxmlElement("w:cols")
+    cols.set(qn("w:num"), str(n))
+    space = props.get("col_space_twips", 720)
+    cols.set(qn("w:space"), str(int(space)))
+    sect_pr.append(cols)
+
+
+def _apply_page_setup(
+    doc: Document, page: PageSetup | None, model: DocumentModel
+) -> None:
+    """Map PageSetup AST (+ legacy metadata.section_props) onto the first section."""
     section = doc.sections[0]
+    if page is not None:
+        _configure_section(section, page, None)
+        return
+
+    props = dict((model.metadata or {}).get("section_props") or {})
+    try:
+        w = props.get("page_width_mm")
+        h = props.get("page_height_mm")
+        if w and h:
+            section.page_width = Mm(float(w))
+            section.page_height = Mm(float(h))
+        margins = props.get("margins_mm") or {}
+        if isinstance(margins, dict):
+            for side in ("top", "right", "bottom", "left"):
+                raw = margins.get(side)
+                if raw is not None:
+                    setattr(section, f"{side}_margin", Mm(float(raw)))
+        if props.get("orientation") == "landscape":
+            section.orientation = WD_ORIENT.LANDSCAPE
+    except (TypeError, ValueError):
+        pass
+
+
+def _apply_section_ast_props(
+    doc: Document, section_node: Section | None, model: DocumentModel
+) -> None:
+    """Write w:cols / extra sectPr from Section.props onto first section."""
+    props: dict = {}
+    if section_node and isinstance(section_node.props, dict):
+        props.update(section_node.props)
+    meta = (model.metadata or {}).get("section_props") or {}
+    if isinstance(meta, dict):
+        for k in ("cols", "col_space_twips"):
+            if k in meta and k not in props:
+                props[k] = meta[k]
+    _write_cols(doc.sections[0]._sectPr, props)
+
+
+def _add_field_run(paragraph, instruction: str, result: str = "") -> None:
+    """Append a complex field (begin / instrText / separate / result / end)."""
+    run = paragraph.add_run()
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = f" {instruction.strip()} "
+    fld_sep = OxmlElement("w:fldChar")
+    fld_sep.set(qn("w:fldCharType"), "separate")
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    run._r.append(fld_begin)
+    run._r.append(instr)
+    run._r.append(fld_sep)
+    if result:
+        run2 = paragraph.add_run(result)
+        run2.italic = True
+    run3 = paragraph.add_run()
+    run3._r.append(fld_end)
+
+
+def _add_toc_field(doc: Document, instruction: str | None = None) -> None:
+    """Insert an automatic Table of Contents field (updates on open in Word)."""
+    p = doc.add_paragraph()
+    instr = instruction or r'TOC \o "1-3" \h \z \u'
+    _add_field_run(p, instr, result="[TOC]")
+    # Trailing paragraph so body content does not glue to the field
+    doc.add_paragraph()
+
+
+def _add_generic_field(doc: Document, instruction: str, result: str = "") -> None:
+    p = doc.add_paragraph()
+    _add_field_run(p, instruction, result=result)
+
+
+def _setup_header_footer(
+    doc: Document,
+    title: str,
+    *,
+    headers_footers: list[HeaderFooter] | None = None,
+) -> None:
+    section = doc.sections[0]
+    headers_footers = headers_footers or []
+    hdr = next((h for h in reversed(headers_footers) if h.kind == "header"), None)
+    ftr = next((h for h in reversed(headers_footers) if h.kind == "footer"), None)
+
     header = section.header
     hp = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-    hp.text = title[:80]
+    hp.text = (hdr.text if hdr and hdr.text else title)[:200]
     hp.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     for run in hp.runs:
         run.font.size = Pt(9)
@@ -205,21 +576,149 @@ def _setup_header_footer(doc: Document, title: str) -> None:
     footer = section.footer
     fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
     fp.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    run = fp.add_run()
-    # PAGE field
-    fld_char_begin = OxmlElement("w:fldChar")
-    fld_char_begin.set(qn("w:fldCharType"), "begin")
-    instr = OxmlElement("w:instrText")
-    instr.set(qn("xml:space"), "preserve")
-    instr.text = " PAGE "
-    fld_char_end = OxmlElement("w:fldChar")
-    fld_char_end.set(qn("w:fldCharType"), "end")
-    run._r.append(fld_char_begin)
-    run._r.append(instr)
-    fld_char_separate = OxmlElement("w:fldChar")
-    fld_char_separate.set(qn("w:fldCharType"), "separate")
-    run._r.append(fld_char_separate)
-    run._r.append(fld_char_end)
+    # Clear default empty run text if we will rebuild
+    if fp.runs:
+        for r in list(fp.runs):
+            r._r.getparent().remove(r._r)
+
+    if ftr and ftr.text:
+        run = fp.add_run(ftr.text[:200])
+        run.font.size = Pt(9)
+        # Keep a PAGE field after custom footer text for pagination.
+        fp.add_run(" ")
+        _add_field_run(fp, "PAGE", result="")
+    else:
+        _add_field_run(fp, "PAGE", result="")
+
+
+def _apply_section_props(doc: Document, model: DocumentModel) -> None:
+    """Backward-compatible wrapper (metadata-only callers)."""
+    _apply_page_setup(doc, None, model)
+    _apply_section_ast_props(doc, None, model)
+
+
+def _add_bookmark(doc: Document, node: Bookmark, bid: int) -> None:
+    name = (node.name or node.anchor or f"bm{bid}").strip() or f"bm{bid}"
+    # OOXML bookmark names: no spaces; keep alnum/_
+    safe = "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in name)[:40]
+    p = doc.add_paragraph()
+    start = OxmlElement("w:bookmarkStart")
+    start.set(qn("w:id"), str(bid))
+    start.set(qn("w:name"), safe)
+    end = OxmlElement("w:bookmarkEnd")
+    end.set(qn("w:id"), str(bid))
+    p._p.append(start)
+    if node.anchor and node.anchor != node.name:
+        run = p.add_run(node.anchor)
+        run.font.size = Pt(1)
+        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    elif node.name:
+        # Zero-width visible sentinel for greppable round-trip without layout impact
+        run = p.add_run(f"[{safe}]")
+        run.font.size = Pt(1)
+        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    p._p.append(end)
+
+
+def _add_run_style(doc: Document, style: RunStyle) -> None:
+    style_id = (style.style_id or style.name or "MdBridgeChar").strip()
+    if not style_id:
+        return
+    # python-docx style names must be unique; skip if present
+    try:
+        existing = {s.style_id for s in doc.styles if getattr(s, "style_id", None)}
+        existing |= {s.name for s in doc.styles}
+        if style_id in existing or (style.name and style.name in existing):
+            return
+        new = doc.styles.add_style(style.name or style_id, WD_STYLE_TYPE.CHARACTER)
+        # Force styleId when possible
+        try:
+            new._element.set(qn("w:styleId"), style_id)
+        except Exception:
+            pass
+        props = style.props or {}
+        if props.get("bold"):
+            new.font.bold = True
+        if props.get("italic"):
+            new.font.italic = True
+        if props.get("strike") or props.get("strikethrough"):
+            new.font.strike = True
+        size_pt = props.get("size_pt") or props.get("size")
+        if size_pt is not None:
+            try:
+                new.font.size = Pt(float(size_pt))
+            except (TypeError, ValueError):
+                pass
+        font_name = props.get("font") or props.get("font_name")
+        if font_name:
+            new.font.name = str(font_name)
+    except Exception:
+        pass
+
+
+def _add_numbering_definition(doc: Document, node: Numbering) -> None:
+    """Append abstractNum + num entries from Numbering AST into word/numbering.xml."""
+    try:
+        numbering = doc.part.numbering_part.numbering_definitions._numbering
+    except Exception:
+        return
+    try:
+        abs_id = int(node.abstract_num_id) if str(node.abstract_num_id).strip() else None
+    except ValueError:
+        abs_id = None
+    try:
+        num_id = int(node.num_id) if str(node.num_id).strip() else None
+    except ValueError:
+        num_id = None
+    if abs_id is None or num_id is None:
+        # Allocate high ids to avoid colliding with python-docx 1/2
+        used_abs = {
+            int(el.get(qn("w:abstractNumId")))
+            for el in numbering.xpath("./w:abstractNum")
+            if el.get(qn("w:abstractNumId")) is not None
+        }
+        used_num = {
+            int(el.get(qn("w:numId")))
+            for el in numbering.xpath("./w:num")
+            if el.get(qn("w:numId")) is not None
+        }
+        abs_id = abs_id if abs_id is not None else (max(used_abs | {0}) + 1)
+        num_id = num_id if num_id is not None else (max(used_num | {0}) + 1)
+
+    # Skip duplicate numId
+    for el in numbering.xpath("./w:num"):
+        if el.get(qn("w:numId")) == str(num_id):
+            return
+
+    abs_n = OxmlElement("w:abstractNum")
+    abs_n.set(qn("w:abstractNumId"), str(abs_id))
+    multi = OxmlElement("w:multiLevelType")
+    multi.set(qn("w:val"), "hybridMultilevel")
+    abs_n.append(multi)
+
+    levels = node.levels or [{"ilvl": 0, "fmt": "decimal", "text": "%1."}]
+    for lvl_spec in levels[:9]:
+        ilvl = int(lvl_spec.get("ilvl", 0))
+        lvl = OxmlElement("w:lvl")
+        lvl.set(qn("w:ilvl"), str(ilvl))
+        start = OxmlElement("w:start")
+        start.set(qn("w:val"), str(lvl_spec.get("start", 1)))
+        lvl.append(start)
+        num_fmt = OxmlElement("w:numFmt")
+        num_fmt.set(qn("w:val"), str(lvl_spec.get("fmt") or lvl_spec.get("numFmt") or "decimal"))
+        lvl.append(num_fmt)
+        lvl_text = OxmlElement("w:lvlText")
+        lvl_text.set(qn("w:val"), str(lvl_spec.get("text") or lvl_spec.get("lvlText") or f"%{ilvl + 1}."))
+        lvl.append(lvl_text)
+        abs_n.append(lvl)
+
+    numbering.append(abs_n)
+    num = OxmlElement("w:num")
+    num.set(qn("w:numId"), str(num_id))
+    abs_ref = OxmlElement("w:abstractNumId")
+    abs_ref.set(qn("w:val"), str(abs_id))
+    num.append(abs_ref)
+    numbering.append(num)
 
 
 def _add_rich_paragraph(doc: Document, rich) -> None:
@@ -415,27 +914,6 @@ def _add_revision_paragraph(doc: Document, rev: Revision) -> None:
     p._p.append(ch)
 
 
-def _apply_section_props(doc: Document, model: DocumentModel) -> None:
-    props = (model.metadata or {}).get("section_props") or {}
-    if not props:
-        return
-    section = doc.sections[0]
-    try:
-        w = props.get("page_width_mm")
-        h = props.get("page_height_mm")
-        if w and h:
-            section.page_width = Mm(float(w))
-            section.page_height = Mm(float(h))
-        margins = props.get("margins_mm") or {}
-        if isinstance(margins, dict):
-            for side in ("top", "right", "bottom", "left"):
-                raw = margins.get(side)
-                if raw is not None:
-                    setattr(section, f"margin_{side}", Mm(float(raw)))
-    except (TypeError, ValueError):
-        pass
-
-
 def _add_content_control_sdt(doc: Document, cc: ContentControl) -> None:
     """Export as w:sdt block (lightweight round-trip with import enrich)."""
     sdt = OxmlElement("w:sdt")
@@ -511,3 +989,25 @@ def _add_image(doc: Document, image: Image) -> None:
             cap.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
     except Exception:
         doc.add_paragraph(f"[Image: {image.alt_text}]")
+
+
+def _add_smartart(doc: Document, node: SmartArt) -> None:
+    from app.exporters.docx_diagram import append_smartart_drawing
+
+    title = node.title or node.layout or "SmartArt"
+    cap = doc.add_paragraph(f"[SmartArt:{title}]")
+    if cap.runs:
+        cap.runs[0].bold = True
+    p = doc.add_paragraph()
+    try:
+        append_smartart_drawing(p, node, shape_id=10 + len(doc.paragraphs))
+    except Exception:
+        for item in node.items[:50]:
+            doc.add_paragraph(item, style="List Bullet")
+
+
+def _add_ole_object(doc: Document, node: OleObject) -> None:
+    """Visible label; binary embedding injected in post-pass."""
+    p = doc.add_paragraph(node.plain_text())
+    if p.runs:
+        p.runs[0].italic = True
