@@ -314,10 +314,10 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 </tr>
 </table>
 <div class="callout c-blue" data-page-node-id="hMNmORyS2PgpZ8B4AN4fkz"><b data-page-node-id="EcCuBy9iCgoJZKaZaAL2Aw">六维解读（小菜观点）：</b><br data-page-node-id="OvqBo5PVARb4hMD8aVmiRV">
-· <b data-page-node-id="Pp9Z2VqcK7fMXwdM3gDlTZ">完整性/功能广度 → md-bridge 单项封顶</b>：全平台只有它把「服务化（Job+Webhook+限流+审计+多租户）+ 双向转换 + 统一 AST」做成了一体产品；anydoc/mammoth/markitdown 是库，docling/unstructured 面向 RAG 管线而非文档交换，pandoc 是单机 CLI，LibreOffice 是套件不是服务。<br data-page-node-id="HIpjVn9mH5AMl0yoOETzNW">
-· <b data-page-node-id="iKpDNZ6kJouxMShgQ7OQPb">结构 → pandoc 教科书级</b>（reader/writer/AST/Lua filter），anydoc 的 Rust 模块化也很好；md-bridge 的注册表 + anydoc 桥设计合理但 import/export 深度不均拖累。<br data-page-node-id="9272QBlFlgKNIossuhiNNu">
-· <b data-page-node-id="z2QHtnlqaObNVsX8PDOvIr">深度 → LibreOffice 与 docling 领先</b>：LibreOffice 有真实排版引擎（像素级保真但拿不到语义 AST）；docling 有 AI 版面/表格模型。md-bridge 深度短板现主要为 <b>PDF 版面</b>与 <b>docx 深布局仍优先 anydoc</b>（xlsx <code>mergeCells</code> 往返已在 v8 闭环；自研 <code>docx_text</code> 已有 mammoth-lite style-map 兜底）。<br data-page-node-id="21zrdVMjE7j1w7QgrGKKmJ">
-· <b data-page-node-id="TsWLVCGbTKZl1oyIY3cENG">整洁度 → pandoc/anydoc 领先</b>：md-bridge 安全面优秀；v8 工程红灯（golden xlsx / header / xlsb）与 B/C 门禁已进 fidelity-gates，工作树已按主题拆分提交。</div>
+· <b data-page-node-id="Pp9Z2VqcK7fMXwdM3gDlTZ">完整性 / 功能广度 → md-bridge 单项封顶</b>：全平台只有它把「服务化（Job+Webhook+限流+审计+多租户）+ 双向转换 + 统一 AST」做成了一体产品；anydoc/mammoth/markitdown 是库，docling/unstructured 面向 RAG 管线而非文档交换，pandoc 是单机 CLI，LibreOffice 是套件不是服务。<br data-page-node-id="HIpjVn9mH5AMl0yoOETzNW">
+· <b data-page-node-id="iKpDNZ6kJouxMShgQ7OQPb">结构（目标 pandoc）→ pandoc 教科书级</b>（reader/writer/AST/Lua filter），anydoc 的 Rust 模块化也很好；md-bridge 的注册表 + anydoc 桥设计合理，但 import/export <b>深度不均</b>仍拖累结构观感（xlsx/ODF 已补强，docx/PDF 深路径仍不齐）。<br data-page-node-id="9272QBlFlgKNIossuhiNNu">
+· <b data-page-node-id="z2QHtnlqaObNVsX8PDOvIr">深度（目标 LibreOffice）→ LibreOffice 与 docling 领先</b>：LibreOffice 有真实排版引擎（像素级保真但拿不到语义 AST）；docling 有 AI 版面/表格模型。md-bridge 深度短板现主要为 <b>PDF 版面</b>与 <b>docx 深布局仍优先 anydoc</b>——xlsx <code>mergeCells</code> 往返已在 v8 <span class="badge b-closed">CLOSED</span>；自研 <code>docx_text</code> mammoth-lite 可作关 anydoc 兜底，仍弱于专项深度。<br data-page-node-id="21zrdVMjE7j1w7QgrGKKmJ">
+· <b data-page-node-id="TsWLVCGbTKZl1oyIY3cENG">整洁度（目标 pandoc）→ pandoc / anydoc 领先</b>：md-bridge 安全面优秀（safe_zip / xml_safe / 默认鉴权）；v8 工程红灯（golden xlsx / header / xlsb）与 B/C/D 门禁已进 fidelity-gates，工作树已按主题拆分提交（不再「待人工」）。</div>
 
 <h3 data-page-node-id="1l0SaqIexO3HDWipcuQtPT">4.3 逐工具深度剖面</h3>
 
