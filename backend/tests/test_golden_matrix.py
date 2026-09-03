@@ -155,12 +155,22 @@ def test_golden_matrix_row(
 
 
 @pytest.mark.skipif(not bridge.anydoc_available(), reason="anydoc wheel not installed")
-def test_golden_docx_anydoc_channel():
-    """Native-build job: docx fixture through anydoc fast path."""
+def test_golden_docx_anydoc_channel(monkeypatch):
+    """Force anydoc fast Markdown (pipe tables) for handmade-tables."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "anydoc_enabled", True)
+    monkeypatch.setattr(
+        settings,
+        "anydoc_formats",
+        "docx," + (settings.anydoc_formats or ""),
+    )
+    # fast_md is skipped when html_table_for_span forces model→HTML tables
+    monkeypatch.setattr(settings, "html_table_for_span", False)
     raw = _fixture_bytes("docx/handmade-tables.docx")
     md = convert(raw, "docx", "md", filename="handmade-tables.docx")
     text = md.decode("utf-8", errors="replace")
-    assert "|" in text
+    assert "|" in text  # anydoc GFM pipe table
 
 
 def _build_ebook_golden_sample(fmt: str) -> bytes:

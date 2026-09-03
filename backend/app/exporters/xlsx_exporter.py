@@ -93,7 +93,7 @@ def export_xlsx(model: DocumentModel) -> bytes:
         for n in model.nodes
         if not isinstance(n, Table)
     ]
-    content_sheet = _content_sheet(model) if non_table else None
+    content_sheet = _content_sheet(model, emit_ast=emit_ast) if non_table else None
     if non_table and meta_sheets and not content_sheet:
         warn_export(
             model,
@@ -437,8 +437,16 @@ def _visible_body_rows(model: DocumentModel) -> list[list[str]]:
     return rows
 
 
-def _content_sheet(model: DocumentModel) -> tuple[str, str, str] | None:
-    """Visible body sheet for mixed docs (headings/lists/rich text searchable)."""
+def _content_sheet(
+    model: DocumentModel, *, emit_ast: bool = False
+) -> tuple[str, str, str] | None:
+    """Visible body sheet for mixed docs (headings/lists/rich text searchable).
+
+    When ``emit_ast`` is False, typed meta (revision/comment/…) is parked as
+    ``paragraph`` text so round-trip does not rehydrate AST nodes without ``_AST``.
+    When ``emit_ast`` is True, Content remains a human-searchable mirror; import
+    prefers ``_AST`` and skips Content rehydration to avoid duplicates.
+    """
     from app.exporters.rich_visible import render_rich_visible
 
     rows: list[list[str]] = [["kind", "text"]]
@@ -461,44 +469,52 @@ def _content_sheet(model: DocumentModel) -> tuple[str, str, str] | None:
         elif isinstance(node, CodeBlock):
             rows.append(["code_block", f"```{node.lang or ''}\n{node.content}\n```"])
         elif isinstance(node, MathBlock):
-            rows.append(["math_block", f"$$ {node.content} $$"])
+            if emit_ast:
+                rows.append(["math_block", f"$$ {node.content} $$"])
+            else:
+                rows.append(["paragraph", f"$$ {node.content} $$"])
         elif isinstance(node, HorizontalRule):
             rows.append(["horizontal_rule", "---"])
         elif isinstance(node, Footnote):
-            rows.append(["footnote", f"[^{node.id}]: {node.text}"])
+            if emit_ast:
+                rows.append(["footnote", f"[^{node.id}]: {node.text}"])
+            else:
+                rows.append(["paragraph", f"[^{node.id}]: {node.text}"])
         elif isinstance(node, Image):
             alt = (node.alt_text or "image").split("|", 1)[0]
-            rows.append(["image", f"[Image: {alt}]"])
+            if emit_ast:
+                rows.append(["image", f"[Image: {alt}]"])
+            else:
+                rows.append(["paragraph", f"[Image: {alt}]"])
         elif isinstance(node, HtmlBlock):
             import re
 
             text = re.sub(r"<[^>]+>", "", node.content or "").strip()
             if text:
-                rows.append(["html_block", text])
+                rows.append(["html_block" if emit_ast else "paragraph", text])
         elif isinstance(node, Comment):
-            rows.append(["comment", f"[Comment {node.author}] {node.text}"])
+            tip = f"[Comment {node.author}] {node.text}"
+            rows.append(["comment" if emit_ast else "paragraph", tip])
         elif isinstance(node, Revision):
             tag = "ins" if node.change == "insert" else "del"
-            rows.append(["revision", f"[{tag} {node.author}] {node.text}"])
+            tip = f"[{tag} {node.author}] {node.text}"
+            rows.append(["revision" if emit_ast else "paragraph", tip])
         elif isinstance(node, ContentControl):
-            rows.append(
-                [
-                    "content_control",
-                    f"[ContentControl {node.tag}|{node.alias}|{node.control_type}] {node.text}",
-                ]
+            tip = (
+                f"[ContentControl {node.tag}|{node.alias}|{node.control_type}] {node.text}"
             )
+            rows.append(["content_control" if emit_ast else "paragraph", tip])
         elif isinstance(node, TextBox):
             src = (node.source or "").strip()
             prefix = f"[TextBox|{src}]" if src else "[TextBox]"
-            rows.append(["text_box", f"{prefix} {node.text}"])
+            tip = f"{prefix} {node.text}"
+            rows.append(["text_box" if emit_ast else "paragraph", tip])
         elif isinstance(node, PivotTable):
             fields = ", ".join(node.row_fields + node.col_fields + node.data_fields)
-            rows.append(
-                [
-                    "pivot_table",
-                    f"[PivotTable {node.name}|{node.source_range}|{node.location}] {fields}",
-                ]
+            tip = (
+                f"[PivotTable {node.name}|{node.source_range}|{node.location}] {fields}"
             )
+            rows.append(["pivot_table" if emit_ast else "paragraph", tip])
         else:
             plain = getattr(node, "plain_text", None)
             if callable(plain):
@@ -967,6 +983,8 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
     rule_count = 0
     table_cell_count = 0
     pending_table_cells: dict[str, list[tuple[int, int, TableCell]]] = {}
+    has_ast_sheet = _META_AST in sheet_names
+    deferred_content_rows: list[list[str]] | None = None
     for idx, sheet_path in enumerate(sheets):
         try:
             root = xml_safe.fromstring(budget.read(zf, sheet_path))
@@ -977,6 +995,7 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             continue
         sname = sheet_names[idx] if idx < len(sheet_names) else f"Sheet{idx + 1}"
         if sname == _META_AST or _rows_match_header(rows[0], _AST_HEADER):
+            has_ast_sheet = True
             for row in rows[1:]:
                 ntype = _row_cell(row, 0, "").lower().replace("-", "_")
                 if ntype in ("table_cell", "cell"):
@@ -1241,36 +1260,8 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             rows
             and _rows_match_header(rows[0], ["kind", "text"])
         ):
-            for node in _nodes_from_content_sheet(rows):
-                nodes.append(node)
-                if isinstance(node, Heading):
-                    heading_count += 1
-                elif isinstance(node, Paragraph):
-                    paragraph_count += 1
-                elif isinstance(node, ListItem):
-                    list_item_count += 1
-                elif isinstance(node, CodeBlock):
-                    code_count += 1
-                elif isinstance(node, Blockquote):
-                    blockquote_count += 1
-                elif isinstance(node, Footnote):
-                    footnote_count += 1
-                elif isinstance(node, Comment):
-                    comment_count += 1
-                elif isinstance(node, Revision):
-                    revision_count += 1
-                elif isinstance(node, ContentControl):
-                    control_count += 1
-                elif isinstance(node, TextBox):
-                    textbox_count += 1
-                elif isinstance(node, HorizontalRule):
-                    rule_count += 1
-                elif isinstance(node, MathBlock):
-                    math_count += 1
-                elif isinstance(node, Image):
-                    image_count += 1
-                elif isinstance(node, HtmlBlock):
-                    html_count += 1
+            # Prefer _AST as typed source of truth; Content is a searchable mirror.
+            deferred_content_rows = rows
             continue
         use_cells = bool(cells) and (
             has_formula
@@ -1289,6 +1280,37 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             row_heights=row_heights,
         )
         nodes.append(tbl)
+    if deferred_content_rows is not None and not has_ast_sheet:
+        for node in _nodes_from_content_sheet(deferred_content_rows):
+            nodes.append(node)
+            if isinstance(node, Heading):
+                heading_count += 1
+            elif isinstance(node, Paragraph):
+                paragraph_count += 1
+            elif isinstance(node, ListItem):
+                list_item_count += 1
+            elif isinstance(node, CodeBlock):
+                code_count += 1
+            elif isinstance(node, Blockquote):
+                blockquote_count += 1
+            elif isinstance(node, Footnote):
+                footnote_count += 1
+            elif isinstance(node, Comment):
+                comment_count += 1
+            elif isinstance(node, Revision):
+                revision_count += 1
+            elif isinstance(node, ContentControl):
+                control_count += 1
+            elif isinstance(node, TextBox):
+                textbox_count += 1
+            elif isinstance(node, HorizontalRule):
+                rule_count += 1
+            elif isinstance(node, MathBlock):
+                math_count += 1
+            elif isinstance(node, Image):
+                image_count += 1
+            elif isinstance(node, HtmlBlock):
+                html_count += 1
     existing_pivot_names = {n.name for n in nodes if isinstance(n, PivotTable) and n.name}
     for p in _parse_pivot_tables(zf, budget):
         if p.name and p.name in existing_pivot_names:

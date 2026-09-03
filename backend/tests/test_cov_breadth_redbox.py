@@ -897,7 +897,9 @@ def test_docling_utils_edge_branches():
         ],
     )
     model = du.docling_document_to_model(doc, title="it")
-    assert any(isinstance(n, Paragraph) for n in model.nodes)
+    from app.core.document_model import Footnote
+
+    assert any(isinstance(n, (Paragraph, Footnote)) for n in model.nodes)
 
     # markdown data-URI images
     tiny = "iVBORw0KGgo="

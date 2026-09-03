@@ -81,7 +81,7 @@
     <li data-page-node-id="rdbBgaxn7UKlDNCRi6cpMj"><b data-page-node-id="0Dyl0NAoDC0tu8oNYVau9R">修复并非孤案</b>：本轮一并恢复/补齐了此前两个未入版本库的保真修复——docx 内嵌图片抽取（P0）与 List Bullet/Number 系列表编号（P1B），三者共用一条主循环，缺一则静默降级。</li>
     <li data-page-node-id="f8BJkuT70rSFLfRF2PQH1B"><b data-page-node-id="jgMLBk7EgjIVUEDcRIzOqX">native 全链路实测全面提升</b>：修复后 sample.docx→md 输出 12340 字符，含 1 张 base64 内嵌图、5 个 bullet（含 2 级嵌套）、3 个有序项、HTML colspan 合并表、特殊字符 14/14、中文 276 字与 golden 全等。</li>
     <li data-page-node-id="BzlnhIkfKhHazmn5aV2CLv"><b data-page-node-id="4EOKyZqhyn0UiqFJs03lmF">默认通道已切 native（D1-B 已落地）</b>：工程配置 <code>anydoc_formats</code> 已排除 docx；默认 <code>convert(docx→md)</code> 走 native 高保真（图/列表/链接/HTML colspan）。竞技日 7.45 / 887B 仍为 anydoc fast <b>快照锚点</b>，对外总分不抬；若手动把 docx 加回 allowlist，fast 丢图行为仍可能复现。</li>
-    <li data-page-node-id="Ny0HLDgThXUXU7RYVTEIYI"><b data-page-node-id="BsVZov0rE4M0yJPc3I1JzR">全量回归零新增</b>：952 passed / 20 failed / 10 skipped，20 项失败名单与修复前逐项一致（xlsx_ast 默认关族 + docling 环境缺失族 + fidelity 基线），非本轮引入。</li>
+    <li data-page-node-id="Ny0HLDgThXUXU7RYVTEIYI"><b data-page-node-id="BsVZov0rE4M0yJPc3I1JzR">全量回归清零既有失败基线</b>：本轮收口后 <b>984 passed / 0 failed / 10 skipped</b>（xlsx Content/_AST 去重、pdf docling 缺模型回退、target=19/rag、表内嵌图等）。</li>
   </ol>
 </div>
 
@@ -179,8 +179,8 @@
   <table style="margin-top:6px" data-page-node-id="c82MlkSWCXIKhHxKDTvBAp">
     <tr data-page-node-id="OLe1Ah7DlQFid5CIbcZ2QP"><th style="width:64px" data-page-node-id="AG1KWqRdYAbrO7wIBZdGY9">级别</th><th data-page-node-id="G6sZ9OcFg2Jp9119gqL4at">事项</th><th style="width:110px" data-page-node-id="jdktByzzmo3tkxgMzU4GC5">状态</th></tr>
     <tr data-page-node-id="K5IDmVbj06Dn2U9XBV7zWE"><td data-page-node-id="pd9iixtHqwalNLOHUxNN1X"><span class="tag p2" data-page-node-id="HXmIxEBqzdt7v00W4Lqdfh">P2</span></td><td data-page-node-id="WQak0bKxHcUdOnKmSpnrrq">native 代码块 fence / chrome 尾注洪水</td><td data-page-node-id="jwm9I2xOxrcIOfvzsZ0PgL"><span class="tag done">CLOSED</span></td></tr>
-    <tr data-page-node-id="9Bg5FJJfrSeuUuahFJGbTf"><td data-page-node-id="mKXUTvQPZhcRV7FJ9ZyJIf"><span class="tag p2" data-page-node-id="LKEfwp2bINkGqpVKLj7IoW">P2</span></td><td data-page-node-id="Pe8lboCnf4mpntBRBjnWyL">表格内嵌图片（段落级 drawing 已覆盖；表内二期）</td><td data-page-node-id="Wght8hc4fJM6DOfuBl487f"><span class="tag open" data-page-node-id="JL9pkIPIxAa2ju7PGATdUE">二期</span></td></tr>
-    <tr data-page-node-id="3wx7xDSIdFuLdH1oe85yHn"><td data-page-node-id="dITf089cTL3hmXpsvan2yn"><span class="tag p2" data-page-node-id="H2WLrYLub1YdcCMngjsmSM">P2</span></td><td data-page-node-id="NyDpn7z8B3Rr7EjlTQuijF">20 项既有失败基线：xlsx_ast 默认关族 + venv 缺 docling + fidelity/golden</td><td data-page-node-id="Pok08sa77VaprwvwcHy8Z1"><span class="tag open" data-page-node-id="XO27GSbmJk4smTgjEfbcrF">专项</span></td></tr>
+    <tr data-page-node-id="9Bg5FJJfrSeuUuahFJGbTf"><td data-page-node-id="mKXUTvQPZhcRV7FJ9ZyJIf"><span class="tag p2" data-page-node-id="LKEfwp2bINkGqpVKLj7IoW">P2</span></td><td data-page-node-id="Pe8lboCnf4mpntBRBjnWyL">表格内嵌图片（w:tc drawing → TableCell.images → md/html）</td><td data-page-node-id="Wght8hc4fJM6DOfuBl487f"><span class="tag done">CLOSED</span></td></tr>
+    <tr data-page-node-id="3wx7xDSIdFuLdH1oe85yHn"><td data-page-node-id="dITf089cTL3hmXpsvan2yn"><span class="tag p2" data-page-node-id="H2WLrYLub1YdcCMngjsmSM">P2</span></td><td data-page-node-id="NyDpn7z8B3Rr7EjlTQuijF">既有失败基线（xlsx_ast 双水合 / pdf docling 缺模型回退 / fidelity target=19）</td><td data-page-node-id="Pok08sa77VaprwvwcHy8Z1"><span class="tag done">CLOSED · 984/0</span></td></tr>
     <tr data-page-node-id="vu2qfkuvIDWoXToxBlFedS"><td data-page-node-id="uwFnGz9QmDD5xBOCpBXV0n"><span class="tag p1" data-page-node-id="UbGHmSwAjHcwks88mnkBCx">P1</span></td><td data-page-node-id="ddyrLThhldCUsx6WWwWlFg">工作区修复 git commit 固化（防 IDE buffer 回退）</td><td data-page-node-id="8F045qK9jWypRxyCOe8sds"><span class="tag done">CLOSED · f6ff4ec</span></td></tr>
   </table>
 </div>
@@ -191,13 +191,13 @@
   <ul class="tight" data-page-node-id="rPmif0j6Mchq0Ef8I7iaOQ">
     <li data-page-node-id="J3PeZJAHu4VDH2BibCE71P"><b data-page-node-id="hewt6jGnpC0QJhoCl8DDEL">同场实测竞技</b>：python-docx 独立构造全特征 sample.docx（与实现解耦），四路同输入转 md；本增量聚焦 md-bridge native 通道修复前后对照，竞品（mammoth 5.55 / markitdown 6.35 / anydoc）未重跑、基线沿用 v9。</li>
     <li data-page-node-id="dFlGP1CS56WWDlyJenCVD7"><b data-page-node-id="OZfIq2m1nAtAdG5lTbYjNX">修复落点</b>：<code data-page-node-id="SHKTThhkWBJBg4DX06gJYs">backend/app/importers/docx_text.py</code>（437 → 610 行）：<code data-page-node-id="QbOgMhxEEnoiaUgH5MWXMu">_paragraph_to_rich</code>（iter_inner_content 文档序）、<code data-page-node-id="qxNWlwh6uWz8HKkd8xEoc3">_img_mime_for / _docx_image_rels / _extract_para_images</code>、<code data-page-node-id="HfmHoMQGJySGEHKrBKK9fJ">_LIST_STYLE_RE / _style_list_meta</code>。</li>
-    <li data-page-node-id="9wzLWiLcxUsPlbFPoCXc2Y"><b data-page-node-id="MnoGhHh28n9gtNx5yWZcdm">回归测试</b>：新增 <code data-page-node-id="ME64JcK0lLk0sF6ZgpoY1h">backend/tests/test_docx_hyperlink.py</code> ×3；图片测试 3/3；docx 专项 14/14；全量 <b data-page-node-id="eUU7iAmU36SgbeI5AoX173">952 passed / 20 failed / 10 skipped</b>（75.6s）。</li>
+    <li data-page-node-id="9wzLWiLcxUsPlbFPoCXc2Y"><b data-page-node-id="MnoGhHh28n9gtNx5yWZcdm">回归测试</b>：docx 图片/超链接/表内嵌图门禁；全量 <b data-page-node-id="eUU7iAmU36SgbeI5AoX173">984 passed / 0 failed / 10 skipped</b>。</li>
     <li data-page-node-id="i2ufNpbCygonpEpAhsGYIZ"><b data-page-node-id="Bav2Sh3U44ZtlIgZy04uvk">arena fixtures 已重生成</b>：<code data-page-node-id="IzRMmS8RybqZlAaB3EpDlo">outputs/v9_arena/out_native_full.md</code>（12340 字符，修复后）；默认通道 <code data-page-node-id="1F2EMWzQ2e6RyZuL32XWSS">out_mdbridge_native.md == out_anydoc.md</code>（887 chars / 1541B，逐字符一致）；过期的 <code data-page-node-id="Kx2cCCzcKYUA6kIUaFM1zs">out_native_fixed.md</code> 已移除。</li>
     <li data-page-node-id="fbWFi2GQQkxTH6D0jpBCu5"><b data-page-node-id="8AsqwhUgfhEmNFD70tHjbL">实测耗时</b>：native 全链路 0.17s vs anydoc fast 0.003s（~50×），为 D1 取舍核心。</li>
   </ul>
   <div class="bom" style="margin-top:12px" data-page-node-id="LBmTpBBzewXz3Y8CbhGW3x">
-    <div class="it" data-page-node-id="AjXLDSlIdpG3esrhtvZrFT"><b data-page-node-id="QHkYmtQkWtb3doE6tvwz2M">已闭环（本轮）</b><span data-page-node-id="DZHxIqrMczCoxMLl7cBwU8">超链接锚文本 · 内嵌图片 · 列表样式编号 · D1 native 默认 · fence/chrome 跳过</span></div>
-    <div class="it" data-page-node-id="BMYzUlDHjADCwlF06uVcEH"><b data-page-node-id="bJYhiQ4mSA5rnJz7AKVGgK">待办</b><span data-page-node-id="5lsD3vuCc821yZo61hijEx">表内嵌图二期 · 既有失败基线专项</span></div>
+    <div class="it" data-page-node-id="AjXLDSlIdpG3esrhtvZrFT"><b data-page-node-id="QHkYmtQkWtb3doE6tvwz2M">已闭环（本轮）</b><span data-page-node-id="DZHxIqrMczCoxMLl7cBwU8">超链接 · 段落/表内图片 · 列表 · D1 native · fence/chrome · 失败基线清零</span></div>
+    <div class="it" data-page-node-id="BMYzUlDHjADCwlF06uVcEH"><b data-page-node-id="bJYhiQ4mSA5rnJz7AKVGgK">残留</b><span data-page-node-id="5lsD3vuCc821yZo61hijEx">无阻塞项（对外分仍锚 66.2）</span></div>
   </div>
 </div>
 

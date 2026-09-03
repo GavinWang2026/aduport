@@ -117,6 +117,8 @@ class TableCell(BaseModel):
     # Spreadsheet semantics (values + formula text; pivot/chart as metadata kind).
     formula: str = ""
     cell_kind: Literal["value", "formula", "pivot", "chart"] = "value"
+    # DOCX w:tc 内嵌 drawing/pict（段落级抽取的表内扩展）
+    images: list["Image"] = Field(default_factory=list)
 
 
 class Image(BaseModel):

@@ -29,4 +29,4 @@ def test_formats_exposes_fidelity_tiers():
         assert "ocr_required" in notes.get("pdf", "") or "ocr_required" in notes.get("ocr", "")
         assert body.get("builtin_coverage", {}).get("xlsb")
         assert len(body.get("source") or []) == 29
-        assert len(body.get("target") or []) == 18
+        assert len(body.get("target") or []) == 19

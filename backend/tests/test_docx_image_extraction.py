@@ -77,3 +77,33 @@ def test_docx_image_survives_md_html_docx_targets():
 
     back = export_docx(model)
     assert b"word/media/" in back or b"image" in back.lower()
+
+
+def _docx_with_table_image() -> bytes:
+    """DOCX with a picture inside a table cell (w:tc → w:drawing)."""
+    doc = Document()
+    table = doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "左栏"
+    run = table.cell(0, 1).paragraphs[0].add_run()
+    run.add_picture(BytesIO(_PNG), width=Inches(0.35))
+    buf = BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def test_docx_table_cell_image_extracted():
+    from app.core.document_model import Table
+
+    model = import_docx(_docx_with_table_image(), filename="tbl-img.docx")
+    tables = [n for n in model.nodes if isinstance(n, Table)]
+    assert tables, "应有 Table 节点"
+    cell_imgs = [img for row in (tables[0].cells or []) for c in row for img in (c.images or [])]
+    assert len(cell_imgs) >= 1, "表内 w:tc drawing 应进入 TableCell.images"
+    assert all(len(i.data) > 0 for i in cell_imgs)
+
+    from app.core.converter import convert
+
+    md = convert(
+        _docx_with_table_image(), "docx", "md", filename="tbl-img.docx", skip_magic=True
+    ).decode()
+    assert "data:image" in md

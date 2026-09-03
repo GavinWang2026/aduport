@@ -20,10 +20,21 @@ def table_has_span_cells(table: Table) -> bool:
     return False
 
 
+def table_has_cell_images(table: Table) -> bool:
+    if not table.cells:
+        return False
+    return any(cell.images for row in table.cells for cell in row)
+
+
 def table_flat_matrix(table: Table) -> list[list[str]]:
-    if table.cells and table_has_span_cells(table):
+    if table.cells and (table_has_span_cells(table) or table_has_cell_images(table)):
         return [
-            ["" if cell.covered else _escape_cell(cell.text) for cell in row]
+            [
+                ""
+                if cell.covered
+                else _cell_text_with_images(cell)
+                for cell in row
+            ]
             for row in table.cells
         ]
     if table.rows:
@@ -32,8 +43,25 @@ def table_flat_matrix(table: Table) -> list[list[str]]:
             for row in table.rows
         ]
     if table.cells:
-        return [[_escape_cell(c.text) for c in row] for row in table.cells]
+        return [[_cell_text_with_images(c) for c in row] for row in table.cells]
     return []
+
+
+def _cell_text_with_images(cell: TableCell) -> str:
+    parts = [_escape_cell(cell.text)] if cell.text else []
+    for img in cell.images or []:
+        alt = (img.alt_text or "image").split("|", 1)[0].replace("]", "")
+        if img.data:
+            import base64
+
+            b64 = base64.b64encode(img.data).decode("ascii")
+            mime = img.mime_type or "image/png"
+            parts.append(f"![{alt}](data:{mime};base64,{b64})")
+        elif img.url:
+            parts.append(f"![{alt}]({img.url})")
+        else:
+            parts.append(f"[Image: {alt}]")
+    return " ".join(parts)
 
 
 def table_span_metadata_comment(table: Table) -> str | None:

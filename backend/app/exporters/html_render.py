@@ -483,7 +483,9 @@ def _render_table_html(table: Table) -> str:
     if not table.rows and not table.cells:
         return ""
     header_rows = _table_header_rows(table)
-    if table.cells and _table_has_span_cells(table):
+    if table.cells and (
+        _table_has_span_cells(table) or _table_has_cell_images(table)
+    ):
         return _render_table_html_spans(table)
     if not table.rows:
         return ""
@@ -521,6 +523,27 @@ def _table_has_span_cells(table: Table) -> bool:
     return False
 
 
+def _table_has_cell_images(table: Table) -> bool:
+    if not table.cells:
+        return False
+    return any(cell.images for row in table.cells for cell in row)
+
+
+def _table_cell_inner_html(cell: TableCell) -> str:
+    parts = [html.escape(cell.text)] if cell.text else []
+    for img in cell.images or []:
+        alt = html.escape((img.alt_text or "image").split("|", 1)[0])
+        if img.data:
+            b64 = base64.b64encode(img.data).decode("ascii")
+            mime = _safe_image_mime(img.mime_type)
+            parts.append(f"<img src='data:{mime};base64,{b64}' alt='{alt}'/>")
+        elif img.url:
+            parts.append(f"<img src='{html.escape(img.url)}' alt='{alt}'/>")
+        else:
+            parts.append(f"[Image: {alt}]")
+    return "".join(parts) or "&nbsp;"
+
+
 def _table_cell_tag(r_idx: int, cell: TableCell, header_rows: int) -> str:
     if header_rows > 0 and r_idx < header_rows:
         return "th"
@@ -542,7 +565,9 @@ def _render_table_html_spans(table: Table) -> str:
             if cell.row_span > 1:
                 attrs.append(f'rowspan="{cell.row_span}"')
             attr_str = f" {' '.join(attrs)}" if attrs else ""
-            lines.append(f"<{tag}{attr_str}>{html.escape(cell.text)}</{tag}>")
+            lines.append(
+                f"<{tag}{attr_str}>{_table_cell_inner_html(cell)}</{tag}>"
+            )
         lines.append("</tr>")
     lines.append("</table>")
     return "\n".join(lines)

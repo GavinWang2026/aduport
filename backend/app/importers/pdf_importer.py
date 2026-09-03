@@ -149,10 +149,9 @@ def import_pdf(source_bytes: bytes, filename: str = "input.pdf") -> DocumentMode
         return _stamp_pdf_pipeline(model, "ocr")
 
     if engine == "docling":
-        model = _import_with_docling(source_bytes, filename)
-        return _stamp_pdf_pipeline(model, "docling")
-
-    if engine == "auto":
+        # Shared path below: models_ready gate → docling → Hub/text fallback.
+        pass
+    elif engine == "auto":
         # Single PDF open: extract once, gate on text richness (T20).
         weak_model: DocumentModel | None = None
         chars = 0

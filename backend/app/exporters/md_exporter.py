@@ -10,6 +10,7 @@ from app.exporters.md_escape import collapse_blank_lines, escape_md_text
 from app.exporters.table_span import (
     render_table_html,
     table_flat_matrix,
+    table_has_cell_images,
     table_has_span_cells,
 )
 from app.core.document_model import (
@@ -439,7 +440,11 @@ def _split_by_marks(rich: RichText) -> list[tuple[str, list[InlineMark]]]:
 
 def _render_table(table: Table) -> list[str]:
     # v9 P2: span → HTML when html_table_for_span (default True); else flat GFM.
-    if table_has_span_cells(table) and getattr(settings, "html_table_for_span", True):
+    # Cell-embedded images also prefer HTML so <img> survives inside <td>.
+    use_html = getattr(settings, "html_table_for_span", True) and (
+        table_has_span_cells(table) or table_has_cell_images(table)
+    )
+    if use_html:
         html_table = render_table_html(table)
         return ["", html_table, ""] if html_table else []
 

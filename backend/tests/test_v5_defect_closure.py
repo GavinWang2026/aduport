@@ -26,6 +26,13 @@ from app.exporters.xlsx_exporter import export_xlsx
 
 
 def test_md_layout_nodes_emit_placeholder_and_warn():
+    """Chrome catalogs stay in AST for JSON/DOCX; Markdown no longer floods placeholders.
+
+    v9 P1/P2: Section/PageSetup/RunStyle/Numbering are skipped in export_md so native
+    md stays compact. Unhandled non-chrome nodes still emit <!-- …|degraded -->.
+    """
+    from app.core.document_model import Comment
+
     model = DocumentModel(
         nodes=[
             Section(title="Ch1"),
@@ -33,16 +40,17 @@ def test_md_layout_nodes_emit_placeholder_and_warn():
             HeaderFooter(kind="header", text="hdr"),
             FieldCode(field_type="PAGE", instruction="PAGE", result_text="1"),
             Numbering(num_id="1", abstract_num_id="0"),
+            Comment(author="x", text="keep-me"),
             Paragraph(text="body"),
         ]
     )
     out = export_md(model)
-    assert "section" in out.lower() or "Ch1" in out or "PageSetup" in out or "PAGE" in out
-    assert "<!--" in out
-    asserts = model.metadata.get("export_warnings") or []
-    # warn_export may only hit context; also check body markers
-    assert "placeholder" in out.lower() or "degraded" in out or "Section" in out or "PageSetup" in out
     assert "body" in out
+    # chrome skipped
+    assert "Ch1" not in out and "PageSetup" not in out
+    # non-chrome still placeholder
+    assert "<!--" in out
+    assert "comment" in out.lower() or "keep-me" in out or "degraded" in out
 
 
 def test_html_layout_nodes_emit_placeholder_aside():

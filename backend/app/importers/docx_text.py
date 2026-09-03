@@ -130,7 +130,7 @@ def try_extract_docx_model(data: bytes, *, title: str = "") -> DocumentModel | N
                     nodes.extend(para_images)
             elif child.tag == qn("w:tbl"):
                 table = DocxTable(child, doc)
-                ast_table = _table_from_docx(table)
+                ast_table = _table_from_docx(table, zf=zf, image_rels=image_rels)
                 if ast_table is not None:
                     nodes.append(ast_table)
     finally:
@@ -196,23 +196,35 @@ def _node_from_style(style: str, rich: RichText, para) -> object | None:
     return Paragraph(text=rich)
 
 
-def _table_from_docx(table) -> Table | None:
+def _table_from_docx(
+    table,
+    *,
+    zf: zipfile.ZipFile | None = None,
+    image_rels: dict | None = None,
+) -> Table | None:
     """Build Table with gridSpan / vMerge → col_span / row_span / covered.
 
     Walks ``w:tc`` (not python-docx ``row.cells``, which duplicates merges).
     Footnotes/comments remain via ``enrich_docx_model`` post-pass.
+    When ``zf`` + ``image_rels`` provided, extracts drawings inside each ``w:tc``.
     """
     try:
         from docx.oxml.ns import qn
     except ImportError:
         return None
 
-    # Each entry: (text, col_span, vmerge) with vmerge in {None, "restart", "continue"}
-    raw: list[list[tuple[str, int, str | None]]] = []
+    # Each entry: (text, col_span, vmerge, images)
+    raw: list[list[tuple[str, int, str | None, list]]] = []
     for tr in table._tbl.findall(qn("w:tr")):
-        row_cells: list[tuple[str, int, str | None]] = []
+        row_cells: list[tuple[str, int, str | None, list]] = []
         for tc in tr.findall(qn("w:tc")):
             text = "".join((t.text or "") for t in tc.iter(qn("w:t"))).strip()
+            cell_images: list = []
+            if zf is not None and image_rels:
+                try:
+                    cell_images = _extract_para_images(zf, image_rels, tc)
+                except Exception:
+                    cell_images = []
             col_span = 1
             vmerge: str | None = None
             tc_pr = tc.find(qn("w:tcPr"))
@@ -227,20 +239,20 @@ def _table_from_docx(table) -> Table | None:
                 if vm is not None:
                     val = (vm.get(qn("w:val")) or "").lower()
                     vmerge = "restart" if val == "restart" else "continue"
-            row_cells.append((text, col_span, vmerge))
+            row_cells.append((text, col_span, vmerge, cell_images))
         if row_cells:
             raw.append(row_cells)
     if not raw:
         return None
 
-    # Map logical column → (text, col_span, vmerge) per row (first cell of a span only)
-    starts: list[dict[int, tuple[str, int, str | None]]] = []
+    # Map logical column → (text, col_span, vmerge, images) per row
+    starts: list[dict[int, tuple[str, int, str | None, list]]] = []
     n_cols = 0
     for row in raw:
-        by_col: dict[int, tuple[str, int, str | None]] = {}
+        by_col: dict[int, tuple[str, int, str | None, list]] = {}
         col = 0
-        for text, col_span, vmerge in row:
-            by_col[col] = (text, col_span, vmerge)
+        for text, col_span, vmerge, cell_images in row:
+            by_col[col] = (text, col_span, vmerge, cell_images)
             col += col_span
         n_cols = max(n_cols, col)
         starts.append(by_col)
@@ -250,7 +262,7 @@ def _table_from_docx(table) -> Table | None:
         row_cells: list[TableCell] = [
             TableCell(text="", covered=True) for _ in range(n_cols)
         ]
-        for start_col, (text, col_span, vmerge) in by_col.items():
+        for start_col, (text, col_span, vmerge, cell_images) in by_col.items():
             if vmerge == "continue":
                 # Find restart above
                 origin_r = r_idx
@@ -293,6 +305,7 @@ def _table_from_docx(table) -> Table | None:
                 col_span=col_span,
                 row_span=row_span,
                 covered=False,
+                images=list(cell_images or []),
             )
             for k in range(1, col_span):
                 if start_col + k < n_cols:
@@ -308,9 +321,10 @@ def _table_from_docx(table) -> Table | None:
     has_span = any(
         c.covered or c.row_span > 1 or c.col_span > 1 for row in cells for c in row
     )
+    has_images = any(c.images for row in cells for c in row)
     return Table(
         rows=rows,
-        cells=cells if has_span else [],
+        cells=cells if (has_span or has_images) else [],
         header_rows=1 if rows else 0,
     )
 

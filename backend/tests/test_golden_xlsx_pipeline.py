@@ -6,9 +6,18 @@ import json
 import zipfile
 from io import BytesIO
 
+import pytest
+
+from app.config import settings
 from app.core.converter import convert
 from app.exporters.xlsx_exporter import export_xlsx
 from tests.golden_xlsx_fixture import golden_xlsx_model
+
+
+@pytest.fixture(autouse=True)
+def _enable_xlsx_ast_for_golden(monkeypatch: pytest.MonkeyPatch):
+    """Meta nodes (comment/revision/…) require _AST sheet; default off is Content-only."""
+    monkeypatch.setattr(settings, "xlsx_ast_sheet", True)
 
 
 def _export_bytes() -> bytes:
