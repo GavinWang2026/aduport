@@ -72,7 +72,13 @@ class ResultCache:
             self._data[key] = (time.time(), store, compressed)
             self.bytes_stored += len(store)
             self._data.move_to_end(key)
-            while len(self._data) > self.max_entries:
+            # v6/T1-#6: evict on byte watermark as well as entry count. Without
+            # this, max_entries=128 of 4MB blobs (or 1024 entries) grew toward
+            # multiple GB because only the entry count was bounded.
+            max_bytes = max(0, int(getattr(settings, "cache_max_bytes", 0) or 0))
+            while len(self._data) > self.max_entries or (
+                max_bytes and self.bytes_stored > max_bytes and len(self._data) > 1
+            ):
                 _, (_, blob, _) = self._data.popitem(last=False)
                 self.bytes_stored = max(0, self.bytes_stored - len(blob))
 

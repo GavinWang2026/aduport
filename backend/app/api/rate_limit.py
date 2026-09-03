@@ -13,6 +13,29 @@ from app.config import settings
 
 _active: "RateLimitMiddleware | None" = None
 _MAX_CLIENT_KEYS = 10_000
+_redis_client = None
+_redis_url: str | None = None
+_redis_lock = __import__("threading").Lock()
+
+
+def _get_redis_client(url: str):
+    """Module-level Redis singleton (avoids per-request connect leak)."""
+    global _redis_client, _redis_url
+    with _redis_lock:
+        if _redis_client is not None and _redis_url == url:
+            return _redis_client
+        import redis  # type: ignore
+
+        if _redis_client is not None:
+            try:
+                _redis_client.close()
+            except Exception:
+                pass
+        _redis_client = redis.from_url(
+            url, socket_connect_timeout=0.4, socket_timeout=0.4
+        )
+        _redis_url = url
+        return _redis_client
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -49,6 +72,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client = request.client.host if request.client else "unknown"
+        # v6/T3-#18 / D-19: honour X-Forwarded-For only for configured proxy hops.
+        hops = int(getattr(settings, "trusted_proxy_hops", 0) or 0)
+        if hops > 0:
+            xff = (request.headers.get("x-forwarded-for") or "").strip()
+            if xff:
+                parts = [p.strip() for p in xff.split(",") if p.strip()]
+                if len(parts) >= hops:
+                    client = parts[-hops]
+                elif parts:
+                    client = parts[0]
         tenant_id = getattr(request.state, "tenant_id", None)
         bucket = f"tenant:{tenant_id}" if tenant_id else f"ip:{client}"
         tenant_limit = getattr(request.state, "tenant_rate_limit", None)
@@ -118,9 +151,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not url:
             return None
         try:
-            import redis  # type: ignore
-
-            r = redis.from_url(url, socket_connect_timeout=0.4, socket_timeout=0.4)
+            r = _get_redis_client(url)
             key = f"mdbridge:rl:{bucket}"
             n = int(r.incr(key))
             if n == 1:
@@ -133,3 +164,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 def reset_rate_limits() -> None:
     if _active is not None:
         _active.reset()
+    global _redis_client, _redis_url
+    with _redis_lock:
+        if _redis_client is not None:
+            try:
+                _redis_client.close()
+            except Exception:
+                pass
+        _redis_client = None
+        _redis_url = None

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     app_name: str = "md-bridge"
     debug: bool = False
     max_upload_mb: int = 100
+    # D-24: abort stalled chunked uploads (slowloris).
+    upload_timeout_seconds: float = 60.0
+    # D-27: OpenAPI /docs is debug-only unless explicitly enabled.
+    expose_api_docs: bool = False
     cors_origins: str = "local"
     cors_allow_credentials: bool = False
 
@@ -56,9 +60,16 @@ class Settings(BaseSettings):
     # PaddleOCR-VL: auto | true | false. auto = off on macOS (SIGTRAP in short workers)
     ocr_allow_paddle: str = "auto"
 
-    # PDF import: auto | text | docling | mineru | paddleocr_vl
-    # auto = use embedded text when rich enough, else OCR (if enabled) / docling
+    # PDF import: auto | text | docling | ocr | mineru | paddleocr_vl
+    # Tri-state product view (v8 §B):
+    #   text   = pypdfium2 text layer only
+    #   docling = optional layout/AI (requires models)
+    #   ocr    = enterprise scan path (MinerU / Paddle); aliases mineru|paddleocr_vl
+    #   auto   = text-richness gate → OCR (if enabled) → docling → text
     pdf_engine: str = "auto"
+    # Embed %%MDBRIDGE-AST sidecar after PDF %%EOF (debug/round-trip only).
+    # Default off — sidecar is not layout fidelity; do not count as PDF 保真.
+    pdf_ast_sidecar: bool = False
     pdf_text_min_chars: int = 80
     pdf_docling_tables: bool = True
     docling_artifacts_path: str = ""
@@ -110,6 +121,8 @@ class Settings(BaseSettings):
     pdf_footer: str = ""
     pdf_page_numbers: bool = True
     pdf_toc: bool = False
+    # Remap PEP textbook math-font CJK→Latin (destructive on normal names; default off)
+    pdf_pep_font_fix: bool = False
 
     # Remote images (SSRF-guarded)
     fetch_remote_images: bool = True
@@ -124,6 +137,8 @@ class Settings(BaseSettings):
 
     # DOCX theme: default | academic | minimal
     docx_theme: str = "default"
+    # Insert a Word TOC field near the top when the document has headings
+    docx_auto_toc: bool = True
     # Emit Word Review comments.xml when AST has Comment nodes
     docx_export_comments: bool = True
     # Prefix headings with 1 / 1.1 / 1.1.1 on export
@@ -150,11 +165,24 @@ class Settings(BaseSettings):
     max_batch_files: int = 20
     max_batch_total_mb: int = 200
     batch_workers: int = 3
+    # Sync/API convert ThreadPool size (0 = reuse batch_workers). T38 engine pool.
+    convert_pool_workers: int = 0
+    # XLSX workbook sheet hard cap (data + Content + meta). Was hard-coded 8.
+    xlsx_max_sheets: int = 64
+    # Emit hidden `_AST` meta sheet for non-table nodes (Comment/Chart/…).
+    # Default off — table-body fidelity only; opt-in for AST sidecar round-trip.
+    xlsx_ast_sheet: bool = False
 
     # Security / ops
     rate_limit_per_minute: int = 60
+    # Trusted reverse-proxy hop count for X-Forwarded-For (v6/T3-#18 / D-19).
+    # 0 = ignore XFF and use socket peer; 1+ = take the client IP that many hops from the right.
+    trusted_proxy_hops: int = 0
     cache_enabled: bool = True
     cache_max_entries: int = 128
+    # v6/T1-#6: entry-count eviction alone let 128 x 4MB blobs grow to ~512MB.
+    # Byte watermark is the real bound; 256MB default keeps a 4-worker host safe.
+    cache_max_bytes: int = 256 * 1024 * 1024
     cache_ttl_seconds: int = 3600
     cache_gzip: bool = True
     cache_gzip_min_bytes: int = 2048
@@ -178,6 +206,8 @@ class Settings(BaseSettings):
     # Async jobs
     job_ttl_seconds: int = 3600
     job_max_entries: int = 256
+    # Max queued+running jobs before 429 (bounds ThreadPoolExecutor backlog)
+    job_queue_max: int = 64
     # 0 = unlimited in-flight upload budget for async jobs
     memory_budget_mb: int = 512
     # Persist finished job metadata (empty = memory only)
@@ -195,7 +225,7 @@ class Settings(BaseSettings):
     webhook_timeout_seconds: float = 10.0
 
     # Soft warn / reject oversized DOCX AST (0 = disabled)
-    docx_max_nodes: int = 50_000
+    docx_max_nodes: int = 200_000  # v6/T2-#13: was 50_000; 10MB md blew the cap
 
     # PDF text-layer: try left/right half merge when both columns look populated
     pdf_text_multicolumn: bool = True
@@ -206,6 +236,18 @@ class Settings(BaseSettings):
     # Run each conversion in a child process (survives native SIGABRT)
     convert_isolate: bool = True
     convert_timeout_seconds: int = 600
+    # v6/T2-#12: persist a ProcessPool of convert workers (reuse interpreter +
+    # cache). Set True to restore the old per-request ``python -m convert_worker``
+    # fork (crash-debug / platforms where spawn pools hang).
+    convert_isolate_fork: bool = False
+    # Recycle isolate workers after N jobs to bound native-leak RSS (0 = never).
+    convert_isolate_max_tasks: int = 64
+    # v8 §C: trusted clients skip the pool (in-process) to avoid +~180ms spawn
+    # tax and keep result-cache hits. Comma-separated client ids from auth
+    # (tenant_id / api key label). Empty = nobody trusted (all go through pool).
+    convert_trusted_clients: str = ""
+    # Master switch for trusted in-process path (False = always isolate when on).
+    convert_trusted_inprocess: bool = True
 
     # Optional virus scan (ClamAV)
     virus_scan: bool = False
@@ -214,6 +256,17 @@ class Settings(BaseSettings):
 
     # Optional HTTP Basic Auth (user:pass). Empty = disabled.
     basic_auth: str = ""
+
+    # Fail closed when no api_key / api_keys / basic_auth are configured.
+    # Set MDBRIDGE_REQUIRE_AUTH=0 (or MDBRIDGE_DEV_OK=1) for local demo / tests.
+    require_auth: bool = True
+
+    # Require X-Job-Token / ?token= for GET /jobs/{id} and /result (create returns token once).
+    job_token_required: bool = True
+
+    # Readiness (/api/health/ready): fail when vendored native wheel is missing.
+    # Docker images set MDBRIDGE_NATIVE_REQUIRED=1 when INSTALL_NATIVE=1.
+    native_required: bool = False
 
     # Multi-tenant API keys (P0-3). Formats:
     #   JSON file path, or inline JSON array:
@@ -231,6 +284,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def api_docs_enabled(self) -> bool:
+        return bool(self.debug or self.expose_api_docs)
 
     @property
     def max_batch_total_bytes(self) -> int:

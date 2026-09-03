@@ -72,6 +72,35 @@ class SpillBuffer:
         assert self._path
         return Path(self._path).read_bytes()
 
+    def append(self, data: bytes) -> None:
+        """Append bytes in O(len(data)) — keep spill file open for sequential writes."""
+        if not data:
+            return
+        self.size += len(data)
+        if self._mem is not None:
+            threshold = max(0, settings.spill_threshold_mb) * 1024 * 1024
+            combined = self._mem + data
+            if threshold > 0 and len(combined) >= threshold:
+                spill_dir = tenant_spill_dir(None)
+                fd, path = tempfile.mkstemp(
+                    prefix="mdbridge-spill-append-",
+                    suffix=".bin",
+                    dir=str(spill_dir) if spill_dir else None,
+                )
+                try:
+                    os.write(fd, combined)
+                    os.fchmod(fd, 0o600)
+                finally:
+                    os.close(fd)
+                self._path = path
+                self._mem = None
+            else:
+                self._mem = combined
+            return
+        assert self._path
+        with open(self._path, "ab") as f:
+            f.write(data)
+
     def release(self) -> None:
         if self._path:
             try:

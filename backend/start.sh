@@ -32,5 +32,10 @@ EXTRA_ARGS=()
 if [[ "${MDBRIDGE_RELOAD:-0}" == "1" ]]; then
   EXTRA_ARGS+=(--reload)
 fi
+# Trust reverse-proxy X-Forwarded-For for rate-limit / audit IP (P1 #22)
+if [[ "${MDBRIDGE_PROXY_HEADERS:-1}" == "1" ]]; then
+  EXTRA_ARGS+=(--proxy-headers)
+  EXTRA_ARGS+=(--forwarded-allow-ips="${MDBRIDGE_TRUSTED_PROXY_CIDR:-127.0.0.1,::1}")
+fi
 
 exec uvicorn main:app --host "$HOST" --port "$PORT" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}" "$@"

@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import httpx
 
 from app.config import settings
+from app.core.safe_fetch import is_safe_url
 
 _log = logging.getLogger("mdbridge.webhooks")
 
@@ -23,6 +24,11 @@ def validate_callback_url(url: str | None) -> str | None:
         raise ValueError("callback_url 仅支持 http/https")
     if not parsed.netloc:
         raise ValueError("callback_url 无效")
+    port = parsed.port
+    if port is not None and port not in (80, 443):
+        raise ValueError("callback_url 仅允许 80/443 端口")
+    if not is_safe_url(raw):
+        raise ValueError("callback_url 指向内网或不可达地址，已拒绝")
     return raw
 
 
@@ -33,16 +39,18 @@ def fire_job_webhook(job_payload: dict[str, Any], callback_url: str | None) -> N
     url = (callback_url or "").strip()
     if not url:
         return
+    # Never leak per-job access tokens to third-party callbacks
+    safe_payload = {k: v for k, v in job_payload.items() if k != "access_token"}
     try:
         validate_callback_url(url)
     except ValueError as exc:
-        _log.warning("skip webhook for job %s: %s", job_payload.get("id"), exc)
+        _log.warning("skip webhook for job %s: %s", safe_payload.get("id"), exc)
         return
 
     body = {
         "event": "job.finished",
-        "job": job_payload,
-        "download_hint": f"/api/jobs/{job_payload.get('id')}/result",
+        "job": safe_payload,
+        "download_hint": f"/api/jobs/{safe_payload.get('id')}/result",
     }
     timeout = float(settings.webhook_timeout_seconds or 10.0)
     try:
@@ -53,9 +61,9 @@ def fire_job_webhook(job_payload: dict[str, Any], callback_url: str | None) -> N
                     "webhook %s returned %s for job %s",
                     url,
                     resp.status_code,
-                    job_payload.get("id"),
+                    safe_payload.get("id"),
                 )
             else:
-                _log.info("webhook delivered job %s → %s", job_payload.get("id"), url)
+                _log.info("webhook delivered job %s → %s", safe_payload.get("id"), url)
     except Exception as exc:
-        _log.warning("webhook failed for job %s: %s", job_payload.get("id"), exc)
+        _log.warning("webhook failed for job %s: %s", safe_payload.get("id"), exc)

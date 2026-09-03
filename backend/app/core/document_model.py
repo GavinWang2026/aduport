@@ -65,6 +65,12 @@ class Paragraph(BaseModel):
         return self.text
 
 
+class CodeBlock(BaseModel):
+    type: Literal["code_block"] = "code_block"
+    lang: str = ""
+    content: str = ""
+
+
 class ListItem(BaseModel):
     type: Literal["list_item"] = "list_item"
     text: RichText | str
@@ -72,8 +78,8 @@ class ListItem(BaseModel):
     level: int = 0
     # None = ordinary list item; True/False = GFM task list checkbox state
     checked: bool | None = None
-    # Extra paragraphs / nested content within a multi-paragraph list item
-    children: list[Paragraph] = Field(default_factory=list)
+    # Extra paragraphs / fenced code within a multi-paragraph list item (V-E).
+    children: list[Paragraph | CodeBlock] = Field(default_factory=list)
     # anydoc fidelity extensions: marker kind, ordinal, and source label.
     marker: "ListMarker | None" = None
     number: int | None = None
@@ -119,12 +125,6 @@ class Image(BaseModel):
     origin_part: str | None = None
     # Floating layout hint (export to HTML/PDF CSS; not full Word anchoring).
     wrap: Literal["inline", "left", "right"] = "inline"
-
-
-class CodeBlock(BaseModel):
-    type: Literal["code_block"] = "code_block"
-    lang: str = ""
-    content: str = ""
 
 
 class Blockquote(BaseModel):
@@ -210,6 +210,150 @@ class TextBox(BaseModel):
     height_mm: float | None = None
 
 
+# --- Priority AST extensions (corp round-trip ~80% coverage targets) ---
+
+
+class Section(BaseModel):
+    """Document section boundary (maps toward OOXML w:sectPr)."""
+
+    type: Literal["section"] = "section"
+    title: str = ""
+    # Free-form sectPr-ish props until full OOXML mapping lands
+    props: dict[str, Any] = Field(default_factory=dict)
+
+    def plain_text(self) -> str:
+        return self.title or "[Section]"
+
+
+class PageSetup(BaseModel):
+    """Page size / orientation / margins for the current section."""
+
+    type: Literal["page_setup"] = "page_setup"
+    page_size: str = "A4"
+    orientation: Literal["portrait", "landscape"] = "portrait"
+    margins_mm: dict[str, float] = Field(default_factory=dict)
+
+    def plain_text(self) -> str:
+        return f"[PageSetup {self.page_size} {self.orientation}]"
+
+
+class HeaderFooter(BaseModel):
+    """Header or footer content block."""
+
+    type: Literal["header_footer"] = "header_footer"
+    kind: Literal["header", "footer"] = "header"
+    text: str = ""
+
+    def plain_text(self) -> str:
+        return f"[{self.kind}] {self.text}".strip()
+
+
+class FieldCode(BaseModel):
+    """Word-like field code (PAGE, TOC, REF, …)."""
+
+    type: Literal["field"] = "field"
+    field_type: str = ""
+    instruction: str = ""
+    result_text: str = ""
+
+    def plain_text(self) -> str:
+        return self.result_text or self.instruction or f"[Field {self.field_type}]"
+
+
+class Bookmark(BaseModel):
+    """Named bookmark / destination for cross-references."""
+
+    type: Literal["bookmark"] = "bookmark"
+    name: str = ""
+    anchor: str = ""
+
+    def plain_text(self) -> str:
+        return f"[Bookmark {self.name or self.anchor}]"
+
+
+class RunStyle(BaseModel):
+    """Named character/paragraph style definition (catalog entry)."""
+
+    type: Literal["run_style"] = "run_style"
+    style_id: str = ""
+    name: str = ""
+    props: dict[str, Any] = Field(default_factory=dict)
+
+    def plain_text(self) -> str:
+        return f"[Style {self.name or self.style_id}]"
+
+
+class Numbering(BaseModel):
+    """Numbering definition (abstract/numId levels) for true list restart."""
+
+    type: Literal["numbering"] = "numbering"
+    num_id: str = ""
+    abstract_num_id: str = ""
+    levels: list[dict[str, Any]] = Field(default_factory=list)
+
+    def plain_text(self) -> str:
+        return f"[Numbering {self.num_id or self.abstract_num_id}]"
+
+
+class Chart(BaseModel):
+    """Chart / plot placeholder (spreadsheet or presentation chart object)."""
+
+    type: Literal["chart"] = "chart"
+    title: str = ""
+    chart_type: str = "bar"  # bar | line | pie | scatter | area | other
+    categories: list[str] = Field(default_factory=list)
+    series: list[dict[str, Any]] = Field(default_factory=list)
+    # Optional embedded preview image
+    preview_mime: str = ""
+    preview_data: bytes = b""
+
+    def plain_text(self) -> str:
+        label = self.title or self.chart_type or "chart"
+        n = len(self.series)
+        return f"[Chart:{self.chart_type}] {label}" + (f" ({n} series)" if n else "")
+
+
+class SpeakerNote(BaseModel):
+    """PPTX speaker notes (notesSlide) attached to a slide index (1-based content)."""
+
+    type: Literal["speaker_note"] = "speaker_note"
+    text: str = ""
+    slide_index: int = 1
+
+    def plain_text(self) -> str:
+        return self.text or f"[SpeakerNote slide {self.slide_index}]"
+
+
+class OleObject(BaseModel):
+    """Embedded OLE object (progId + optional binary payload)."""
+
+    type: Literal["ole_object"] = "ole_object"
+    prog_id: str = ""
+    label: str = ""
+    relationship_id: str = ""
+    # Raw embedding bytes (word/embeddings/oleObjectN.bin); empty → synthesize from label
+    data: bytes = b""
+    mime_type: str = "application/vnd.openxmlformats-officedocument.oleObject"
+
+    def plain_text(self) -> str:
+        return f"[OLE:{self.prog_id or 'object'}] {self.label}".strip()
+
+
+class SmartArt(BaseModel):
+    """DOCX/PPTX SmartArt diagram — text points (+ layout hint for visual rendering)."""
+
+    type: Literal["smartart"] = "smartart"
+    # process | list | cycle | hierarchy | other
+    layout: str = "process"
+    title: str = ""
+    items: list[str] = Field(default_factory=list)
+
+    def plain_text(self) -> str:
+        label = self.title or self.layout or "diagram"
+        joined = " | ".join(self.items[:20])
+        return f"[SmartArt:{label}] {joined}".strip()
+
+
 DocumentNode = Annotated[
     Union[
         Heading,
@@ -228,6 +372,17 @@ DocumentNode = Annotated[
         ContentControl,
         PivotTable,
         TextBox,
+        Section,
+        PageSetup,
+        HeaderFooter,
+        FieldCode,
+        Bookmark,
+        RunStyle,
+        Numbering,
+        Chart,
+        SpeakerNote,
+        SmartArt,
+        OleObject,
     ],
     Field(discriminator="type"),
 ]

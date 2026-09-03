@@ -15,9 +15,16 @@ _EXT_MAP: dict[str, str] = {
     "html": "html",
     "htm": "html",
     "docx": "docx",
+    "docm": "docm",
+    "doc": "doc",
     "pdf": "pdf",
     "pptx": "pptx",
-    "ppt": "pptx",
+    "pptm": "pptm",
+    "ppsx": "ppsx",
+    "ppsm": "ppsm",
+    "ppt": "ppt",
+    "pps": "pps",
+    "pot": "pot",
     "epub": "epub",
     "mobi": "mobi",
     "azw": "mobi",
@@ -25,6 +32,16 @@ _EXT_MAP: dict[str, str] = {
     "kf8": "kf8",
     "tex": "latex",
     "latex": "latex",
+    "xlsx": "xlsx",
+    "xlsm": "xlsm",
+    "xls": "xls",
+    "xlsb": "xlsb",
+    "ods": "ods",
+    "odp": "odp",
+    "odt": "odt",
+    "rtf": "rtf",
+    "csv": "csv",
+    "json": "json",
 }
 
 
@@ -69,8 +86,18 @@ def _sniff_bytes(data: bytes) -> str | None:
     head = data[:8]
     if data[:4] == b"%PDF":
         return "pdf"
+    if head[:4] == b"\xd0\xcf\x11\xe0":
+        # OLE CFB — prefer anydoc sniff; lightweight guess by stream hints
+        low = data[:4096].lower()
+        if b"workbook" in low or b"book\x00" in data[:2048]:
+            return "xls"
+        if b"powerpoint" in low or b"powerpoint document" in low:
+            return "ppt"
+        if b"worddocument" in low:
+            return "doc"
+        return None
     if head[:2] == b"PK":
-        # ZIP-based: docx / pptx / epub — prefer Content_Types / mimetype when possible
+        # ZIP-based: docx / pptx / xlsx / xlsb / odt / ods / odp / epub
         try:
             import zipfile
             from io import BytesIO
@@ -81,8 +108,28 @@ def _sniff_bytes(data: bytes) -> str | None:
                     return "docx"
                 if "ppt/presentation.xml" in names:
                     return "pptx"
+                if "xl/workbook.bin" in names:
+                    return "xlsb"
+                if "xl/workbook.xml" in names:
+                    return "xlsx"
+                if "content.xml" in names and "mimetype" in names:
+                    from app.core.safe_zip import read_zip_member
+
+                    mt = read_zip_member(zf, "mimetype", max_bytes=256).decode(
+                        "utf-8", errors="ignore"
+                    )
+                    if "opendocument.text" in mt:
+                        return "odt"
+                    if "opendocument.spreadsheet" in mt:
+                        return "ods"
+                    if "opendocument.presentation" in mt:
+                        return "odp"
                 if "mimetype" in names:
-                    mt = zf.read("mimetype").decode("utf-8", errors="ignore")
+                    from app.core.safe_zip import read_zip_member
+
+                    mt = read_zip_member(zf, "mimetype", max_bytes=256).decode(
+                        "utf-8", errors="ignore"
+                    )
                     if "epub" in mt:
                         return "epub"
         except Exception:
@@ -92,4 +139,6 @@ def _sniff_bytes(data: bytes) -> str | None:
     stripped = data.lstrip()[:64].lower()
     if stripped.startswith(b"<!doctype html") or stripped.startswith(b"<html"):
         return "html"
+    if stripped.startswith(b"{\\rtf"):
+        return "rtf"
     return None

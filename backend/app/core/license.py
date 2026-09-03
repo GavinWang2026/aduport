@@ -45,6 +45,7 @@ class LicenseInfo:
     reason: str = ""
 
     def to_dict(self) -> dict[str, object]:
+        """Full dict including machine fingerprints (CLI / internal only)."""
         return {
             "machine_id": self.machine_id,
             "expires": self.expires,
@@ -54,6 +55,17 @@ class LicenseInfo:
             "valid": self.valid,
             "reason": self.reason,
             "host_machine_id": machine_id(),
+        }
+
+    def public_dict(self) -> dict[str, object]:
+        """API-safe dict — no machine_id / host_machine_id (T23)."""
+        return {
+            "expires": self.expires,
+            "seats": self.seats,
+            "customer": self.customer,
+            "product": self.product,
+            "valid": self.valid,
+            "reason": self.reason,
         }
 
 

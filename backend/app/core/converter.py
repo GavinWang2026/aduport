@@ -51,7 +51,7 @@ SUPPORTED_SOURCE_FORMATS = frozenset(
         "json",
         "xlsx",
         "csv",
-        # --- Formats read through the anydoc bridge ---
+        # --- Office / ODF builtins (native; anydoc preferred when compiled) ---
         "ppt",
         "pps",
         "pot",
@@ -81,6 +81,8 @@ SUPPORTED_TARGET_FORMATS = frozenset(
         "latex",
         "csv",
         "odt",
+        "ods",
+        "odp",
         "json",
         "xlsx",
         "rtf",
@@ -102,6 +104,8 @@ MIME_TYPES = {
     "latex": "application/x-latex",
     "csv": "text/csv; charset=utf-8",
     "odt": "application/vnd.oasis.opendocument.text",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "odp": "application/vnd.oasis.opendocument.presentation",
     "rtf": "application/rtf",
     "doc": "application/msword",
     "json": "application/json; charset=utf-8",
@@ -251,32 +255,49 @@ def _export(
     exporter = get_exporter(fmt)
     if exporter is None:
         raise UnsupportedFormatError(f"不支持的目标格式: {target_format}")
+    from app.exporters.export_warnings import (
+        begin_export_warnings,
+        set_last_export_warnings,
+        take_export_warnings,
+    )
+
+    token = begin_export_warnings()
     try:
-        if settings.heading_numbering:
-            from app.core.heading_numbers import apply_heading_numbers
+        try:
+            if settings.heading_numbering:
+                from app.core.heading_numbers import apply_heading_numbers
 
-            model = apply_heading_numbers(model)
-        if settings.image_compress:
-            from app.core.image_ops import maybe_compress_images
+                model = apply_heading_numbers(model)
+            if settings.image_compress:
+                from app.core.image_ops import maybe_compress_images
 
-            model = maybe_compress_images(model)
-        result = exporter(
-            model,
-            pdf_font_family=pdf_font_family,
-            pdf_custom_css=pdf_custom_css,
-            pdf_page_size=pdf_page_size,
-            pdf_orientation=pdf_orientation,
-            pdf_header=pdf_header,
-            pdf_footer=pdf_footer,
-            pdf_page_numbers=pdf_page_numbers,
-            pdf_toc=pdf_toc,
-            docx_theme=docx_theme,
-        )
-        return result if isinstance(result, bytes) else str(result).encode("utf-8")
-    except MdBridgeError:
-        raise
-    except Exception as exc:
-        raise ExportError(f"导出失败 ({target_format}): {exc}") from exc
+                model = maybe_compress_images(model)
+            result = exporter(
+                model,
+                pdf_font_family=pdf_font_family,
+                pdf_custom_css=pdf_custom_css,
+                pdf_page_size=pdf_page_size,
+                pdf_orientation=pdf_orientation,
+                pdf_header=pdf_header,
+                pdf_footer=pdf_footer,
+                pdf_page_numbers=pdf_page_numbers,
+                pdf_toc=pdf_toc,
+                docx_theme=docx_theme,
+            )
+            return result if isinstance(result, bytes) else str(result).encode("utf-8")
+        except MdBridgeError:
+            raise
+        except Exception as exc:
+            raise ExportError(f"导出失败 ({target_format}): {exc}") from exc
+    finally:
+        collected = take_export_warnings(token)
+        existing = model.metadata.get("export_warnings") or []
+        if not isinstance(existing, list):
+            existing = []
+        merged = list(dict.fromkeys([*existing, *collected]))
+        if merged:
+            model.metadata["export_warnings"] = merged
+        set_last_export_warnings(merged)
 
 
 def _try_anydoc_fast_markdown(
@@ -340,10 +361,24 @@ def convert(
     _check_size(source_bytes, filename)
 
     if src == tgt:
-        # Still validate identity passthrough unless skipped
+        # Still validate identity passthrough unless skipped.
+        # Identity is not a real conversion — exclude from conversions_total.
         if settings.magic_bytes_check and not skip_magic:
             validate_upload(source_bytes, src, filename)
         scan_bytes(source_bytes, filename or f"input.{src}")
+        metrics.record_identity_passthrough(src)
+        audit_event(
+            action="convert_identity",
+            source_format=src,
+            target_format=tgt,
+            filename=filename,
+            success=True,
+            client=client,
+            cached=False,
+            bytes_in=len(source_bytes),
+            bytes_out=len(source_bytes),
+            detail="identity_passthrough",
+        )
         return source_bytes
 
     extra = "|".join(
@@ -361,6 +396,16 @@ def convert(
             f"hn={settings.heading_numbering}",
             f"dc={settings.docx_export_comments}",
             f"ic={settings.image_compress}:{settings.image_max_edge}:{settings.image_jpeg_quality}",
+            f"sv={int(bool(settings.stream_convert))}",
+            f"smb={settings.stream_min_bytes}",
+            # v6/T1-#6: these change the rendered output but were absent from
+            # the cache key, so flipping them served the previous result for
+            # the whole TTL window (verified: KaTeX on/off returned identical
+            # HTML; docx_auto_toc on/off returned identical docx).
+            f"katex={int(bool(getattr(settings, 'html_katex', False)))}",
+            f"toc={int(bool(getattr(settings, 'docx_auto_toc', False)))}",
+            f"scc={getattr(settings, 'stream_chunk_chars', 0)}",
+            f"tfrh={int(bool(getattr(settings, 'table_first_row_header', False)))}",
         ]
     )
     cache_key = result_cache.make_key(source_bytes, src, tgt, extra)
@@ -573,12 +618,22 @@ def convert_directory(
         return item
 
     done = 0
-    with ThreadPoolExecutor(max_workers=n_workers) as pool:
+    pool = ThreadPoolExecutor(max_workers=n_workers)
+    try:
         futs = {pool.submit(_one, fp): fp for fp in files}
         for fut in as_completed(futs):
             if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
+                for pending in futs:
+                    pending.cancel()
                 break
-            item = fut.result()
+            try:
+                item = fut.result()
+            except Exception as exc:
+                item = BatchItemResult(
+                    source=str(futs.get(fut, "")),
+                    error=str(exc),
+                    code="conversion_error",
+                )
             result.items.append(item)
             if item.success:
                 result.succeeded += 1
@@ -590,6 +645,9 @@ def convert_directory(
                     progress_cb(done, result.total, item)
                 except Exception:
                     pass
+    finally:
+        # cancel_futures so cancel_event actually stops work (P1 #16)
+        pool.shutdown(wait=False, cancel_futures=True)
     return result
 
 

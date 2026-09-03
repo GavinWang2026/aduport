@@ -17,6 +17,7 @@ ERROR_CODES: dict[str, int] = {
     "virus_scan_unavailable": 503,
     "job_not_found": 404,
     "convert_timeout": 504,
+    "upload_timeout": 408,
     "worker_crash": 500,
     "conversion_error": 422,
     "cancelled": 499,
@@ -71,6 +72,13 @@ class FileTooLargeError(MdBridgeError):
     status_code = 413
 
 
+class UploadTimeoutError(MdBridgeError):
+    """Slowloris / stalled body — D-24."""
+
+    code = "upload_timeout"
+    status_code = 408
+
+
 class CorruptedFileError(MdBridgeError):
     code = "corrupted_file"
     status_code = 422
@@ -86,6 +94,28 @@ class OcrUnavailableError(MdBridgeError):
 
     code = "ocr_unavailable"
     status_code = 503
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        status_code: int | None = None,
+        install_hint: str | None = None,
+    ) -> None:
+        super().__init__(message, code=code, status_code=status_code)
+        self.ocr_required = True
+        self.install_hint = install_hint or (
+            "pip install 'md-bridge[ocr-mineru]' 或 'md-bridge[ocr-paddle]'；"
+            "设置 MDBRIDGE_OCR_ENABLED=true；详见 /api/formats notes.ocr 与 "
+            "/api/health/detail.ocr"
+        )
+
+    def to_dict(self) -> dict[str, str | int | bool]:
+        d = super().to_dict()
+        d["ocr_required"] = True
+        d["install"] = self.install_hint
+        return d
 
 
 class ExportError(MdBridgeError):

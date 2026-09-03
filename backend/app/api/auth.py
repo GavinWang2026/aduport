@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import hmac
+import logging
+import os
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -14,11 +16,32 @@ from app.core.license import LicenseError, assert_license_ok
 from app.core.request_context import set_request_context
 from app.core.tenants import load_tenant_keys, tenants_configured
 
+_log = logging.getLogger("mdbridge.auth")
+
+
+def _dev_ok() -> bool:
+    """v6/T3-#17 / D-18: DEV_OK only bypasses auth when debug=True.
+
+    Previously ``MDBRIDGE_DEV_OK=1`` alone disabled auth in production.
+    """
+    if not settings.debug:
+        if (os.environ.get("MDBRIDGE_DEV_OK") or "").strip() in ("1", "true", "TRUE", "yes"):
+            _log.warning("MDBRIDGE_DEV_OK ignored because MDBRIDGE_DEBUG is not true")
+        return False
+    return (os.environ.get("MDBRIDGE_DEV_OK") or "").strip() in ("1", "true", "TRUE", "yes")
+
 
 def _public_path(path: str) -> bool:
-    if path == "/" or path.startswith("/docs") or path.startswith("/openapi") or path.startswith("/redoc"):
+    if path == "/":
         return True
-    if path in ("/api/health", "/api/license"):
+    # D-27: /docs /redoc /openapi.json are public only when explicitly enabled.
+    if settings.api_docs_enabled and (
+        path.startswith("/docs")
+        or path.startswith("/openapi")
+        or path.startswith("/redoc")
+    ):
+        return True
+    if path in ("/api/health", "/api/health/ready", "/api/license"):
         return True
     return False
 
@@ -56,8 +79,28 @@ def _license_gate(path: str) -> JSONResponse | None:
     return None
 
 
+def _unauthorized(basic: str, keys_on: bool) -> JSONResponse:
+    headers = {}
+    if basic and not keys_on:
+        headers["WWW-Authenticate"] = 'Basic realm="md-bridge"'
+    return JSONResponse(
+        status_code=401,
+        content={
+            "error": True,
+            "code": "unauthorized",
+            "message": "缺少或无效的鉴权（X-API-Key 或 Basic Auth）",
+            "status_code": 401,
+        },
+        headers=headers,
+    )
+
+
 class APIKeyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
+        # CORS preflight must never be blocked by auth (middleware-order safety net)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         blocked = _license_gate(path)
         if blocked is not None:
@@ -66,6 +109,12 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         basic = (settings.basic_auth or "").strip()
         keys_on = tenants_configured() > 0
         if not keys_on and not basic:
+            # Fail closed unless explicitly disabled for local/dev/tests
+            if settings.require_auth and not _dev_ok():
+                if _public_path(path):
+                    return await call_next(request)
+                _log.warning("reject anonymous %s %s (require_auth, no credentials configured)", request.method, path)
+                return _unauthorized("", False)
             request.state.tenant_id = None
             request.state.api_key_id = None
             set_request_context(tenant_id=None, client="")
@@ -95,19 +144,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             request.state.api_key_id = None
 
         if not ok:
-            headers = {}
-            if basic and not keys_on:
-                headers["WWW-Authenticate"] = 'Basic realm="md-bridge"'
-            return JSONResponse(
-                status_code=401,
-                content={
-                    "error": True,
-                    "code": "unauthorized",
-                    "message": "缺少或无效的鉴权（X-API-Key 或 Basic Auth）",
-                    "status_code": 401,
-                },
-                headers=headers,
-            )
+            return _unauthorized(basic, keys_on)
         set_request_context(
             tenant_id=getattr(request.state, "tenant_id", None),
             client=client_host,

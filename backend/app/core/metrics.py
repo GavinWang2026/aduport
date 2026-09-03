@@ -15,6 +15,7 @@ class Metrics:
     conversions_failed_by_code: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     conversions_by_tenant: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     conversions_by_importer: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    identity_passthrough: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     tenant_daily: dict[str, int] = field(default_factory=lambda: defaultdict(int))  # "{tid}:{YYYY-MM-DD}"
     anydoc_hits: int = 0
     anydoc_degrades: int = 0
@@ -47,11 +48,18 @@ class Metrics:
                 self.conversions_by_tenant[tid] += 1
                 day = time.strftime("%Y-%m-%d", time.gmtime())
                 self.tenant_daily[f"{tid}:{day}"] += 1
+                self._prune_tenant_daily_unlocked(day)
             if importer:
                 self.conversions_by_importer[importer] += 1
             self.conversion_seconds.append(seconds)
             if len(self.conversion_seconds) > 5000:
                 self.conversion_seconds = self.conversion_seconds[-2500:]
+
+    def record_identity_passthrough(self, fmt: str) -> None:
+        """Same-format passthrough — tracked separately from real conversions."""
+        key = (fmt or "").strip().lower() or "unknown"
+        with self._lock:
+            self.identity_passthrough[key] += 1
 
     def record_failure(
         self,
@@ -99,9 +107,36 @@ class Metrics:
     def _p95_unlocked(self) -> float:
         if not self.conversion_seconds:
             return 0.0
-        xs = sorted(self.conversion_seconds)
-        idx = min(len(xs) - 1, int(len(xs) * 0.95))
-        return xs[idx]
+        xs = self.conversion_seconds
+        # Approximate p95 without full sort on every health poll (P1 #14)
+        n = len(xs)
+        if n <= 64:
+            ordered = sorted(xs)
+            idx = min(n - 1, int(n * 0.95))
+            return ordered[idx]
+        # Sample every k-th sample + tail for large buffers
+        step = max(1, n // 256)
+        sample = xs[::step]
+        if xs[-1] not in sample:
+            sample.append(xs[-1])
+        ordered = sorted(sample)
+        idx = min(len(ordered) - 1, int(len(ordered) * 0.95))
+        return ordered[idx]
+
+    def _prune_tenant_daily_unlocked(self, today: str) -> None:
+        """Drop tenant_daily keys older than yesterday (UTC day roll)."""
+        if len(self.tenant_daily) < 64:
+            return
+        drop = [
+            k
+            for k in self.tenant_daily
+            if ":" in k and not k.endswith(f":{today}")
+            and not k.endswith(
+                f":{time.strftime('%Y-%m-%d', time.gmtime(time.time() - 86400))}"
+            )
+        ]
+        for k in drop:
+            self.tenant_daily.pop(k, None)
 
     def _share_unlocked(self) -> dict[str, float | None]:
         """Rust-channel ratios for dashboards (None when denominator is 0)."""
@@ -165,6 +200,7 @@ class Metrics:
                 "conversions_failed_by_code": dict(self.conversions_failed_by_code),
                 "conversions_by_tenant": dict(self.conversions_by_tenant),
                 "conversions_by_importer": dict(self.conversions_by_importer),
+                "identity_passthrough": dict(self.identity_passthrough),
                 "tenant_daily": dict(self.tenant_daily),
                 "anydoc_hits": self.anydoc_hits,
                 "anydoc_degrades": self.anydoc_degrades,
@@ -229,6 +265,16 @@ class Metrics:
                 safe = str(eng).replace('"', "")
                 lines.append(
                     f'mdbridge_conversions_by_importer{{importer="{safe}"}} {val}'
+                )
+            lines.append(
+                "# HELP mdbridge_identity_passthrough Same-format passthrough "
+                "(excluded from conversions_total)"
+            )
+            lines.append("# TYPE mdbridge_identity_passthrough counter")
+            for fmt, val in self.identity_passthrough.items():
+                safe = str(fmt).replace('"', "")
+                lines.append(
+                    f'mdbridge_identity_passthrough{{format="{safe}"}} {val}'
                 )
             lines.append(
                 "# HELP mdbridge_anydoc_hits Conversions performed by the anydoc native parser"

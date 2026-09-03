@@ -21,20 +21,41 @@ from app.core.exceptions import MdBridgeError
 async def lifespan(_app: FastAPI):
     from app.core.warmup import start_warmup_background
 
+    # v6/T3-#17 / D-18: surface misconfigured DEV_OK at boot (never silent).
+    import logging
+    import os
+
+    _auth_log = logging.getLogger("mdbridge.auth")
+    dev_set = (os.environ.get("MDBRIDGE_DEV_OK") or "").strip() in ("1", "true", "TRUE", "yes")
+    if dev_set and not settings.debug:
+        _auth_log.error(
+            "startup assert: MDBRIDGE_DEV_OK is set but debug=False — auth bypass DISABLED"
+        )
+    elif dev_set and settings.debug:
+        _auth_log.warning("startup: MDBRIDGE_DEV_OK active (debug auth bypass)")
+
     start_warmup_background()
     yield
 
 
+_docs_on = settings.api_docs_enabled
 app = FastAPI(
     title=settings.app_name,
     description="Local document bidirectional converter (PDF/DOCX/Markdown/TXT/HTML/PPTX/EPUB/MOBI)",
     version=__version__,
     lifespan=lifespan,
+    docs_url="/docs" if _docs_on else None,
+    redoc_url="/redoc" if _docs_on else None,
+    openapi_url="/openapi.json" if _docs_on else None,
 )
 
 origins = settings.cors_origin_list()
 allow_credentials = settings.cors_allow_credentials and origins != ["*"]
 
+# Starlette: last add_middleware = outermost. Auth/rate-limit must sit inside CORS
+# so browser OPTIONS preflight is never answered with 401.
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(APIKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -42,8 +63,19 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(APIKeyMiddleware)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    if request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
+
 
 app.include_router(router)
 

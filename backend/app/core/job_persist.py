@@ -12,6 +12,9 @@ from typing import Any
 from app.config import settings
 
 _lock = threading.Lock()
+_conn: sqlite3.Connection | None = None
+_conn_path: str | None = None
+_migrated = False
 
 
 def _db_path() -> Path | None:
@@ -45,9 +48,35 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 
 def _connect(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(str(path), check_same_thread=False)
+    """Singleton connection with WAL + timeout (avoids per-call DDL + lock storms)."""
+    global _conn, _conn_path, _migrated
+    key = str(path.resolve())
+    if _conn is not None and _conn_path == key:
+        return _conn
+    if _conn is not None:
+        try:
+            _conn.close()
+        except sqlite3.Error:
+            pass
+        _conn = None
+        _migrated = False
+    conn = sqlite3.connect(
+        str(path),
+        check_same_thread=False,
+        timeout=30.0,
+    )
     conn.row_factory = sqlite3.Row
-    _migrate(conn)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+    except sqlite3.Error:
+        pass
+    if not _migrated:
+        _migrate(conn)
+        _migrated = True
+    _conn = conn
+    _conn_path = key
     return conn
 
 
@@ -65,35 +94,32 @@ def save_job_snapshot(job_id: str, payload: dict[str, Any]) -> None:
         return
     with _lock:
         conn = _connect(path)
-        try:
-            conn.execute(
-                "INSERT OR REPLACE INTO jobs(id, payload, updated_at, tenant_id) "
-                "VALUES (?, ?, ?, ?)",
-                (
-                    job_id,
-                    json.dumps(payload, ensure_ascii=False),
-                    time.time(),
-                    _tenant_of(payload),
-                ),
-            )
+        conn.execute(
+            "INSERT OR REPLACE INTO jobs(id, payload, updated_at, tenant_id) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                job_id,
+                json.dumps(payload, ensure_ascii=False),
+                time.time(),
+                _tenant_of(payload),
+            ),
+        )
+        conn.commit()
+        # prune old
+        ttl = float(settings.job_ttl_seconds)
+        if ttl > 0:
+            cutoff = time.time() - ttl
+            conn.execute("DELETE FROM jobs WHERE updated_at < ?", (cutoff,))
             conn.commit()
-            # prune old
-            ttl = float(settings.job_ttl_seconds)
-            if ttl > 0:
-                cutoff = time.time() - ttl
-                conn.execute("DELETE FROM jobs WHERE updated_at < ?", (cutoff,))
+        max_n = int(settings.job_max_entries)
+        if max_n > 0:
+            rows = conn.execute(
+                "SELECT id FROM jobs ORDER BY updated_at DESC"
+            ).fetchall()
+            if len(rows) > max_n:
+                drop = [r["id"] for r in rows[max_n:]]
+                conn.executemany("DELETE FROM jobs WHERE id = ?", [(i,) for i in drop])
                 conn.commit()
-            max_n = int(settings.job_max_entries)
-            if max_n > 0:
-                rows = conn.execute(
-                    "SELECT id FROM jobs ORDER BY updated_at DESC"
-                ).fetchall()
-                if len(rows) > max_n:
-                    drop = [r["id"] for r in rows[max_n:]]
-                    conn.executemany("DELETE FROM jobs WHERE id = ?", [(i,) for i in drop])
-                    conn.commit()
-        finally:
-            conn.close()
 
 
 def load_recent_snapshots(
@@ -106,30 +132,27 @@ def load_recent_snapshots(
         return []
     with _lock:
         conn = _connect(path)
-        try:
-            viewer = (tenant_id or "").strip() or None
-            if viewer is None:
-                rows = conn.execute(
-                    "SELECT payload FROM jobs "
-                    "WHERE tenant_id IS NULL OR tenant_id = '' "
-                    "ORDER BY updated_at DESC LIMIT ?",
-                    (max(1, limit),),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT payload FROM jobs WHERE tenant_id = ? "
-                    "ORDER BY updated_at DESC LIMIT ?",
-                    (viewer, max(1, limit)),
-                ).fetchall()
-            out: list[dict[str, Any]] = []
-            for row in rows:
-                try:
-                    out.append(json.loads(row["payload"]))
-                except json.JSONDecodeError:
-                    continue
-            return out
-        finally:
-            conn.close()
+        viewer = (tenant_id or "").strip() or None
+        if viewer is None:
+            rows = conn.execute(
+                "SELECT payload FROM jobs "
+                "WHERE tenant_id IS NULL OR tenant_id = '' "
+                "ORDER BY updated_at DESC LIMIT ?",
+                (max(1, limit),),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT payload FROM jobs WHERE tenant_id = ? "
+                "ORDER BY updated_at DESC LIMIT ?",
+                (viewer, max(1, limit)),
+            ).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            try:
+                out.append(json.loads(row["payload"]))
+            except json.JSONDecodeError:
+                continue
+        return out
 
 
 def load_job_snapshot(job_id: str) -> dict[str, Any] | None:
@@ -147,5 +170,3 @@ def load_job_snapshot(job_id: str) -> dict[str, Any] | None:
             return json.loads(row["payload"])
         except (json.JSONDecodeError, sqlite3.Error):
             return None
-        finally:
-            conn.close()

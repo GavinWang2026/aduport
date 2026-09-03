@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import threading
 from collections.abc import Callable
 from typing import Any
 
@@ -13,6 +14,8 @@ ExporterFn = Callable[..., bytes | str]
 
 _IMPORTERS: dict[str, ImporterFn] = {}
 _EXPORTERS: dict[str, ExporterFn] = {}
+_REGISTRY_LOCK = threading.RLock()
+_BUILTINS_READY = False
 
 
 def register_importer(fmt: str, fn: ImporterFn) -> ImporterFn:
@@ -83,6 +86,12 @@ def _anydoc_first(fmt: str, native: ImporterFn | None) -> ImporterFn:
             except AnydocFallback:
                 if native is None or not settings.anydoc_fallback:
                     raise
+            except Exception:
+                # Hard parse failures (malformed / encrypted / limits) used to
+                # pierce the "never reduces coverage" net. Prefer native when
+                # configured — unsupported formats still raise AnydocFallback.
+                if native is None or not settings.anydoc_fallback:
+                    raise
         if model is None:
             if native is None:
                 from app.core.exceptions import UnsupportedFormatError
@@ -103,6 +112,7 @@ def _anydoc_first(fmt: str, native: ImporterFn | None) -> ImporterFn:
         return model
 
     _wrapped.__name__ = f"anydoc_or_{getattr(native, '__name__', fmt)}"
+    setattr(_wrapped, "_anydoc_wired", True)
     return _wrapped
 
 
@@ -112,20 +122,39 @@ def _wire_anydoc() -> None:
         supports as anydoc_supports,
     )
 
-    for fmt in ("doc", "docx", "odt", "rtf", "pptx", "epub", "csv", "xlsx"):
+    for fmt in ("doc", "docx", "odt", "rtf", "pptx", "epub", "csv", "xlsx", "ods", "odp"):
         native = _IMPORTERS.get(fmt)
         if native is not None and anydoc_supports(fmt):
+            if getattr(native, "_anydoc_wired", False):
+                continue
             register_importer(fmt, _anydoc_first(fmt, native))
 
     for fmt, sibling in ANYDOC_ONLY_SIBLINGS.items():
-        if not anydoc_supports(fmt):
+        existing = _IMPORTERS.get(fmt)
+        if existing is not None and getattr(existing, "_anydoc_wired", False):
             continue
-        native = _IMPORTERS.get(sibling) if sibling else None
-        register_importer(fmt, _anydoc_first(fmt, native))
+        # Prefer dedicated native for this exact format, else sibling alias
+        native = _IMPORTERS.get(fmt) or (
+            _IMPORTERS.get(sibling) if sibling else None
+        )
+        if anydoc_supports(fmt):
+            register_importer(fmt, _anydoc_first(fmt, native))
+        elif native is not None and existing is None:
+            # anydoc absent: still expose builtin native so breadth never collapses
+            register_importer(fmt, native)
 
 
 def ensure_builtin_plugins() -> None:
     """Lazy-load built-in plugins once."""
+    global _BUILTINS_READY
+    with _REGISTRY_LOCK:
+        if _BUILTINS_READY:
+            return
+        _ensure_builtin_plugins_unlocked()
+        _BUILTINS_READY = True
+
+
+def _ensure_builtin_plugins_unlocked() -> None:
     needed_exporters = {
         "md",
         "docx",
@@ -154,8 +183,13 @@ def ensure_builtin_plugins() -> None:
         "latex",
         "azw3",
         "kf8",
+        "ods",
+        "odp",
+        "xls",
+        "ppt",
     }
     if needed_exporters.issubset(_EXPORTERS) and needed_importers.issubset(_IMPORTERS):
+        _wire_anydoc()
         return
 
     from app.exporters.json_exporter import import_json
@@ -168,7 +202,16 @@ def ensure_builtin_plugins() -> None:
     from app.importers.latex_importer import import_latex
     from app.importers.md_importer import import_md
     from app.importers.mobi_importer import import_mobi
+    from app.importers.odp_importer import import_odp
+    from app.importers.ods_importer import import_ods
     from app.importers.odt_importer import import_odt
+    from app.importers.ole_office import (
+        import_pot,
+        import_pps,
+        import_ppt,
+        import_xls,
+        import_xlsb,
+    )
     from app.importers.pdf_importer import import_pdf
     from app.importers.pptx_importer import import_pptx
     from app.importers.rtf_importer import import_rtf
@@ -178,20 +221,31 @@ def ensure_builtin_plugins() -> None:
     register_importer("txt", import_txt)
     register_importer("html", import_html)
     register_importer("docx", import_docx)
+    register_importer("docm", import_docx)
     register_importer("pdf", import_pdf)
     register_importer("pptx", import_pptx)
+    register_importer("pptm", import_pptx)
+    register_importer("ppsx", import_pptx)
+    register_importer("ppsm", import_pptx)
     register_importer("epub", import_epub)
     register_importer("mobi", import_mobi)
     register_importer("azw3", import_mobi)
     register_importer("kf8", import_mobi)
     register_importer("latex", import_latex)
     register_importer("odt", import_odt)
+    register_importer("ods", import_ods)
+    register_importer("odp", import_odp)
     register_importer("rtf", import_rtf)
     register_importer("doc", import_doc)
     register_importer("json", import_json)
     register_importer("xlsx", import_xlsx)
+    register_importer("xlsm", import_xlsx)
+    register_importer("xls", import_xls)
+    register_importer("xlsb", import_xlsb)
+    register_importer("ppt", import_ppt)
+    register_importer("pps", import_pps)
+    register_importer("pot", import_pot)
     register_importer("csv", import_csv)
-
     from app.exporters.azw3_exporter import export_azw3, export_kf8
     from app.exporters.csv_exporter import export_csv
     from app.exporters.docx_exporter import export_docx
@@ -202,6 +256,8 @@ def ensure_builtin_plugins() -> None:
     from app.exporters.md_exporter import export_md
     from app.exporters.mobi_exporter import export_mobi
     from app.exporters.odt_exporter import export_odt
+    from app.exporters.ods_exporter import export_ods
+    from app.exporters.odp_exporter import export_odp
     from app.exporters.pdf_exporter import export_pdf
     from app.exporters.pptx_exporter import export_pptx
     from app.exporters.rtf_exporter import export_rtf
@@ -281,6 +337,12 @@ def ensure_builtin_plugins() -> None:
     def _export_odt_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_odt(model)
 
+    def _export_ods_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_ods(model)
+
+    def _export_odp_bytes(model: DocumentModel, **_: Any) -> bytes:
+        return export_odp(model)
+
     def _export_json_bytes(model: DocumentModel, **_: Any) -> bytes:
         return export_json(model).encode("utf-8")
 
@@ -303,6 +365,8 @@ def ensure_builtin_plugins() -> None:
     register_exporter("latex", _export_latex_bytes)
     register_exporter("csv", _export_csv_bytes)
     register_exporter("odt", _export_odt_bytes)
+    register_exporter("ods", _export_ods_bytes)
+    register_exporter("odp", _export_odp_bytes)
     register_exporter("json", _export_json_bytes)
     register_exporter("xlsx", _export_xlsx_bytes)
     register_exporter("rtf", _export_rtf_bytes)

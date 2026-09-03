@@ -38,6 +38,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "pydantic>=2.0.0",
     "fonttools>=4.53.0",
+    "defusedxml>=0.7.1",
     # Own PDF text-layer backend (not via docling). Without this, pdf_text_char_count
     # silently returns 0 and digital PDFs are misclassified as scan-only.
     "pypdfium2>=4.30.0",
