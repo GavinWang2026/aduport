@@ -27,8 +27,23 @@ jobs:
         run: bash scripts/build_native.sh
       - name: Full golden + EPUB roundtrip (native)
         working-directory: backend
+        env:
+          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
         run: |
           .venv/bin/pytest -q tests/test_anydoc_bridge.py tests/test_golden_matrix.py \
             tests/test_golden_mobi_footnote.py tests/test_golden_ast_xlsx.py \
             tests/test_golden_xlsx_pipeline.py tests/test_golden_odt_json_deep.py \
-            tests/test_exporter_spans.py tests/test_accepted_depth.py --tb=short
+            tests/test_exporter_spans.py tests/test_accepted_depth.py \
+            tests/test_sample_pack_t39.py tests/test_api_e2e_t40.py \
+            tests/test_private_samples_optional.py \
+            tests/test_sprint_illusion_ab_weasy.py \
+            tests/test_xml_safe_no_et_fromstring.py --tb=short
+      - name: Private / acceptance sample gate
+        working-directory: backend
+        env:
+          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+        run: |
+          .venv/bin/pytest -q tests/test_private_samples_optional.py \
+            tests/test_sample_pack_t39.py tests/test_v_g_corpus_inventory.py --tb=short

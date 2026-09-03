@@ -46,6 +46,8 @@ export type TargetFormat =
   | 'latex'
   | 'csv'
   | 'odt'
+  | 'ods'
+  | 'odp'
   | 'json'
   | 'xlsx'
   | 'rtf'
@@ -178,67 +180,87 @@ export function formatLabel(fmt: DocFormat, locale: 'zh' | 'en' = 'zh'): string 
   const zh: Record<DocFormat, string> = {
     auto: '自动识别',
     docx: 'Word (.docx)',
-    doc: 'Word 97-2003 (.doc)',
+    doc: 'Word 97-2003（文本级）',
     docm: 'Word 宏 (.docm)',
-    pdf: 'PDF',
+    pdf: 'PDF（数字文本层；扫描需 OCR）',
     md: 'Markdown (.md)',
     txt: '纯文本 (.txt)',
     html: 'HTML (.html)',
     pptx: 'PowerPoint (.pptx)',
-    ppt: 'PowerPoint 97-2003 (.ppt)',
-    pps: 'PowerPoint 放映 (.pps)',
-    pot: 'PowerPoint 模板 (.pot)',
+    ppt: 'PowerPoint 97-2003（文本级）',
+    pps: 'PowerPoint 放映（文本级）',
+    pot: 'PowerPoint 模板（文本级）',
     pptm: 'PowerPoint 宏 (.pptm)',
     ppsx: 'PowerPoint 放映 (.ppsx)',
     ppsm: 'PowerPoint 宏放映 (.ppsm)',
     epub: 'EPUB',
-    mobi: 'MOBI / Kindle',
-    azw3: 'AZW3',
-    kf8: 'KF8 (Kindle)',
+    mobi: 'MOBI（文本级）',
+    azw3: 'AZW3（文本级）',
+    kf8: 'KF8（文本级）',
     latex: 'LaTeX (.tex)',
     csv: 'CSV 表格',
     odt: 'OpenDocument 文本 (.odt)',
     rtf: 'RTF',
     json: 'JSON',
     xlsx: 'Excel (.xlsx)',
-    xls: 'Excel 97-2003 (.xls)',
-    xlsb: 'Excel 二进制 (.xlsb)',
+    xls: 'Excel 97-2003（文本级）',
+    xlsb: 'Excel 二进制（xlsb/anydoc）',
     xlsm: 'Excel 宏 (.xlsm)',
-    ods: 'OpenDocument 表格 (.ods)',
-    odp: 'OpenDocument 演示 (.odp)',
-    rtf: 'RTF',
+    ods: 'OpenDocument 表格（浅导出）',
+    odp: 'OpenDocument 演示（浅导出）',
   }
   const en: Record<DocFormat, string> = {
     auto: 'Auto-detect',
     docx: 'Word (.docx)',
-    doc: 'Word 97-2003 (.doc)',
+    doc: 'Word 97-2003 (text-level)',
     docm: 'Word macro (.docm)',
-    pdf: 'PDF',
+    pdf: 'PDF (digital text; scan needs OCR)',
     md: 'Markdown (.md)',
     txt: 'Plain text (.txt)',
     html: 'HTML (.html)',
     pptx: 'PowerPoint (.pptx)',
-    ppt: 'PowerPoint 97-2003 (.ppt)',
-    pps: 'PowerPoint show (.pps)',
-    pot: 'PowerPoint template (.pot)',
+    ppt: 'PowerPoint 97-2003 (text-level)',
+    pps: 'PowerPoint show (text-level)',
+    pot: 'PowerPoint template (text-level)',
     pptm: 'PowerPoint macro (.pptm)',
     ppsx: 'PowerPoint show (.ppsx)',
     ppsm: 'PowerPoint macro show (.ppsm)',
     epub: 'EPUB',
-    mobi: 'MOBI / Kindle',
-    azw3: 'AZW3',
-    kf8: 'KF8 (Kindle)',
+    mobi: 'MOBI (text-level)',
+    azw3: 'AZW3 (text-level)',
+    kf8: 'KF8 (text-level)',
     latex: 'LaTeX (.tex)',
     csv: 'CSV table',
     odt: 'OpenDocument Text (.odt)',
     rtf: 'RTF',
     json: 'JSON',
     xlsx: 'Excel (.xlsx)',
-    xls: 'Excel 97-2003 (.xls)',
-    xlsb: 'Excel binary (.xlsb)',
+    xls: 'Excel 97-2003 (text-level)',
+    xlsb: 'Excel binary (xlsb/anydoc)',
     xlsm: 'Excel macro (.xlsm)',
-    ods: 'OpenDocument Spreadsheet (.ods)',
-    odp: 'OpenDocument Presentation (.odp)',
+    ods: 'OpenDocument Spreadsheet (shallow export)',
+    odp: 'OpenDocument Presentation (shallow export)',
   }
   return (locale === 'en' ? en : zh)[fmt] ?? fmt
 }
+
+/** Breadth honesty: formats that are import-degraded / text-level (not full layout fidelity). */
+export const TEXT_LEVEL_SOURCE_FORMATS: ReadonlySet<string> = new Set([
+  'doc',
+  'ppt',
+  'pps',
+  'pot',
+  'xls',
+  'xlsb',
+  'mobi',
+  'azw3',
+  'kf8',
+])
+
+/** Target formats that are intentionally shallow (table/slide text-level). */
+export const EXPORT_SHALLOW_FORMATS: ReadonlySet<string> = new Set([
+  'ods',
+  'odp',
+  'azw3',
+  'kf8',
+])

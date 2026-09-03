@@ -6,8 +6,9 @@ const props = withDefaults(
     modelValue: string
     options: { value: string; label: string; hint?: string }[]
     label?: string
+    testId?: string
   }>(),
-  { label: '' },
+  { label: '', testId: '' },
 )
 
 const emit = defineEmits<{
@@ -87,10 +88,15 @@ const currentLabel = () => props.options.find((o) => o.value === props.modelValu
 </script>
 
 <template>
-  <div ref="root" class="md-select">
+  <div ref="root" class="md-select" :data-testid="testId || undefined">
     <label v-if="label" class="md-label">{{ label }}</label>
-    <button ref="btn" type="button" class="md-select__btn" @click="toggle">
-      <span class="md-ext" :class="extClass(modelValue)">{{ extText(modelValue) }}</span>
+    <button
+      ref="btn"
+      type="button"
+      class="md-select__btn"
+      :data-testid="testId ? `${testId}-btn` : undefined"
+      @click="toggle"
+    >      <span class="md-ext" :class="extClass(modelValue)">{{ extText(modelValue) }}</span>
       <span class="md-select__value">{{ currentLabel() }}</span>
       <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6 9l6 6 6-6" stroke="currentColor" fill="none" stroke-width="1.5" stroke-linecap="round" />

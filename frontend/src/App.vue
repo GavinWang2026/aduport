@@ -9,22 +9,29 @@ import {
   downloadServerJob,
   fetchFormats,
   fetchHealth,
+  fetchLicense,
+  fetchMetricsPreview,
+  fetchUsage,
+  getApiKey,
   listServerJobs,
+  setApiKey,
+  type LicensePayload,
   type ServerJob,
+  type UsagePayload,
 } from './api'
 import type { ConvertJob, ConvertOptions, HistoryItem, SourceFormat, SourceFormatOption, TargetFormat } from './types'
-import { DEFAULT_CONVERT_OPTIONS, SOURCE_FORMAT_ORDER, detectFormat, formatLabel } from './types'
+import { DEFAULT_CONVERT_OPTIONS, EXPORT_SHALLOW_FORMATS, SOURCE_FORMAT_ORDER, detectFormat, formatLabel } from './types'
 import { t, type Locale as UILocale } from './i18n'
 
 const sourceFormats: SourceFormat[] = [...SOURCE_FORMAT_ORDER]
 const targetFormats: TargetFormat[] = [
   'docx', 'pdf', 'md', 'html', 'txt', 'epub', 'pptx', 'mobi',
-  'azw3', 'kf8', 'latex', 'csv', 'odt', 'json', 'xlsx', 'rtf',
+  'azw3', 'kf8', 'latex', 'csv', 'odt', 'ods', 'odp', 'json', 'xlsx', 'rtf',
 ]
 
 const locale = ref<UILocale>((localStorage.getItem('mdbridge-locale') as UILocale) || 'zh')
 const theme = ref<'dark' | 'light'>((localStorage.getItem('mdbridge-theme') as 'dark' | 'light') || 'dark')
-const activeTab = ref<'convert' | 'tasks'>('convert')
+const activeTab = ref<'convert' | 'tasks' | 'ops'>('convert')
 const sourceFormat = ref<SourceFormatOption>('auto')
 const targetFormat = ref<TargetFormat>('md')
 const showAdvanced = ref(false)
@@ -40,12 +47,19 @@ const previewMode = ref<'md' | 'render'>('md')
 const previewFullscreen = ref(false)
 const history = ref<HistoryItem[]>([])
 const serverJobs = ref<ServerJob[]>([])
+const usageInfo = ref<UsagePayload | null>(null)
+const licenseInfo = ref<LicensePayload | null>(null)
+const metricsPreview = ref('')
+const opsLoading = ref(false)
+const apiKeyDraft = ref(getApiKey())
 const dragIndex = ref<number | null>(null)
 const autoRefresh = ref(true)
 const jobFilter = ref<'all' | 'active' | 'done' | 'error'>('all')
 const uploader = ref<{ openDirectory: () => void } | null>(null)
 /** Target formats that cannot be used as source (from GET /api/formats). */
 const exportOnlyFormats = ref<Set<string>>(new Set())
+/** Shallow export targets (ODS/ODP/KF) — honesty tags from API or local fallback. */
+const exportShallowFormats = ref<Set<string>>(new Set(EXPORT_SHALLOW_FORMATS))
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const HISTORY_KEY = 'mdbridge-history'
@@ -94,6 +108,10 @@ onMounted(async () => {
       fmts.export_only.map((x) => x.toLowerCase()),
     )
   }
+  const shallow = fmts?.fidelity_tiers?.export_shallow
+  if (shallow?.length) {
+    exportShallowFormats.value = new Set(shallow.map((x) => x.toLowerCase()))
+  }
   await refreshServerJobs()
   startPolling()
   // keep online badge fresh (PDF/docling can make API look offline)
@@ -110,6 +128,34 @@ watch([activeTab, autoRefresh], () => {
   stopPolling()
   startPolling()
 })
+
+watch(activeTab, (tab) => {
+  if (tab === 'ops') void refreshOps()
+})
+
+async function refreshOps() {
+  opsLoading.value = true
+  try {
+    const [u, l, m] = await Promise.all([fetchUsage(), fetchLicense(), fetchMetricsPreview()])
+    usageInfo.value = u
+    licenseInfo.value = l
+    metricsPreview.value = m || ''
+  } finally {
+    opsLoading.value = false
+  }
+}
+
+function saveApiKey() {
+  setApiKey(apiKeyDraft.value)
+  apiKeyDraft.value = getApiKey()
+  message.success(tt('apiKeySaved'))
+  void checkApi()
+  if (activeTab.value === 'ops') void refreshOps()
+}
+
+async function checkApi() {
+  apiOnline.value = await fetchHealth()
+}
 
 function startPolling() {
   if (!autoRefresh.value || activeTab.value !== 'tasks') return
@@ -153,14 +199,21 @@ const sourceOptions = computed(() => [
 const targetOptions = computed(() =>
   targetFormats.map((f) => {
     const only = exportOnlyFormats.value.has(f)
+    const shallow = exportShallowFormats.value.has(f)
+    let label = formatLabel(f, locale.value)
+    if (only) label = `${label} · ${tt('exportOnlyTag')}`
+    else if (f === 'csv') label = `${label} · ${tt('csvTableOnlyShort')}`
+    else if (shallow) label = `${label} · ${tt('exportShallowTag')}`
     return {
       value: f,
-      label: only
-        ? `${formatLabel(f, locale.value)} · ${tt('exportOnlyTag')}`
+      label,
+      hint: only
+        ? tt('exportOnlyHint')
         : f === 'csv'
-          ? `${formatLabel(f, locale.value)} · ${tt('csvTableOnlyShort')}`
-          : formatLabel(f, locale.value),
-      hint: only ? tt('exportOnlyHint') : f === 'csv' ? tt('csvTableOnly') : undefined,
+          ? tt('csvTableOnly')
+          : shallow
+            ? tt('exportShallowHint')
+            : undefined,
     }
   }),
 )
@@ -565,8 +618,9 @@ function simpleMarkdown(src: string): string {
     </div>
 
     <nav class="md-tabs" aria-label="tabs">
-      <button type="button" :class="{ on: activeTab === 'convert' }" @click="activeTab = 'convert'">{{ tt('tabConvert') }}</button>
-      <button type="button" :class="{ on: activeTab === 'tasks' }" @click="activeTab = 'tasks'">{{ tt('tabTasks') }}</button>
+      <button type="button" data-testid="tab-convert" :class="{ on: activeTab === 'convert' }" @click="activeTab = 'convert'">{{ tt('tabConvert') }}</button>
+      <button type="button" data-testid="tab-tasks" :class="{ on: activeTab === 'tasks' }" @click="activeTab = 'tasks'">{{ tt('tabTasks') }}</button>
+      <button type="button" data-testid="tab-ops" :class="{ on: activeTab === 'ops' }" @click="activeTab = 'ops'">{{ tt('tabOps') }}</button>
     </nav>
 
     <main class="md-main">
@@ -580,14 +634,24 @@ function simpleMarkdown(src: string): string {
             </div>
             <div class="md-workspace">
               <div class="md-fmt-grid">
-                <FormatSelect v-model="sourceFormat" :label="tt('sourceFormat')" :options="sourceOptions" />
+                <FormatSelect
+                  v-model="sourceFormat"
+                  :label="tt('sourceFormat')"
+                  :options="sourceOptions"
+                  test-id="source-format"
+                />
                 <button type="button" class="md-swap" :title="tt('swap')" @click="swapFormats">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M7 4v14m0 0-3.5-3.5M7 18l3.5-3.5" />
                     <path d="M17 20V6m0 0-3.5 3.5M17 6l3.5 3.5" />
                   </svg>
                 </button>
-                <FormatSelect v-model="targetFormat" :label="tt('targetFormat')" :options="targetOptions" />
+                <FormatSelect
+                  v-model="targetFormat"
+                  :label="tt('targetFormat')"
+                  :options="targetOptions"
+                  test-id="target-format"
+                />
               </div>
 
               <div v-if="needsAdvanced" class="md-adv">
@@ -669,7 +733,7 @@ function simpleMarkdown(src: string): string {
                   <div v-if="item.status === 'converting'" class="md-bar" :class="{ 'is-indet': !item.progress }">
                     <i :style="item.progress ? { width: `${Math.round(item.progress * 100)}%` } : undefined" />
                   </div>
-                  <button v-if="item.status === 'done'" type="button" class="md-link" @click="downloadJob(item)">{{ tt('download') }}</button>
+                  <button v-if="item.status === 'done'" type="button" class="md-link" data-testid="btn-download-job" @click="downloadJob(item)">{{ tt('download') }}</button>
                   <button type="button" class="md-x" :title="tt('remove')" @click="removeJob(item.id)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
                   </button>
@@ -681,8 +745,13 @@ function simpleMarkdown(src: string): string {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16M8 16V8m8 8V4M12 12V6" /></svg>
                   {{ tt('pickDir') }}
                 </button>
-                <button type="button" class="md-btn md-btn--p" :disabled="converting" @click="convertAll">
-                  <span v-if="converting" class="md-spin" />
+                <button
+                  type="button"
+                  class="md-btn md-btn--p"
+                  data-testid="btn-convert"
+                  :disabled="converting"
+                  @click="convertAll"
+                >                  <span v-if="converting" class="md-spin" />
                   <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" /></svg>
                   {{ tt('start') }}
                 </button>
@@ -691,7 +760,7 @@ function simpleMarkdown(src: string): string {
                   <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
                   {{ tt('downloadZip') }}
                 </button>
-                <button type="button" class="md-btn md-btn--g" :disabled="converting || !doneCount" @click="downloadAll">
+                <button type="button" class="md-btn md-btn--g" data-testid="btn-download-all" :disabled="converting || !doneCount" @click="downloadAll">
                   {{ tt('downloadAll') }} ({{ doneCount }})
                 </button>
                 <button type="button" class="md-btn md-btn--g" :disabled="converting || !jobs.length" @click="clearJobs">
@@ -766,7 +835,7 @@ function simpleMarkdown(src: string): string {
                 <span class="idx">{{ String(index + 1).padStart(2, '0') }}</span>
                 <span class="s" :class="`is-${item.status}`" />
                 <span class="n" :title="item.relativePath || item.file.name">{{ item.relativePath || item.file.name }}</span>
-                <button v-if="item.status === 'done'" type="button" class="md-link" @click="downloadJob(item)">{{ tt('download') }}</button>
+                <button v-if="item.status === 'done'" type="button" class="md-link" data-testid="btn-download-job" @click="downloadJob(item)">{{ tt('download') }}</button>
               </div>
             </div>
           </section>
@@ -796,6 +865,67 @@ function simpleMarkdown(src: string): string {
           </section>
         </div>
       </template>
+
+      <section v-else-if="activeTab === 'ops'" class="md-panel">
+        <div class="md-p-head">
+          <div class="md-p-title"><span class="k" />{{ tt('opsTitle') }}</div>
+          <button type="button" class="md-btn md-btn--g" :disabled="opsLoading" @click="refreshOps">
+            {{ opsLoading ? tt('opsLoading') : tt('refreshJobs') }}
+          </button>
+        </div>
+        <p class="md-p-sub" style="margin:0 0 14px">{{ tt('opsHint') }}</p>
+        <div class="md-adv" style="margin-bottom:14px">
+          <div class="md-field" style="flex:1;min-width:240px">
+            <span>{{ tt('apiKeyLabel') }}</span>
+            <input
+              v-model="apiKeyDraft"
+              type="password"
+              class="md-input"
+              data-testid="api-key-input"
+              autocomplete="off"
+              :placeholder="tt('apiKeyPh')"
+              @keyup.enter="saveApiKey"
+            >
+          </div>
+          <button type="button" class="md-btn md-btn--p" data-testid="api-key-save" style="align-self:flex-end" @click="saveApiKey">
+            {{ tt('apiKeySave') }}
+          </button>
+        </div>
+        <p class="md-p-sub" style="margin:0 0 14px;font-size:12px;opacity:.8">{{ tt('apiKeyHint') }}</p>
+        <div class="md-stat-row" style="margin-bottom:16px">
+          <div class="md-stat">
+            <b class="blue">{{ usageInfo?.conversions_today ?? '—' }}</b>
+            <span>{{ tt('opsToday') }}</span>
+          </div>
+          <div class="md-stat">
+            <b class="green">{{ usageInfo?.conversions_total ?? '—' }}</b>
+            <span>{{ tt('opsTotal') }}</span>
+          </div>
+          <div class="md-stat">
+            <b class="gray">{{ usageInfo?.conversions_failed ?? '—' }}</b>
+            <span>{{ tt('opsFailed') }}</span>
+          </div>
+        </div>
+        <div class="md-adv" style="margin-bottom:14px">
+          <div class="md-field">
+            <span>{{ tt('opsTenant') }}</span>
+            <code class="mono">{{ usageInfo?.tenant_id || '—' }}</code>
+          </div>
+          <div class="md-field">
+            <span>{{ tt('opsLicense') }}</span>
+            <code class="mono">
+              {{
+                licenseInfo
+                  ? (licenseInfo.required ? tt('opsLicenseRequired') : tt('opsLicenseOpen'))
+                    + (licenseInfo.license ? ` · ${JSON.stringify(licenseInfo.license).slice(0, 120)}` : '')
+                  : '—'
+              }}
+            </code>
+          </div>
+        </div>
+        <div class="md-p-title" style="margin-bottom:8px">{{ tt('opsMetrics') }}</div>
+        <pre class="md-metrics-pre">{{ metricsPreview || tt('opsMetricsEmpty') }}</pre>
+      </section>
 
       <section v-else class="md-panel">
         <div class="md-p-head">

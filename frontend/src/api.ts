@@ -1,10 +1,87 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ConvertOptions, ConvertResult, SourceFormatOption, TargetFormat } from './types'
+
+const API_KEY_STORAGE = 'mdbridge-api-key'
+const JOB_TOKEN_STORAGE = 'mdbridge-job-tokens'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '',
   timeout: 300000,
 })
+
+/** FE-01: resolve API key from localStorage, then VITE_API_KEY. */
+export function getApiKey(): string {
+  try {
+    const fromStore = (localStorage.getItem(API_KEY_STORAGE) || '').trim()
+    if (fromStore) return fromStore
+  } catch {
+    /* ignore */
+  }
+  const fromEnv = String(import.meta.env.VITE_API_KEY || '').trim()
+  return fromEnv
+}
+
+export function setApiKey(key: string): void {
+  const v = (key || '').trim()
+  try {
+    if (v) localStorage.setItem(API_KEY_STORAGE, v)
+    else localStorage.removeItem(API_KEY_STORAGE)
+  } catch {
+    /* ignore */
+  }
+}
+
+function readJobTokenMap(): Record<string, string> {
+  try {
+    const raw = sessionStorage.getItem(JOB_TOKEN_STORAGE)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, string>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeJobTokenMap(map: Record<string, string>): void {
+  try {
+    sessionStorage.setItem(JOB_TOKEN_STORAGE, JSON.stringify(map))
+  } catch {
+    /* ignore */
+  }
+}
+
+/** FE-02: persist per-job access_token for later status/result calls. */
+export function rememberJobToken(jobId: string, token: string | undefined | null): void {
+  const id = (jobId || '').trim()
+  const tok = (token || '').trim()
+  if (!id || !tok) return
+  const map = readJobTokenMap()
+  map[id] = tok
+  // Cap map size to avoid unbounded sessionStorage growth
+  const keys = Object.keys(map)
+  if (keys.length > 200) {
+    for (const k of keys.slice(0, keys.length - 200)) delete map[k]
+  }
+  writeJobTokenMap(map)
+}
+
+export function getJobToken(jobId: string): string {
+  return readJobTokenMap()[(jobId || '').trim()] || ''
+}
+
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const key = getApiKey()
+  if (key) {
+    config.headers = config.headers || {}
+    config.headers['X-API-Key'] = key
+  }
+  return config
+})
+
+function jobAuthHeaders(jobId: string): Record<string, string> {
+  const token = getJobToken(jobId)
+  return token ? { 'X-Job-Token': token } : {}
+}
 
 function appendConvertOptions(form: FormData, opts?: ConvertOptions) {
   if (!opts) return
@@ -83,6 +160,7 @@ export interface JobStatusPayload {
   progress: number
   error?: string | null
   result_filename?: string | null
+  access_token?: string
 }
 
 function sleep(ms: number) {
@@ -106,17 +184,23 @@ export async function convertDocumentAsync(
   try {
     const { data: created } = await api.post<JobStatusPayload>('/api/jobs', form)
     const jobId = created.id
+    rememberJobToken(jobId, created.access_token)
     onProgress?.(created.progress ?? 0, created.status)
 
     for (let i = 0; i < 600; i++) {
       await sleep(i < 10 ? 200 : 500)
-      const { data: st } = await api.get<JobStatusPayload>(`/api/jobs/${jobId}`)
+      const { data: st } = await api.get<JobStatusPayload>(`/api/jobs/${jobId}`, {
+        headers: jobAuthHeaders(jobId),
+      })
       onProgress?.(st.progress ?? 0, st.status)
       if (st.status === 'error') {
         throw new Error(st.error || '转换失败')
       }
       if (st.status === 'done') {
-        const response = await api.get(`/api/jobs/${jobId}/result`, { responseType: 'blob' })
+        const response = await api.get(`/api/jobs/${jobId}/result`, {
+          responseType: 'blob',
+          headers: jobAuthHeaders(jobId),
+        })
         const disposition = response.headers['content-disposition'] as string | undefined
         const filename = parseFilename(
           disposition,
@@ -185,6 +269,11 @@ export interface FormatsPayload {
   target: string[]
   export_only: string[]
   notes?: Record<string, string>
+  fidelity_tiers?: {
+    full?: string[]
+    text_level?: string[]
+    export_shallow?: string[]
+  }
 }
 
 export async function fetchFormats(): Promise<FormatsPayload | null> {
@@ -216,12 +305,17 @@ export async function listServerJobs(): Promise<ServerJob[]> {
 }
 
 export async function getServerJob(jobId: string): Promise<ServerJob> {
-  const { data } = await api.get<ServerJob>(`/api/jobs/${jobId}`)
+  const { data } = await api.get<ServerJob>(`/api/jobs/${jobId}`, {
+    headers: jobAuthHeaders(jobId),
+  })
   return data
 }
 
 export async function downloadServerJob(jobId: string, fallbackName: string): Promise<void> {
-  const response = await api.get(`/api/jobs/${jobId}/result`, { responseType: 'blob' })
+  const response = await api.get(`/api/jobs/${jobId}/result`, {
+    responseType: 'blob',
+    headers: jobAuthHeaders(jobId),
+  })
   const disposition = response.headers['content-disposition'] as string | undefined
   const filename = parseFilename(disposition, fallbackName)
   const url = URL.createObjectURL(response.data as Blob)
@@ -230,4 +324,48 @@ export async function downloadServerJob(jobId: string, fallbackName: string): Pr
   a.download = filename
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
+}
+
+export interface UsagePayload {
+  tenant_id: string
+  conversions_today: number
+  conversions_total: number
+  conversions_failed: number
+}
+
+export interface LicensePayload {
+  required: boolean
+  license: Record<string, unknown> | null
+}
+
+export async function fetchUsage(): Promise<UsagePayload | null> {
+  try {
+    const { data } = await api.get<UsagePayload>('/api/usage')
+    return data
+  } catch {
+    return null
+  }
+}
+
+export async function fetchLicense(): Promise<LicensePayload | null> {
+  try {
+    const { data } = await api.get<LicensePayload>('/api/license')
+    return data
+  } catch {
+    return null
+  }
+}
+
+/** Prometheus text exposition (first N chars for UI preview). */
+export async function fetchMetricsPreview(maxChars = 2400): Promise<string | null> {
+  try {
+    const { data } = await api.get<string>('/api/metrics', {
+      responseType: 'text' as 'json',
+      transformResponse: [(d) => d],
+    })
+    const text = typeof data === 'string' ? data : String(data ?? '')
+    return text.slice(0, maxChars)
+  } catch {
+    return null
+  }
 }

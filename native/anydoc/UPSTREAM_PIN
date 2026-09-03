@@ -2,4 +2,4 @@
 # Must match native/anydoc/Cargo.toml version (tag form vX.Y.Z) or set ANYDOC_SHA.
 REF=v0.2.4
 # Optional exact commit (preferred when the tag moves): set ANYDOC_SHA=<40hex>
-# SHA=
+SHA=42bf1c5ecdde9eb0d96d6bd75a9e6698cf93b14c

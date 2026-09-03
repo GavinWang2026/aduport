@@ -97,7 +97,7 @@ defineExpose({ openDirectory })
         <span class="md-chip">CSV</span>
       </div>
     </div>
-    <input ref="fileInput" class="md-hidden" type="file" multiple @change="onFileChange" />
+    <input ref="fileInput" class="md-hidden" type="file" multiple data-testid="file-input" @change="onFileChange" />
     <input
       ref="dirInput"
       class="md-hidden"

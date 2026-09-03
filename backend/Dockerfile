@@ -61,6 +61,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HF_HUB_ENABLE_HF_TRANSFER=0 \
     MDBRIDGE_DOCLING_OFFLINE=true \
     MDBRIDGE_ANYDOC_ENABLED=true \
+    MDBRIDGE_NATIVE_REQUIRED=${INSTALL_NATIVE} \
     MDBRIDGE_DOCLING_ARTIFACTS_PATH=/opt/docling/models \
     DOCLING_ARTIFACTS_PATH=/opt/docling/models
 
@@ -122,5 +123,14 @@ download_models(output_dir=Path('/opt/docling/models'), progress=True, with_layo
 
 EXPOSE 8000
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin mdbridge \
+ && mkdir -p /opt/docling/models /tmp/mdbridge \
+ && chown -R mdbridge:mdbridge /app /opt/docling /tmp/mdbridge
+
+USER mdbridge
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=3)"
+
 # Bind inside container; compose maps 127.0.0.1 on host
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
