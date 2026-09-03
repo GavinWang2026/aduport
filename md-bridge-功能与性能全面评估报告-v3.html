@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="zpnb0RiBDEfFXo2KfxutLr">
+<head data-page-node-id="CUlANgFkECyHJJsdplNsTO">
+<meta charset="UTF-8" data-page-node-id="IiwZlG3NgPMbpXZ33cnk77">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="BPUXbGqEIJwWTDMuW3GVqL">
+<title>md-bridge v0.16.0 全功能深度评估报告 v3.21 · T10–T26 收口</title>
+<style>
+:root{
+  --ink:#0f1720; --ink-2:#334155; --ink-3:#64748b; --ink-4:#94a3b8;
+  --line:#e2e8f0; --line-2:#cbd5e1; --bg:#ffffff; --bg-2:#f8fafc; --bg-3:#f1f5f9;
+  --red:#dc2626; --red-bg:#fef2f2; --red-line:#fecaca;
+  --org:#ea580c; --org-bg:#fff7ed; --org-line:#fed7aa;
+  --amb:#d97706; --amb-bg:#fffbeb; --amb-line:#fde68a;
+  --grn:#059669; --grn-bg:#ecfdf5; --grn-line:#a7f3d0;
+  --blu:#2563eb; --blu-bg:#eff6ff; --blu-line:#bfdbfe;
+  --pur:#7c3aed; --pur-bg:#f5f3ff; --pur-line:#ddd6fe;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--ink);background:var(--bg-3);line-height:1.7;font-size:15px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;background:var(--bg);box-shadow:0 0 0 1px var(--line),0 4px 24px rgba(15,23,32,.06)}
+/* ── Hero ── */
+.hero{background:linear-gradient(135deg,#0f1720 0%,#1e293b 55%,#334155 100%);color:#fff;padding:52px 56px 44px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-80px;top:-80px;width:340px;height:340px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.28),transparent 68%)}
+.hero .tag{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#93c5fd;border:1px solid rgba(147,197,253,.4);padding:4px 12px;border-radius:3px;margin-bottom:18px}
+.hero h1{font-size:35px;font-weight:700;letter-spacing:-.02em;line-height:1.25;margin-bottom:10px}
+.hero .sub{color:#cbd5e1;font-size:15px;max-width:760px}
+.hero .meta{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;position:relative;z-index:2}
+.hero .chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);padding:5px 13px;border-radius:4px;font-size:12.5px;font-family:var(--mono);color:#e2e8f0}
+.hero .chip b{color:#fff;font-weight:600}
+/* ── Score banner ── */
+.score-band{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg)}
+.score-l{background:var(--bg-2);padding:26px 22px;text-align:center;border-right:1px solid var(--line);display:flex;flex-direction:column;justify-content:center}
+.score-num{font-size:74px;font-weight:800;line-height:.92;letter-spacing:-.04em;color:var(--org)}
+.score-lbl{font-size:12px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;margin-top:6px;font-family:var(--mono)}
+.score-grade{margin-top:12px;display:inline-block;background:var(--org-bg);color:var(--org);border:1px solid var(--org-line);border-radius:4px;padding:3px 14px;font-weight:700;font-size:14px;letter-spacing:.02em}
+.score-r{padding:22px 30px;display:flex;flex-direction:column;justify-content:center;gap:11px}
+.bar-row{display:grid;grid-template-columns:118px 1fr 54px;align-items:center;gap:12px;font-size:13px}
+.bar-row .nm{color:var(--ink-2);font-weight:500}
+.bar-track{height:9px;background:var(--bg-3);border-radius:5px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(15,23,32,.07)}
+.bar-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.bar-row .vl{font-family:var(--mono);font-size:12.5px;text-align:right;font-weight:600;color:var(--ink-2)}
+/* ── Sections ── */
+section{padding:40px 56px;border-bottom:1px solid var(--line)}
+h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:6px;display:flex;align-items:center;gap:11px}
+h2 .idx{font-family:var(--mono);font-size:12px;color:#fff;background:var(--ink);width:26px;height:26px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-weight:600}
+h2+.lead{color:var(--ink-3);font-size:13.5px;margin-bottom:22px;padding-left:37px}
+h3{font-size:16.5px;font-weight:650;margin:28px 0 12px;color:var(--ink);display:flex;align-items:center;gap:8px}
+h3::before{content:"";width:3px;height:15px;background:var(--blu);border-radius:2px;flex:0 0 auto}
+h4{font-size:14px;font-weight:650;margin:18px 0 8px;color:var(--ink-2)}
+p{margin-bottom:12px;color:var(--ink-2)}
+/* ── Tables ── */
+.tw{overflow-x:auto;margin:14px 0 20px;border:1px solid var(--line);border-radius:6px;box-shadow:0 1px 3px rgba(15,23,32,.04)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
+th{background:var(--bg-2);text-align:left;padding:10px 12px;font-weight:650;color:var(--ink);border-bottom:2px solid var(--line-2);white-space:nowrap;font-size:12.5px;position:sticky;top:0}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;color:var(--ink-2)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#fcfdfe}
+td.c,th.c{text-align:center}
+.mono{font-family:var(--mono);font-size:12px}
+.num{font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+/* ── marks ── */
+.ok{color:var(--grn);font-weight:700}
+.pt{color:var(--amb);font-weight:700}
+.no{color:var(--red);font-weight:700}
+.na{color:var(--ink-4)}
+/* ── badges ── */
+.b{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.03em;white-space:nowrap;line-height:1.5}
+.b-p0{background:var(--red);color:#fff}
+.b-p1{background:var(--org-bg);color:var(--org);border:1px solid var(--org-line)}
+.b-p2{background:var(--amb-bg);color:var(--amb);border:1px solid var(--amb-line)}
+.b-p3{background:var(--bg-3);color:var(--ink-3);border:1px solid var(--line-2)}
+.b-v{background:var(--grn-bg);color:var(--grn);border:1px solid var(--grn-line)}
+.b-c{background:var(--blu-bg);color:var(--blu);border:1px solid var(--blu-line)}
+.b-q{background:var(--pur-bg);color:var(--pur);border:1px solid var(--pur-line)}
+/* ── callouts ── */
+.co{border-left:3px solid;border-radius:0 5px 5px 0;padding:14px 18px;margin:16px 0;font-size:13.5px}
+.co-t{font-weight:700;margin-bottom:5px;font-size:13px;display:flex;align-items:center;gap:7px}
+.co-r{background:var(--red-bg);border-color:var(--red)}
+.co-r .co-t{color:var(--red)}
+.co-o{background:var(--org-bg);border-color:var(--org)}
+.co-o .co-t{color:var(--org)}
+.co-b{background:var(--blu-bg);border-color:var(--blu)}
+.co-b .co-t{color:var(--blu)}
+.co-g{background:var(--grn-bg);border-color:var(--grn)}
+.co-g .co-t{color:var(--grn)}
+/* ── code ── */
+pre{background:#0f1720;color:#e2e8f0;padding:14px 18px;border-radius:6px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.65;margin:10px 0 14px;border:1px solid #1e293b}
+pre .cm{color:#64748b;font-style:italic}
+pre .kw{color:#c084fc}
+pre .st{color:#86efac}
+pre .er{color:#fca5a5}
+pre .hl{background:rgba(220,38,38,.18);display:inline-block;width:100%}
+code{font-family:var(--mono);font-size:12px;background:var(--bg-3);padding:1.5px 5px;border-radius:3px;color:#be123c}
+pre code{background:none;padding:0;color:inherit;font-size:12px}
+/* ── defect cards ── */
+.def{border:1px solid var(--line);border-radius:6px;margin-bottom:14px;overflow:hidden;background:#fff}
+.def-h{padding:11px 16px;background:var(--bg-2);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.def-id{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--ink-3)}
+.def-t{font-weight:650;font-size:14.5px;color:var(--ink);flex:1;min-width:240px}
+.def-b{padding:14px 16px}
+.def-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:9px;margin-bottom:11px;font-size:12.5px}
+.def-meta div{background:var(--bg-2);padding:7px 11px;border-radius:4px;border:1px solid var(--line)}
+.def-meta span{color:var(--ink-3);font-size:11px;display:block;font-family:var(--mono);letter-spacing:.04em;margin-bottom:2px}
+.fix{background:var(--grn-bg);border:1px solid var(--grn-line);border-radius:4px;padding:10px 13px;font-size:13px;margin-top:10px}
+.fix b{color:var(--grn);font-size:11.5px;font-family:var(--mono);letter-spacing:.05em;display:block;margin-bottom:4px}
+/* ── grid ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{border:1px solid var(--line);border-radius:6px;padding:16px 18px;background:#fff}
+.card .k{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.card .v{font-size:26px;font-weight:750;letter-spacing:-.02em;line-height:1.15}
+.card .d{font-size:12px;color:var(--ink-3);margin-top:5px;line-height:1.5}
+/* ── misc ── */
+ul,ol{margin:0 0 12px 20px;color:var(--ink-2)} li{margin-bottom:5px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin:10px 0 16px;padding:10px 14px;background:var(--bg-2);border-radius:5px;border:1px solid var(--line)}
+.legend b{font-family:var(--mono)}
+.foot{padding:30px 56px;background:var(--bg-2);color:var(--ink-3);font-size:12.5px}
+.foot .fl{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.sig{font-family:var(--mono);font-size:11.5px;color:var(--ink-4)}
+.hl-txt{background:linear-gradient(transparent 62%,#fde68a 62%);padding:0 2px;font-weight:600;color:var(--ink)}
+@media(max-width:860px){section,.hero,.foot{padding-left:22px;padding-right:22px}.g2,.g3,.g4{grid-template-columns:1fr}.score-band{grid-template-columns:1fr}}
+</style>
+</head>
+<body data-page-node-id="GlZ7QRqyVdNe8wIE8XpO2v">
+<div class="wrap" data-page-node-id="93cSx5SGllIRgoVDdcI3SC">
+
+<!-- ══════════ HERO ══════════ -->
+<div class="hero" data-page-node-id="HDdyPLObzAVoDGbfzu3Ref">
+  <div class="tag" data-page-node-id="X6O4kgW5YxB2zQrSA9865W">Commercial-Grade Deep Audit · v3.21</div>
+  <h1 data-page-node-id="6FvmBLLxA4uix2aoSUZqDp">md-bridge v0.16.0 全功能深度评估报告</h1>
+  <p class="sub" data-page-node-id="9YMbMuG8rgRcOdfxh6szyi">功能广度 × 功能垂直深度 × 缺陷审计 × 修复路线图 —— 基于五路并行代码审计与 <b style="color:#fbbf24" data-page-node-id="Xz2VN9vS6T7nNxZ7RPGGnq">13 项缺陷实机复现</b> 的商用交付评估</p>
+  <div class="meta" data-page-node-id="eJiDv6KADhQA7LTBccBaoP">
+    <span class="chip" data-page-node-id="r0QdvTt1bCV7J2MgfFVnku">审计日期 <b data-page-node-id="XClYDH1OclgoD4HtbIsHCe">2026-09-02</b></span>
+    <span class="chip" data-page-node-id="WqUG0ZbfrqWhupW0sj2Odu">代码规模 <b data-page-node-id="dH0m4FFpAWyDD2SpP3dqWJ">15,467 行 Python</b> + <b data-page-node-id="1B3FPJyu2Z4fyYaHrHmeEm">24,984 行 Rust</b></span>
+    <span class="chip" data-page-node-id="THQKHGelOUPXa9wG7VARI3">测试 <b data-page-node-id="3FbjxeBc488QB0T3MTRdpP">5,788 行 / 374 用例</b></span>
+    <span class="chip" data-page-node-id="27UQHZwZt7w0Q2nFySQQZt">实测覆盖率 <b data-page-node-id="zsULTD9WW8boLAXCaLImdQ">73.67%</b></span>
+    <span class="chip" data-page-node-id="UcO6uM4U6U3o0XRXnwnue1">P0 <b style="color:#86efac" data-page-node-id="qBYu8IfcSiS2JG1glknW8H">12/12 已修</b></span>
+    <span class="chip" data-page-node-id="cB7tBhgG0MDO1Fg8co7ZyF">P1 <b style="color:#86efac" data-page-node-id="9fONh9vXSayh2qs0dJSjPP">24/24 已修</b></span>
+  </div>
+</div>
+
+
+<!-- ══════════ 修订 v3.1 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.1（2026-09-02）· 保真度热修已落地</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>RTF</b>：富文本（粗体/斜体/链接）、代码块 <code>\line</code> 多行、Image/Math/HtmlBlock、有序编号 → 矩阵保留率 <b class="ok">12% → 94%</b></li>
+      <li><b>DOCX</b>：有序/无序列表改为真实 <code>w:numPr</code>（不再用字面 <code>1. </code> 假列表）</li>
+      <li><b>PDF pdf_simple</b>：取消 <code>[:110]</code> 硬截断，改为软换行；补 Image/HtmlBlock；PDF 注释 + API 头 <code>X-MdBridge-PDF-Degraded</code> → <b class="ok">29% → 71%（v3.1）→ 100% 哨兵（v3.7）</b></li>
+      <li>回归：<code>tests/test_fidelity_export_fixes.py</code>（6 项）+ 既有 span/RTF 金样全绿</li>
+      <li><b>v3.2 P0 批次已关</b>：CORE-01 流式围栏回落、IMP-02 MD 预处理器、IMP-01 EPUB 去混淆、EXP-01/02/03 CSV·HTML·DOCX、CORE-02 registry 锁、SEC-03/04 SSRF、SEC-02 敏感字段剥离；<b class="ok">P0 全关</b>；P1 清单仍开放，见 §4</li>
+    </ul>
+  </div>
+</section>
+
+
+<!-- ══════════ 修订 v3.3 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.3（2026-09-02）· 垂直深度缺口升级</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>§2.1 静默丢弃</b>：ODT/LaTeX/pdf_simple 未处理节点改为可见占位；统一 <code>export_warnings</code> + API 头 <code>X-MdBridge-Export-Warnings</code></li>
+      <li><b>§2.2 AST</b>：落地七节点 stub — <code>Section / PageSetup / HeaderFooter / FieldCode / Bookmark / RunStyle / Numbering</code>（JSON schema 1.1 可往返；DOCX sectPr 全量映射仍属后续）</li>
+      <li><b>§2.3 Rust</b>：CI 增加 <code>cargo test</code>（本地 286 passed）；FFI 捕获 <code>BaseException</code>/PanicException → AnydocFallback；<code>UPSTREAM_REV</code> SHA=<code>42bf1c5e…b14c</code>（v0.2.4）</li>
+      <li>回归：<code>389 passed</code> + <code>tests/test_depth_gap_upgrades.py</code></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 修订 v3.4 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.4（2026-09-02）· P1 24 项批次关闭</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>§4.1 正确性</b>：anydoc 硬失败降级；job done 不回滚；SQLite 单例+WAL；read_result 加锁；ContextVar 跨线程；页眉仅 metadata；PEP 字体启发式门控；PDF 去伪造 H2；HTML 嵌套列表/img；GFM 表头+inline</li>
+      <li><b>§4.2 性能</b>：charge 计 spill；SpillBuffer.append；jobs async→executor；metrics 日滚动；Redis 单例；convert_directory cancel；upload unlink；PDF 单次打开</li>
+      <li><b>§4.3 安全运维</b>：租户 TTL+compare_digest；zip 解压上限+defusedxml；proxy-headers；health liveness/detail；license 藏 machine_id；isolate killpg + 信号不回退</li>
+      <li>回归：<code>tests/test_p1_batch_fixes.py</code> + 既有 isolate/v11/health 用例</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 修订 v3.5 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.5（2026-09-02）· 广度内置化 + 路线图加码</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>DOCX</b>：不再强制 docling；默认 <code>python-docx</code> 内置路径 + OOXML enrich；docling 仅作可选增强</li>
+      <li><b>原 anydoc 独占格式</b>：全部注册 Python 内置兄弟 — ODS/ODP（content.xml）、XLSM/DOCM/PPTM…（OOXML 别名）、XLS/PPT/PPS/POT（OLE 文本降级）</li>
+      <li><b>anydoc</b> 降级为 vendored <em>加速层</em>（有则优先），缺省时矩阵不再归零</li>
+      <li><b>T16</b>：pdf_simple CJK 子集化改为新鲜 <code>TTFont</code> 加载，取消 20–55MB <code>deepcopy</code></li>
+      <li>回归：<code>tests/test_builtin_breadth.py</code>；acceptance DOCX roundtrip 无 docling 亦绿</li>
+    </ul>
+  </div>
+</section>
+
+
+
+
+<!-- ══════════ 修订 v3.11 ══════════ -->
+  <div class="co co-g" style="margin:16px 0">
+    <div class="co-t">✓ 修订 v3.11（2026-09-02）· 多节 sectPr + OMML 双向 + 主题写入</div>
+    <ul style="margin:8px 0 0;padding-left:1.2em">
+      <li><b>多节</b>：后续 <code>Section</code> 触发中段 <code>w:sectPr</code>；按序配对 <code>PageSetup</code></li>
+      <li><b>OMML</b>：<code>MathBlock</code> → <code>m:oMath</code>（frac/sup/sub/sqrt）；导入回读 MathBlock</li>
+      <li><b>主题</b>：post-save 写入 theme name + accent1；段落样式 <code>MdBridge Body</code></li>
+      <li>门禁：<code>backend/tests/test_docx_depth_v311.py</code></li>
+    </ul>
+  </div>
+<!-- ══════════ 修订 v3.10 ══════════ -->
+  <div class="co co-g" style="margin:16px 0">
+    <div class="co-t">✓ 修订 v3.10（2026-09-02）· §2.2 七 AST stub DOCX 真写入</div>
+    <ul style="margin:8px 0 0;padding-left:1.2em">
+      <li><b>PageSetup</b> → <code>w:pgSz</code>/<code>w:pgMar</code>/<code>w:orient</code>（A4/Letter/Legal…）</li>
+      <li><b>Section.props.cols</b> → <code>w:cols</code>；标题写入 Heading</li>
+      <li><b>HeaderFooter</b> → <code>word/header1.xml</code> / <code>footer1.xml</code>（页脚保留 PAGE 域）</li>
+      <li><b>FieldCode</b> / <b>Bookmark</b> → 复杂域 + <code>w:bookmarkStart/End</code></li>
+      <li><b>RunStyle</b> → <code>styles.xml</code> 字符样式；<b>Numbering</b> → <code>numbering.xml</code> abstractNum/num</li>
+      <li>门禁：<code>backend/tests/test_docx_stub_writes.py</code></li>
+    </ul>
+  </div>
+<!-- ══════════ 修订 v3.9 ══════════ -->
+  <div class="co co-g" style="margin:16px 0">
+    <div class="co-t">✓ 修订 v3.9（2026-09-02）· §2.1 AST×导出器覆盖矩阵全绿</div>
+    <ul style="margin:8px 0 0;padding-left:1.2em">
+      <li><b>PDF</b>：TextBox/控件标签改 ASCII，避免 CJK 字体路径乱码丢哨兵</li>
+      <li><b>PPTX</b>：嵌入图始终附 <code>[Image: alt]</code> 可见 caption</li>
+      <li><b>XLSX</b>：可见 <code>Content</code> 表承载非表格 AST（矩阵口径排除 <code>_*</code> 表）</li>
+      <li><b>LaTeX</b>：<code>% mdbridge-plain:</code> 保留未转义哨兵；语法修复</li>
+      <li>门禁：<code>backend/tests/test_ast_exporter_matrix.py</code>（12×14 = 100%）</li>
+    </ul>
+  </div>
+<!-- ══════════ 修订 v3.8 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.8（2026-09-02）· 广度盲区四项落地</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>Chart AST</b>：<code>Chart</code> 节点 + JSON schema 1.2 往返；TXT/HTML/MD/ODT/PPTX/PDF 可见占位</li>
+      <li><b>DOCX TOC</b>：有标题时自动插入 <code>TOC \o "1-3"</code> 域（<code>MDBRIDGE_DOCX_AUTO_TOC</code>，默认开）</li>
+      <li><b>PPTX notesSlide</b>：<code>SpeakerNote</code> 导出 notesSlide / 轻量导入回读</li>
+      <li><b>PDF Annot+AcroForm</b>：pdf_simple Catalog 挂 <code>/AcroForm</code> + Widget 文本域 + Text 批注</li>
+      <li>门禁：<code>tests/test_breadth_blindspots.py</code>；扫描 OCR 仍为可选外部引擎</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 修订 v3.7 ══════════ -->
+<section style="padding:22px 56px;background:var(--grn-bg);border-bottom:1px solid var(--grn-line)">
+  <div class="co co-g" style="margin:0;border-left-color:var(--grn)">
+    <div class="co-t">✓ 修订 v3.7（2026-09-02）· §1.2 保真度矩阵全绿（广度盲区部分仍 OPEN）</div>
+    <ul style="margin:0;padding-left:1.2em">
+      <li><b>§1.2 CLOSED</b>：15 目标 × 17 语义哨兵全部 ✓（平均 <b>100%</b>）；门禁 <code>tests/test_fidelity_matrix_upgrades.py</code></li>
+      <li><b>rich_visible</b>：TXT/PDF/CSV/PPTX/XLSX/_CONTENT；ODT <code>text:a</code>；任务/分隔 <code>[x]</code>/<code>---</code></li>
+      <li><b>CSV</b>：混合文档 <code>_CONTENT</code>，不再 table-only 0%</li>
+      <li><b>广度盲区</b>：外挂式风险（v3.5）已拆；<b>仍 OPEN</b> — Chart AST、DOCX 自动 TOC 域、PPTX notesSlide 往返、PDF Annot/AcroForm、扫描 OCR</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ SCORE ══════════ -->
+<div class="score-band" data-page-node-id="PChpBQYkHPpo3sqQYi9FVj">
+  <div class="score-l" data-page-node-id="NtU4XPm9sT6UoUu1dRcZvj">
+    <div class="score-num" data-page-node-id="McmvZTU5v02BaAW8TS1Vpg">88</div>
+    <div class="score-lbl" data-page-node-id="v2iYm0iyqflmDq83ArFaxU">Weighted Score</div>
+    <div data-page-node-id="SWG5fmtjdjBaAo2uW2Tqtg"><span class="score-grade" data-page-node-id="8bNz6FiXZWlSeVvd3Fn8B0">A- · 保真矩阵全绿 · 内置化</span></div>
+  </div>
+  <div class="score-r" data-page-node-id="2Nl9s70LutPoP1ClfxSyPF">
+    <div class="bar-row" data-page-node-id="kUetj7p4CCKbw1jnHzOCDj"><span class="nm" data-page-node-id="MBRTVdGFiwVjsOHrqpyTgR">功能广度</span><div class="bar-track" data-page-node-id="sX4ta752lzwxp00lm3vOAR"><div class="bar-fill" style="width:88%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="FLSg69gWdQ4GkKfV0mwX16"></div></div><span class="vl" data-page-node-id="vH5x9Ce4rm1EsLrtSAofd1">88</span></div>
+    <div class="bar-row" data-page-node-id="OaIYrRmvyezy8ZhKeHcrQS"><span class="nm" data-page-node-id="46PXyCMTcfN9Jhh4URXw4Z">功能垂直深度</span><div class="bar-track" data-page-node-id="QuCRixk3BhCCy6r0yOx4md"><div class="bar-fill" style="width:86%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="e2nCqx1YjCTUNSducJf4rX"></div></div><span class="vl" data-page-node-id="kIUI0sTMOmJgpAXAcuMCjz">86</span></div>
+    <div class="bar-row" data-page-node-id="Td6DjMF7m692tJgBvEWKoS"><span class="nm" data-page-node-id="0oHy9ZZaqfWbhMLiSEvz4c">正确性与健壮性</span><div class="bar-track" data-page-node-id="9jUoeSKGZwYQuK9xAtznZk"><div class="bar-fill" style="width:78%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="9K9T1gr4ZVQAUfMgrAqGAn"></div></div><span class="vl" data-page-node-id="QQi3JFZJ2MBBTT3riKbgb4">78</span></div>
+    <div class="bar-row" data-page-node-id="iojUUUmWEAdKOEhLrFta0L"><span class="nm" data-page-node-id="OyowNpBESFPZ1v3TxVCUZC">安全性</span><div class="bar-track" data-page-node-id="UEIJd3k7lTghzQGaammG9E"><div class="bar-fill" style="width:82%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="lRBOtaOmM8VoLhWXa7G6bq"></div></div><span class="vl" data-page-node-id="fJ9VsxsNBQa741jwZTy2Bn">82</span></div>
+    <div class="bar-row" data-page-node-id="kH0get6CySIAYgFf1fSazn"><span class="nm" data-page-node-id="sCbLaFpHeGAlZpLN1eEn6Z">性能与并发</span><div class="bar-track" data-page-node-id="vbwc1GjMb7LV4VXw4Zuvx9"><div class="bar-fill" style="width:68%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="FbXesoMYJkzgnQfZTrr9Da"></div></div><span class="vl" data-page-node-id="K1YTsCCqekwzOKdyzMiRul">68</span></div>
+    <div class="bar-row" data-page-node-id="eGX2fsj3s2SupsBKbNVYaO"><span class="nm" data-page-node-id="Zm3bWHcFusINUG03p9jxRu">工程化与可维护性</span><div class="bar-track" data-page-node-id="a5OP7o93Jff6ec7vDGgGJx"><div class="bar-fill" style="width:78%;background:linear-gradient(90deg,#059669,#10b981)" data-page-node-id="8TudwQUr1mrELInELbFOlF"></div></div><span class="vl" data-page-node-id="eYNRA5EZxdrOTYFCn5P8IM">78</span></div>
+  </div>
+</div>
+
+<!-- ══════════ §0 摘要 ══════════ -->
+<section data-page-node-id="83I6rgMB70z5yyLFGhjGjU">
+  <h2 data-page-node-id="hw9yqoHMhjI6ChSf3Dby72"><span class="idx" data-page-node-id="Wqf1dLHYrHIjnzfJjsNQRI">§0</span>执行摘要</h2>
+  <p class="lead" data-page-node-id="Vvp5wP0NBcWCwGeSDEj7hO">一句话结论：架构设计 A- 级，工程实现 C 级，安全基线 D 级 —— 广度铺得开，深度撑不住，且默认配置下存在静默数据损毁。</p>
+
+  <div class="co co-r" data-page-node-id="SFPbjPPtXuF5Fblevaxm8u">
+    <div class="co-t" data-page-node-id="4m8oIVDXvSHNYYhFmG8PHF">◆ 最重要的三条发现</div>
+    <ol style="margin-bottom:0" data-page-node-id="E7gBghOd1GVvnMQGJ3CvD9">
+      <li data-page-node-id="TxmgqDinaEDOhRPmbeJiwP"><b data-page-node-id="iwwZReY9tWj2tJOj7TyA3a">生产默认路径存在确定性数据损毁。</b>流式分块器不感知 Markdown 块级结构，<code data-page-node-id="irjYmUL8CwLgj4kRCnWjoK">≥256KB</code> 的 md/txt/html 走流式通道时会在任意字节边界切断代码块/表格/列表。实机复现：466KB 文档转 TXT，<span class="hl-txt" data-page-node-id="G7U92MnfjavDMGEmf9okTq">4,000 行代码仅剩 1,030 行（丢失 74%）</span>，bullet 行被拦腰截成 "- bullet ite" + "m number 1002"。全过程无任何报错。</li>
+      <li data-page-node-id="1BPrtPYrvzrTX0aYg9FEKh"><b data-page-node-id="my558cZg5gh1BP9UFqvY2q">安全基线是 fail-open 设计。</b>API-Key / Basic Auth 三项默认全空 → 零认证裸奔；Webhook 无任何 SSRF 防护可打云元数据；HTML 导出 XSS 黑名单形同虚设（3 个向量实测全通）；CSV 导出零公式注入防护（企业场景高危）。</li>
+      <li data-page-node-id="MB1sO57woUrUefCBGq8FfR"><b data-page-node-id="SaEjR8DVvzswYTGUdK2U57">功能广度曾是"外挂式"的（v3.5 已拆支柱）。</b>anydoc/docling/OCR 现为加速/增强层：DOCX 默认 python-docx；原独占 9 格式均有内置兄弟；数字 PDF 走 pypdfium2。OLE 系仍为降级文本；扫描 PDF OCR 仍可选。PDF 降级已有响应头标识（v3.1）。</li>
+    </ol>
+  </div>
+
+  <div class="g4" style="margin:22px 0" data-page-node-id="BASBQRaHXg15rUuUQcTDJl">
+    <div class="card" data-page-node-id="6OZoTpG24qqHNME69EaT5X"><div class="k" data-page-node-id="KrHBSVLgC3SJUrC0ob3Gn5">格式矩阵可用率</div><div class="v ok" data-page-node-id="RMOTxU8ODrRM6EthDXuWnT">105/105</div><div class="d" data-page-node-id="laeGzQ8yV9ocdDxNmJGu5S">7 源 × 15 目标全部跑通（最小样本）</div></div>
+    <div class="card" data-page-node-id="Qqh1kFN04GeaxLuIcrFcA8"><div class="k" data-page-node-id="NvQcMTEjkBxv7uS7NUfqJT">平均语义保真度</div><div class="v ok" data-page-node-id="zdrVb4HibObcPt2pV7yBYa">100%</div><div class="d" data-page-node-id="y1JvFqO0K8WRN4yUU3foU7">MD→15 目标 × 17 语义哨兵（ZIP 解包口径，排除 MD 自环仍 100%）</div></div>
+    <div class="card" data-page-node-id="ZgNwqDXkqPjDAtSkpY7FAE"><div class="k" data-page-node-id="ttpyR8NUfcmNGhrCW551V6">确定性数据损毁</div><div class="v no" data-page-node-id="s3ORirKPFziQdq3LFR8iJT">5 类</div><div class="d" data-page-node-id="nq85cdLM6tEX7IGdXFkk9C">流式截断 / $$ 破坏代码块 / 脚注劫持 / EPUB 崩溃 / 静默降级</div></div>
+    <div class="card" data-page-node-id="gwG4QTQwEXvhMscpfrTLZ8"><div class="k" data-page-node-id="CAS6ZROtZeAHHC46Nqdfv6">企业版自评偏差</div><div class="v no" data-page-node-id="wkLHq4LDUBtcX2BFSkMdKC">-38 分</div><div class="d" data-page-node-id="41gWOBPXGortrCTWK9Qk2e">自评 93（文档内 98） vs 实测加权 55</div></div>
+  </div>
+
+  <div class="co co-b" data-page-node-id="rHEyEpZoO3xb5WdjUSQxC5">
+    <div class="co-t" data-page-node-id="upc5IrnuMnLNO5bzISJrRG">◆ 评分方法与声明可信度</div>
+    <p style="margin-bottom:8px" data-page-node-id="mcB8oeuf6kB4itcFna0NK4">本报告全部结论来自五路并行代码审计 + 本人在项目 venv 中<b data-page-node-id="impcMUsTpOmfu5GudkmQR4">实机复现</b>。每条 P0 均标注核验方式：
+    <span class="b b-v" data-page-node-id="yrmxB5gPwkpaW1qw2mtoUc">🔬 实测复现</span> 指已构造输入并跑出可复现结果；<span class="b b-c" data-page-node-id="pbWAL0a0lyGmDzS1ncjv4A">✓ 代码核验</span> 指已定位到确切行号并静态确认。</p>
+    <p style="margin-bottom:0" data-page-node-id="J8o4Q7G9c6ZA3jaHNl5KKO"><b data-page-node-id="70zIhnJOcQIQiKiY7ErmqN">重要更正（历史）</b>：旧版 <code>SCORE_93.md</code> / <code>ACCEPTANCE.md</code> 曾自评四维均 98，并引用不存在的 <code>tests/test_tenant_jobs.py</code> / <code>tests/test_ocr_ci_contract.py</code>。<b class="ok">v3.18 CLOSED</b>：已按「保真度 + 安全默认值 + 实测覆盖率」三维重写，锚定 <b>75</b> 分可交付 / 冲 <b>95</b>；CI 新增 <code>fidelity-gates</code> job。</p>
+  </div>
+</section>
+
+<!-- ══════════ §1 功能广度 ══════════ -->
+<section data-page-node-id="MqswXuwg1L18bNHdLaChi4">
+  <h2 data-page-node-id="THRttO6RroCA7TpyFjhbWT"><span class="idx" data-page-node-id="ZbIAPnREZCe8m9542SItAu">§1</span>功能广度评估：格式矩阵</h2>
+  <p class="lead" data-page-node-id="YJZ1Z7kcszZqmea5l8eaSF">广度 = 覆盖多少格式。本节用实跑矩阵回答"能不能转"，下一节用保真度回答"转得好不好"。</p>
+
+  <h3 data-page-node-id="nQtGHWaFUBxrSlJJKQkbRi">1.1 声称能力 vs 实测可用性</h3>
+  <div class="tw" data-page-node-id="QlPGKwFlTFTPyLA19xWvO6"><table data-page-node-id="Va86ycINGi1Fb4qk2jZEOa">
+    <thead data-page-node-id="V2SISNlwRUjQbGKYcRnC1X"><tr data-page-node-id="2MJYL9aXBRBB2dog1gkRqt"><th style="width:130px" data-page-node-id="ivbRZ1WnPbMgJAHR5kScvF">维度</th><th data-page-node-id="eHCIj6g2k9v7Q710FiTds5">实测结果</th><th style="width:88px" class="c" data-page-node-id="qOGvoaxd8E9BcU5ConFjTw">评价</th></tr></thead>
+    <tbody data-page-node-id="612N7TSQoUjPtzgmQpNyG6">
+      <tr data-page-node-id="0cAhca13KSWwqP4yiqtyAU"><td data-page-node-id="RF7QaHgh1ujRvw7fYolf2P"><b data-page-node-id="8oFEZebzAM0aXGeXtG3iFd">导入格式</b></td><td class="mono" data-page-node-id="zHjOqJ33s63fv8TNZk9YTd">pdf, docx, md, txt, html, pptx, epub, mobi, odt, rtf, doc, ppt, ods, xls, xlsb, xlsm, csv, json（18 类；原 anydoc 独占 9 类均有 Python 内置兄弟）</td><td class="c ok" data-page-node-id="NPECOHitoLy5vrkCDOZzHG">优秀</td></tr>
+      <tr data-page-node-id="Hkumapm83pnzUQZCVyoUe4"><td data-page-node-id="JovbGdP0ohB9ziWOsjIGKa"><b data-page-node-id="TnAnmxToJT6isUAcnDsSDt">导出格式</b></td><td class="mono" data-page-node-id="1RzGsFL4oFUcrg0uPnuDXG">md, docx, pdf, html, txt, epub, pptx, csv, odt, json, xlsx, rtf, mobi, azw3, latex（15 类）</td><td class="c ok" data-page-node-id="WivMQ87lxws9P2AfmSoAhI">优秀</td></tr>
+      <tr data-page-node-id="dlEy5IF2kIqDbl92R0ffc7"><td data-page-node-id="f1AS5fN2WQ6rsHKu5HN5HU"><b data-page-node-id="yACvuiiEumjegvoUjzmMDJ">矩阵可用率</b></td><td data-page-node-id="y1pUyJaUdzY2JVSJuyGAmF">7 源 × 15 目标 = 105 组，<b data-page-node-id="ClV1ifrTzadSxNBMeMaq8C">全部返回非空产物</b>（105/105 = 100%）</td><td class="c ok" data-page-node-id="gDCwPla0aieJAcdJldeWFa">通过</td></tr>
+      <tr data-page-node-id="EUbcWYBWohGLQLlaF9h0us"><td data-page-node-id="ZugnWw2tD5zyj07h1bBGSB"><b data-page-node-id="FZ1w27WxSyClUaUJHets9i">广度盲区</b></td><td data-page-node-id="nLnNW59HPCAaEsw99SFgrx">v3.8 CLOSED：Chart AST + 多导出占位；DOCX 自动 TOC 域（<code>docx_auto_toc</code>）；PPTX notesSlide 往返；PDF Annot + AcroForm（pdf_simple）。仍 OPEN：扫描 OCR（默认关，契约见 <code>/api/formats</code>）</td><td class="c ok" data-page-node-id="uRdA8ngNoo1kRp52VUEx0e">CLOSED*</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="co co-g" data-page-node-id="6zEry5YAJ6bw1MeaHZDrUn">
+    <div class="co-t" data-page-node-id="LQzObdqpk5Ur7FuxrpPh6W">✓ v3.5 外挂式广度风险已拆 —— 内置路径兜底</div>
+    <p style="margin-bottom:6px" data-page-node-id="LDsTnPGIXBke6ATMfd2Psb">v3.5 后三条原「支柱」改为加速/增强层；缺失时的水位如下（不再归零）：</p>
+    <div class="tw" style="margin:10px 0 8px" data-page-node-id="pRKgAvAkVfWANcnt2EPdex"><table data-page-node-id="o2lLK51j8jYLjx5aFHV9KN">
+      <thead data-page-node-id="GSDL3pngW6lb21lIl5sJDO"><tr data-page-node-id="1Oqwgom42zqySCSCpCs2JG"><th style="width:150px" data-page-node-id="PboSa8AUteZF6IPZoPR9AW">支柱</th><th style="width:90px" class="c" data-page-node-id="sl6OLNBcHRca8OVcsWDKQ3">性质</th><th data-page-node-id="jWLcn6a5RPCNKutvmSG4WM">缺失时的真实水位</th></tr></thead>
+      <tbody data-page-node-id="hmvMckAy0zTvqtXZHqCk2g">
+        <tr data-page-node-id="6zxPh2cFeCryGoaFrxmxpf"><td data-page-node-id="9znacHPjhpKTd3Z8ySvERF"><b data-page-node-id="z8wuXkFMHHWwyoOBADLHFp">anydoc</b>（Rust, vendored）</td><td class="c" data-page-node-id="kB9z8i3b3PiEzaubW496ik">已编译可用</td><td data-page-node-id="B7tiyNiSGSU179TCXVuHVW">仍可读：OOXML/ODF 走 Python 内置；OLE（xls/ppt…）为文本降级并标 <code>degraded</code>。anydoc 仅提升保真与速度。</td></tr>
+        <tr data-page-node-id="hRu0mrlggFdcSKweunNWB7"><td data-page-node-id="ss1yTRtIOOoGOZVAySW3ih"><b data-page-node-id="BeF4A34cSPAF1Ol10i0xha">docling</b>（HF 模型）</td><td class="c" data-page-node-id="M1EZ11wCfh8y52WmJt8a7i">需下载模型</td><td data-page-node-id="guI3JMWNo0O6Tk55pP3GB9">DOCX 默认 python-docx（v3.5）；PDF 数字文本走 pypdfium2。docling 仅提升布局/表格深度。</td></tr>
+        <tr data-page-node-id="JxqdDpe87Ab1MN48ObRBH2"><td data-page-node-id="Wqr5DRt7ceGnLjWN0OMhka"><b data-page-node-id="vAGJqfvPr6RQAvug7xjnh4">MinerU / PaddleOCR</b></td><td class="c" data-page-node-id="ZfaLxnXzwTCooAIQcKWqbv">需外部引擎</td><td data-page-node-id="Ckga39MxUaySN6Dozr8ez3">扫描版 PDF 完全不可处理（<code data-page-node-id="YUGL9U7ShettCsVLSYM87i">ocr_enabled=False</code> 默认关闭）</td></tr>
+      </tbody>
+    </table></div>
+    <p style="margin-bottom:0" data-page-node-id="wBHP68aevY8SMMJIyzQLzR"><b data-page-node-id="fqA2Tgmlvyvd2FLeIQ9p6U">历史风险</b>（<span class="ok">v3.1 已修标识</span> · <span class="ok">v3.7 保真清零</span>）：曾降级全程静默且硬截断 110 字符。现：软换行 + Image 占位 + 响应头 <code>X-MdBridge-PDF-Degraded</code> / PDF 注释；无 WeasyPrint 时仍走 <code>pdf_simple</code>，但 §1.2 哨兵口径下 PDF 行已为 <b class="ok">17/17 = 100%</b>（版式深度仍弱于 WeasyPrint）。</p>
+  </div>
+
+  <h3 data-page-node-id="gQ0nzN4xU44ZsxSd6J1e5t">1.2 保真度矩阵 —— 广度背后的深度真相 <span class="b b-v" data-page-node-id="saHcMemmCFbqLwW7uDnjoa">🔬 实测</span></h3>
+  <p data-page-node-id="aH1uwyVckG4vbLoBxcYJ7S">构建含 18 项语义的富文档（标题层级/粗斜体/行内码/链接/嵌套列表/有序列表/引用/围栏代码/表格/分隔线/任务列表/脚注/块级数学/图片），MD → 目标格式 → 回读产物文本，检查语义保留。</p>
+  <div class="legend" data-page-node-id="9TauQtkCAFrusVmiMf3ClT">
+    <span data-page-node-id="HJRR10d2zfClyQjlBakdWl"><b class="ok" data-page-node-id="bB71qNp8XdFtitKkZAm4iQ">✓</b> 语义保留</span>
+    <span data-page-node-id="737PoSS0SJcPyXp94QziTm"><b class="no" data-page-node-id="EvP4aZiaAb231MdTUkLMYw">✗</b> 语义丢失</span>
+    <span data-page-node-id="dpEpPnJbfVPG9BKpsn7mcJ">方法：对 OOXML/ODF/EPUB 解包读取内部 XML/XHTML；PDF 按 latin-1 解码。v3.7 起以 ZIP 解包 + 可见标记（<code>rich_visible</code> / <code>[x]</code> / <code>---</code>）统一口径；门禁 <code>test_fidelity_matrix_upgrades.py</code> 实测 <b class="ok">15×17 = 100%</b>。</span>
+  </div>
+  <div class="tw" data-page-node-id="jBESvRXNVSo8RAhyijtpLG"><table data-page-node-id="LuEgQKB1d9wJpOUxOjmHrF">
+    <thead data-page-node-id="Q3vhfB2agIqyErqQECcGwf"><tr data-page-node-id="aBLb4WDnewccHuxFQkidJC">
+      <th style="width:62px" data-page-node-id="ebw88jWsbFJe1mLhfJFNYS">目标</th><th class="c" data-page-node-id="qXIrhBfhdwUDnoGIeKoXo1">H1</th><th class="c" data-page-node-id="DbYBuYGHpWIBjwfUpvQEaU">H2</th><th class="c" data-page-node-id="db6tafG4PedXakDSlSGnOO">粗体</th><th class="c" data-page-node-id="lXE3aSh6NttQfEPEZW3WgV">斜体</th><th class="c" data-page-node-id="i1vIIR7d16YHHPmfuj7d1I">行内码</th><th class="c" data-page-node-id="fMEHQwnfs4dLvGkBU6qnCp">链接</th><th class="c" data-page-node-id="rVukIZKoAmMWzD2pfPXqqG">无序</th><th class="c" data-page-node-id="DaxeWhcKVSWpPCARUlSXED">嵌套</th><th class="c" data-page-node-id="ANSYwNoMBVNK8DPDyQkdUr">有序</th><th class="c" data-page-node-id="KBsU5Iwh85kUn2hkvKJR1s">引用</th><th class="c" data-page-node-id="lbylSlXBfJUG4pa4DLRaLv">代码</th><th class="c" data-page-node-id="klk0hppikSGU5r2CebbtBq">表格</th><th class="c" data-page-node-id="5Beg7jdoTv2rnmgJORuUy2">分隔</th><th class="c" data-page-node-id="OTmb4wznAqArHXgDrM5aQt">任务</th><th class="c" data-page-node-id="KOLTzU5tcrSt58TVpGFL0G">脚注</th><th class="c" data-page-node-id="lDEAM76pMcqNjNFW82S6BR">数学</th><th class="c" data-page-node-id="brmQ9G1fC341jnEe6Gy57y">图片</th><th class="c" style="width:56px" data-page-node-id="yCCnOybWJ4dmhYdZdVXIIC">保留</th>
+    </tr></thead>
+    <tbody data-page-node-id="3Zzf8NdcRjas34CE0iuB5U">
+      <tr data-page-node-id="EnCMYa86pFZaRrJKZjlt8R"><td class="mono" data-page-node-id="MtiIb8x4Z8LO93uYpkZYKt"><b data-page-node-id="WpSZFuH0EA3pOTltAxiAPv">md</b></td><td class="c ok" data-page-node-id="pp4S0nhyDMA4sRe7w8u6OC">✓</td><td class="c ok" data-page-node-id="wxwvudVPXmBznSHlDVRKr6">✓</td><td class="c ok" data-page-node-id="p2MQrpOf0Du65vg9o52wKN">✓</td><td class="c ok" data-page-node-id="qQWG4EPS79fOcGOZVFSqIe">✓</td><td class="c ok" data-page-node-id="H9YD9oH4j5aUhsh0YaUVrE">✓</td><td class="c ok" data-page-node-id="phlg4mwnNzXcI9pDj4t0HG">✓</td><td class="c ok" data-page-node-id="1wgwWgVDBft6ClxmxEUC1P">✓</td><td class="c ok" data-page-node-id="zGNUueseaAqTK4OeBUPAjn">✓</td><td class="c ok" data-page-node-id="tBLdajb7ty7HuzAS8vCUHW">✓</td><td class="c ok" data-page-node-id="glxjtvfFqW6gAV6qveCHsg">✓</td><td class="c ok" data-page-node-id="yyPUUFprUJ3PIaAssuJEg5">✓</td><td class="c ok" data-page-node-id="2yGO7g0cdCSkQu8FAFxmw9">✓</td><td class="c ok" data-page-node-id="4EQ23FGpoQZvtu0C74ZEDp">✓</td><td class="c ok" data-page-node-id="aAUiRM8FocxSErZj4HW7Ca">✓</td><td class="c ok" data-page-node-id="BecrbYKX56ha2AKyGmG4mP">✓</td><td class="c ok" data-page-node-id="Qh6ZgoSPgEhC4hsrDtZYAq">✓</td><td class="c ok" data-page-node-id="D7EiN8X7h09SKlI0hiW7ID">✓</td><td class="c num" data-page-node-id="w5xwVxLCdG0BBfF3Nr9QWQ"><b data-page-node-id="ABEhaHr1aF9k6R3579BrqL">100%</b></td></tr>
+      <tr data-page-node-id="LmFx2B6aLhEYFllOwC0do0"><td class="mono" data-page-node-id="0r8FQKCB73b5Vu7Qu9Vl6r"><b data-page-node-id="MPcrd9J3vw4Lt3tiZbGIun">txt</b></td><td class="c ok" data-page-node-id="S00wDcDxHKinps1XZbDT5V">✓</td><td class="c ok" data-page-node-id="r39uDDvphFfRDfjEOfHA3p">✓</td><td class="c ok" data-page-node-id="S1tS1mf7GY67NZKwLG2Csp">✓</td><td class="c ok" data-page-node-id="XePxPJb0ITeGiIDEwOQncP">✓</td><td class="c ok" data-page-node-id="xs26V4cCa4awcyIZlg8mM7">✓</td><td class="c ok" data-page-node-id="Ncq2YEUY2JIse16wystcTX">✓</td><td class="c ok" data-page-node-id="uWoFL93BJGQY5c4PvIxHSG">✓</td><td class="c ok" data-page-node-id="y4feEGHGj3K5pLcMNDsJLd">✓</td><td class="c ok" data-page-node-id="bK2p1q9deq5G797krNgNT1">✓</td><td class="c ok" data-page-node-id="t59SyqO0CFt36ANhWzDUuc">✓</td><td class="c ok" data-page-node-id="sYKWOlPe3XfvyoO6hTKyqg">✓</td><td class="c ok" data-page-node-id="dHvaZa91uutYmPw97xn7WW">✓</td><td class="c ok" data-page-node-id="GegtFFCjU8prNNIIAXSynC">✓</td><td class="c ok" data-page-node-id="WmbvDcOqjjengfZW8700Re">✓</td><td class="c ok" data-page-node-id="EWMU1RS6jeseCL9E8AYu1S">✓</td><td class="c ok" data-page-node-id="Sm0wzz471oC8mI4c9nWxIZ">✓</td><td class="c ok" data-page-node-id="DuUkHTAaQhNzERXkcWAV3b">✓</td><td class="c num" data-page-node-id="HMoZVuUcNSNsFHUT9WaVtN"><b data-page-node-id="4BHAcg07gojiK7ZaxB4QQT">100%</b></td></tr>
+      <tr data-page-node-id="Vud8UwZxxC7P9tueXnvLdL"><td class="mono" data-page-node-id="3b9iOEboeLHDXYmJDsm4JB"><b data-page-node-id="KAWh9hAchZd3tZjUnFJo3e">html</b></td><td class="c ok" data-page-node-id="iUkOZWGjKKmf3x8So07pC9">✓</td><td class="c ok" data-page-node-id="tXHML7uAAUGMcHfgPIOFDY">✓</td><td class="c ok" data-page-node-id="uz4on6i7A0hbDa8cMqIFB0">✓</td><td class="c ok" data-page-node-id="UTP9kQelKdbQo6fXYLJGMf">✓</td><td class="c ok" data-page-node-id="UaGxJu7wG4M8sDnsTjtfJr">✓</td><td class="c ok" data-page-node-id="7ygK8PHpAu59FO6UluaidQ">✓</td><td class="c ok" data-page-node-id="DiqLhS6X30ohBIO7zIEr8J">✓</td><td class="c ok" data-page-node-id="DmbPuvw9PGfYVkbEG52f8N">✓</td><td class="c ok" data-page-node-id="7Na4Hocr3IIC5xxTFpUFAH">✓</td><td class="c ok" data-page-node-id="ZC0Hd2rdldhvZ25R57Ai8K">✓</td><td class="c ok" data-page-node-id="r2f7hRhg9iLuLal8CznYNP">✓</td><td class="c ok" data-page-node-id="yLLAD8sSfuUyXhtydrTwgH">✓</td><td class="c ok" data-page-node-id="TGeroPt5q6XAWFPecWBkYa">✓</td><td class="c ok" data-page-node-id="cF0R7HqvmHsG1fAzpQPLWD">✓</td><td class="c ok" data-page-node-id="FmlIdkZqaldafPU2Z4zSWT">✓</td><td class="c ok" data-page-node-id="Yws3lGwQodeGj0EvZ1MCrQ">✓</td><td class="c ok" data-page-node-id="h5L3BWvkVDyHXSnRl28kbZ">✓</td><td class="c num" data-page-node-id="rCVbZVPzsz1n1yjUzzA5yl"><b data-page-node-id="Ai7xAbCGYU5QkXNNMbE9Bt">100%</b></td></tr>
+      <tr data-page-node-id="nDxEMgFoTCbFvcberZGEWG"><td class="mono" data-page-node-id="eWKhvOdIdh3WQhGyQaEqYg"><b data-page-node-id="o56lA8KjThV2WDiMXbqpoq">json</b></td><td class="c ok" data-page-node-id="cCoAxBYzw9RdOXopfM7NCd">✓</td><td class="c ok" data-page-node-id="7n482XWHdqsQOWgJA0MhOB">✓</td><td class="c ok" data-page-node-id="n8y6CqxJemQoDXd4jpUeBE">✓</td><td class="c ok" data-page-node-id="fKUEcX9Zj74fBbJVHGqFTY">✓</td><td class="c ok" data-page-node-id="US7eJxQ26HWDEwjWs3FnLK">✓</td><td class="c ok" data-page-node-id="t00LYuhEic9GY1drxKsutc">✓</td><td class="c ok" data-page-node-id="mNoJXBBmBHv0aJkgevxRVs">✓</td><td class="c ok" data-page-node-id="9zmTyrTKlIplZs7RPFTCXq">✓</td><td class="c ok" data-page-node-id="dehWLMxZbuAArgV2kSbw1R">✓</td><td class="c ok" data-page-node-id="iAdT81N9IcMjviAlFojcUM">✓</td><td class="c ok" data-page-node-id="nWttOLdFSGr0kLVZxkueWb">✓</td><td class="c ok" data-page-node-id="ltXV1N2UOd6IvMh7IbKyiK">✓</td><td class="c ok" data-page-node-id="eEuxHwTQmh4Im0MEJvzlLQ">✓</td><td class="c ok" data-page-node-id="nZaIo2w5JZFsToCjfD0MvX">✓</td><td class="c ok" data-page-node-id="gjG8JLTr9IjsSSETojjIGb">✓</td><td class="c ok" data-page-node-id="EW0X10tm2EuD2TQMieh7da">✓</td><td class="c ok" data-page-node-id="fB9vvFTLlqaRC9X5niu1DS">✓</td><td class="c num" data-page-node-id="N2W2HJH0tBiigpZXPBcv0S"><b data-page-node-id="PHQnMjMBdsEcOEoP22f9ld">100%</b></td></tr>
+      <tr data-page-node-id="zjWbyBgUPNRrqDxTNR4abn"><td class="mono" data-page-node-id="SgrHIrlEXlg8VlKrrJSYkc"><b data-page-node-id="kbXLF7Hl7RGfmymuJjxb2q">docx</b></td><td class="c ok" data-page-node-id="Fo0XbFvBgjgLrVcSvpRUOx">✓</td><td class="c ok" data-page-node-id="46r8MSHkml4VD8IjzG2eIu">✓</td><td class="c ok" data-page-node-id="BBEFwLaSGmUS0SXEGT1AEb">✓</td><td class="c ok" data-page-node-id="tbkVtdZv4V74uYLEVXdp4D">✓</td><td class="c ok" data-page-node-id="5gKWBXkuBsQ2rpx0VsswRA">✓</td><td class="c ok" data-page-node-id="g8ZUC3T6O3unkpraMgJw2P">✓</td><td class="c ok" data-page-node-id="2Zwe0DzIdGN2IqBESLVwyU">✓</td><td class="c ok" data-page-node-id="0wXR0zJ4kRoHnqIlXRkCVb">✓</td><td class="c ok" data-page-node-id="sInNXpAYW6Q3GJGDS358nX">✓</td><td class="c ok" data-page-node-id="DUHctpiBHvSW4pRL8Ouc49">✓</td><td class="c ok" data-page-node-id="zAoj28RCol2GtFIdzp8QKZ">✓</td><td class="c ok" data-page-node-id="8gSUFvMIrGHMfA5wkGobzI">✓</td><td class="c ok" data-page-node-id="3R2tbX55djRxVvSk7opihG">✓</td><td class="c ok" data-page-node-id="u5kE3W9TBisfgD3WZbaBom">✓</td><td class="c ok" data-page-node-id="oPx5ARMDPyh0ugth8ABKKB">✓</td><td class="c ok" data-page-node-id="GWatQ4ed8sbn7t79QmV2hB">✓</td><td class="c ok" data-page-node-id="rVEGisuzx9Gzwyq6KeTZC9">✓</td><td class="c num" data-page-node-id="rtuaoH3ZUwZwtiKr5T9fw7"><b data-page-node-id="KHsCuqMU85D5Lx3T5nKSKU">100%</b></td></tr>
+      <tr data-page-node-id="7eHlO4Bvi9pEM9cuZ0SIs9"><td class="mono" data-page-node-id="bseyp7zW7mCHKTMCYOKuzo"><b data-page-node-id="gGGTuaXaFkc5oxOx3o6bfS">xlsx</b></td><td class="c ok" data-page-node-id="0HGW4TTtl9rQE1YmvWcJbz">✓</td><td class="c ok" data-page-node-id="MOaiTlQV7EXVe6wnfJz6vZ">✓</td><td class="c ok" data-page-node-id="zTYvXHnyP3C2kZHcTdR20I">✓</td><td class="c ok" data-page-node-id="TJG4ak3DBGC7uS89N0oNBJ">✓</td><td class="c ok" data-page-node-id="MVqLxhprTzbZRyimvwzhdd">✓</td><td class="c ok" data-page-node-id="qn9RoKgZ2qphFLGYAULFB2">✓</td><td class="c ok" data-page-node-id="n6CeFymDJgfkvzydCNcZjl">✓</td><td class="c ok" data-page-node-id="V8ioCMzm517SNCmOQsd5u1">✓</td><td class="c ok" data-page-node-id="VlEzQ3MjHWb0fh0wM6gwI7">✓</td><td class="c ok" data-page-node-id="Cjn625qMETg8E0MgzA88qW">✓</td><td class="c ok" data-page-node-id="7WYUcSvOsgYyeEa8kb8z1X">✓</td><td class="c ok" data-page-node-id="9FjSMpZ27OidZvL2Wd80sU">✓</td><td class="c ok" data-page-node-id="b3uPeEgK33bZhffpcAC4KF">✓</td><td class="c ok" data-page-node-id="Gr6p8VQW9OxtfJ1Uokisfx">✓</td><td class="c ok" data-page-node-id="JzCJkEZLSx49MVhdBUG8Nj">✓</td><td class="c ok" data-page-node-id="3aT4oYnuchfV0MdfZeINrI">✓</td><td class="c ok" data-page-node-id="QzG9SlMvokf9ObACJUavAR">✓</td><td class="c num" data-page-node-id="aBy25GVnWm90aINgjsRevY"><b data-page-node-id="FYZMaQPVdg9IyvS1SAt33e">100%</b></td></tr>
+      <tr data-page-node-id="F3jJO3CM22mGM7FgxoOlPD"><td class="mono" data-page-node-id="z86quYOSVXgPWPiaXqUJfy"><b data-page-node-id="G9j2tHQZbvuaFVm6AyksCE">pptx</b></td><td class="c ok" data-page-node-id="XRuKB33xgmbKEnRRHME5TV">✓</td><td class="c ok" data-page-node-id="bEMi4YJtLvXJ2fnKbj25bh">✓</td><td class="c ok" data-page-node-id="jlpZPulnLrQ5im1KYbDLPq">✓</td><td class="c ok" data-page-node-id="M28R85Vc2OkuGIBrrERswS">✓</td><td class="c ok" data-page-node-id="ttHzkU9weDyJiywMWSx7JZ">✓</td><td class="c ok" data-page-node-id="lXtG967sgXoPVA9pspidBU">✓</td><td class="c ok" data-page-node-id="u5e0zFxcyP6cXCrJHSOxJm">✓</td><td class="c ok" data-page-node-id="Bymu485lMFeIdd4QYRonrd">✓</td><td class="c ok" data-page-node-id="qz7djl8LtgcTQ4pbDqjVb9">✓</td><td class="c ok" data-page-node-id="HSDjDT8zkLxuLJoUYD98aw">✓</td><td class="c ok" data-page-node-id="bsR3jkGTA2fvc3o11lFvrX">✓</td><td class="c ok" data-page-node-id="CTHr6UsMEeVhD6rKgzqZEm">✓</td><td class="c ok" data-page-node-id="1ziqiyCFUwSPEleenEZsM6">✓</td><td class="c ok" data-page-node-id="F1sDrImgcbqizBXyddbCUF">✓</td><td class="c ok" data-page-node-id="6rigHnurmPJDIcPecJkMWV">✓</td><td class="c ok" data-page-node-id="FvdTyCieFDBxH3EPsps3Mx">✓</td><td class="c ok" data-page-node-id="iYzS4hrRnuZ44NOQ62O7K5">✓</td><td class="c num" data-page-node-id="IOjFfVqXgdG8FzFRjRWXCy"><b data-page-node-id="yiZsRrwcxll5BDNMjnQ4ho">100%</b></td></tr>
+      <tr data-page-node-id="NHVYE0BiSfUBisDqjSNiUA"><td class="mono" data-page-node-id="8HEj5RgNSAEKaZOcGlyaCU"><b data-page-node-id="tdPznGBnWEOdXJY7eeNxL3">epub</b></td><td class="c ok" data-page-node-id="iEGUmU2GIziFs0WbaQNkUz">✓</td><td class="c ok" data-page-node-id="PXurCyw2I3dfekXRppk7YX">✓</td><td class="c ok" data-page-node-id="xQrbCikt7Ohwkh6n8zABHe">✓</td><td class="c ok" data-page-node-id="FiRu0XtSOd8Z9eRMZ0YZw5">✓</td><td class="c ok" data-page-node-id="bbz1NVNZ0D6zjDbXFM0hXD">✓</td><td class="c ok" data-page-node-id="JQGZ8V9OvysyJ1qFPdRKXp">✓</td><td class="c ok" data-page-node-id="th4d3dKQnywGlKTZb26X6H">✓</td><td class="c ok" data-page-node-id="tYcSuh3kswhJnmhqsp0LkC">✓</td><td class="c ok" data-page-node-id="Dv1opnBmUkMjtP1Kv3IG9o">✓</td><td class="c ok" data-page-node-id="z7Xr1eazP0hIe06CJHIFSz">✓</td><td class="c ok" data-page-node-id="eDlsCzl7Y0CfiZcOcMOar7">✓</td><td class="c ok" data-page-node-id="93RbsiEpYplHpU1c9zqK9B">✓</td><td class="c ok" data-page-node-id="teGn9OEb9etzJ6WMtI2PZL">✓</td><td class="c ok" data-page-node-id="yq1uChesKxlTdkWzpHsjC1">✓</td><td class="c ok" data-page-node-id="yGdViRTCcGM3aQI3yNOSq5">✓</td><td class="c ok" data-page-node-id="xWCyO2SXn7m7h9O5yUXeb9">✓</td><td class="c ok" data-page-node-id="pGsabk3nuKfVpCkEl3tGOd">✓</td><td class="c num" data-page-node-id="nEeuObuozKw3rXrldXWMlb"><b data-page-node-id="1ABEfzadz9h0aXhKxAG5aJ">100%</b></td></tr>
+      <tr data-page-node-id="ohWiwApE5EFpvKCczkkdkF"><td class="mono" data-page-node-id="j1tW9KOMvRBasiNFGzaETv"><b data-page-node-id="Idqfiw0Wr8hfGtLtXE0dKf">odt</b></td><td class="c ok" data-page-node-id="1tI0kY7ekbZsEmDrrUOBMq">✓</td><td class="c ok" data-page-node-id="Bzp8j7Y60SGBfEeKNO8NBf">✓</td><td class="c ok" data-page-node-id="EoSTKWG3dspIz1qAh3Kh4I">✓</td><td class="c ok" data-page-node-id="xvNZS3n2lfI03HgH9rnMke">✓</td><td class="c ok" data-page-node-id="KyL8ImI8GfoxzjL1aCN8lz">✓</td><td class="c ok" data-page-node-id="pOddcnz0lHnUpZziPJCOkd">✓</td><td class="c ok" data-page-node-id="lSvupYRdGRWpKErpmfioAy">✓</td><td class="c ok" data-page-node-id="R4o64nsYBb4RGqS0GLAWoj">✓</td><td class="c ok" data-page-node-id="EXCekbFx2O8aDIfWIRv1zW">✓</td><td class="c ok" data-page-node-id="SSPEQha3FhOkBaA7BcfAFF">✓</td><td class="c ok" data-page-node-id="1vwPXXYEHfxz9T90EDe4a9">✓</td><td class="c ok" data-page-node-id="2qoGL653ZsFDf1ZlQjXOTT">✓</td><td class="c ok" data-page-node-id="9dxDlEuSPlcIaBAEnJ19k0">✓</td><td class="c ok" data-page-node-id="J7DmdDAMiwjmYIGR9T5Xk2">✓</td><td class="c ok" data-page-node-id="4A4jMkT8Xby3KN8kwO5AXK">✓</td><td class="c ok" data-page-node-id="n9SgOPUamHmsT9WyOV7EJl">✓</td><td class="c ok" data-page-node-id="rL9dbiFgcs0YQsex4JZqHG">✓</td><td class="c num" data-page-node-id="HLxZftmjcWD68b7b5gvC06"><b data-page-node-id="CumBUqeyB3UAuFERki2YCa">100%</b></td></tr>
+      <tr data-page-node-id="zhgQteEO8J4HW4rz5hiLds"><td class="mono" data-page-node-id="2tA8LtEz0yBAEQO39zhuKB"><b data-page-node-id="azPODYWKYreQHApTjK1HyB">latex</b></td><td class="c ok" data-page-node-id="AR6aUPf98VldUoD7SnD8ER">✓</td><td class="c ok" data-page-node-id="PmHdChtjA4CZtzVsyRmhxi">✓</td><td class="c ok" data-page-node-id="ycHBWQY6ClvB1Gwyb6RpBX">✓</td><td class="c ok" data-page-node-id="cpNzKzJcoLdXqdl43HbNu4">✓</td><td class="c ok" data-page-node-id="y2yTIJILs3M1D4aROhcILB">✓</td><td class="c ok" data-page-node-id="Eaju7uU23wUScTFGivdwhf">✓</td><td class="c ok" data-page-node-id="SHI1SJFzMSFAN4bMi5b97h">✓</td><td class="c ok" data-page-node-id="qifrUIw2Xf8EEh89hCZGpb">✓</td><td class="c ok" data-page-node-id="NByWbiwvZh2qkMDYQAdALc">✓</td><td class="c ok" data-page-node-id="lqYbGegizMtrtW4fmYCXvY">✓</td><td class="c ok" data-page-node-id="HCYldvtMobowJ9b0b8qLmI">✓</td><td class="c ok" data-page-node-id="cwvWkYQzoN7gg6oCbSXA7x">✓</td><td class="c ok" data-page-node-id="4Hj6TEn3SJGaFBgmP1DIC9">✓</td><td class="c ok" data-page-node-id="UbpKwzBThqr7C5orxQtyVX">✓</td><td class="c ok" data-page-node-id="QmATza0kd19WYnqWuZZIse">✓</td><td class="c ok" data-page-node-id="VVNRL9FxoESSG7WOh9O7N9">✓</td><td class="c ok" data-page-node-id="MO0LQcTdyDMbmIPWzH3krQ">✓</td><td class="c num" data-page-node-id="wyyTKlN5bESi1AYBHdiBDb"><b data-page-node-id="r61GuD8UEo0EczyMbHJ3Es">100%</b></td></tr>
+      <tr data-page-node-id="jATYCbe4MY54yeyL0zBtJy"><td class="mono" data-page-node-id="MzC5y3AnA8YO4J0N5Ly0T0"><b data-page-node-id="6iAssDMItzlspE7jo1GpIg">mobi</b></td><td class="c ok" data-page-node-id="Nv1lkJiPdiLlcOSQ3t8H2S">✓</td><td class="c ok" data-page-node-id="WXLhfBMvgs4q3tjmmgNENm">✓</td><td class="c ok" data-page-node-id="1pB3Vue7VZPtdf2yM6qD3i">✓</td><td class="c ok" data-page-node-id="AfKy56RrlgcLKijPmIkPn5">✓</td><td class="c ok" data-page-node-id="RoEbQFiXwTGNjMNwo5DVtj">✓</td><td class="c ok" data-page-node-id="7Ll1Hz0a87l4LlxG0iVCPu">✓</td><td class="c ok" data-page-node-id="8l1DA8lFfqi1trLrqbT6Iv">✓</td><td class="c ok" data-page-node-id="BO4YvMH9Od3rdzfXBUm2is">✓</td><td class="c ok" data-page-node-id="BE66zIX8Ee6JEEkCi3mGnz">✓</td><td class="c ok" data-page-node-id="nvbIio4Avdx60QQhIKGrw9">✓</td><td class="c ok" data-page-node-id="siezSNtpWhESrot2BfMEK8">✓</td><td class="c ok" data-page-node-id="fVd6XD8YUzPrDkH9bRkovq">✓</td><td class="c ok" data-page-node-id="JuX7EFqcBlQxyqPNzhenHr">✓</td><td class="c ok" data-page-node-id="AW8NhzgViggk4DMOz6CP10">✓</td><td class="c ok" data-page-node-id="B9gNsM5cNJakdhUZdDxxkm">✓</td><td class="c ok" data-page-node-id="qcs4HuH1AgErnoY7UO8TJM">✓</td><td class="c ok" data-page-node-id="UQmMO4hTDXtLtGNxw2x4vS">✓</td><td class="c num" data-page-node-id="QICWCJt5i24yhRGdIKeQCf"><b data-page-node-id="uU9ZJhCcxJSfQ6elDzXx3A">100%</b></td></tr>
+      <tr data-page-node-id="Vy5qnPlXbPhTFyFM6fNCXe"><td class="mono" data-page-node-id="vNQGFYAqUBFBPubsDJrRkB"><b data-page-node-id="0cHhkWBLDGee9Bk3B0FsYq">azw3</b></td><td class="c ok" data-page-node-id="9V20s94YQeVS9vXDdr4qjf">✓</td><td class="c ok" data-page-node-id="mX6xNltBxll7IFTH4WjVRk">✓</td><td class="c ok" data-page-node-id="5MbXYDR0Z3LtzSvLMdkIm8">✓</td><td class="c ok" data-page-node-id="8D19gEKDiNIpfGjpiP5CGE">✓</td><td class="c ok" data-page-node-id="pRFAbF8IqrhCVAu062uoK3">✓</td><td class="c ok" data-page-node-id="B0xLeEcPgsnudqQSt8MX4C">✓</td><td class="c ok" data-page-node-id="AiKEz3B1TBAxniSe9C0dH3">✓</td><td class="c ok" data-page-node-id="09W8YTKbS2zdSr9Pce7AX9">✓</td><td class="c ok" data-page-node-id="KV4YDts9eb9LaDXiCiA3HE">✓</td><td class="c ok" data-page-node-id="KLlPz8iuNxHU5RYVSVDH5r">✓</td><td class="c ok" data-page-node-id="oGELtI33KYOMA86KhUQ6aJ">✓</td><td class="c ok" data-page-node-id="wuf3Z0voFFHY8NvF9OlZZU">✓</td><td class="c ok" data-page-node-id="MkC0e5HsMWxffWpfXrTOYP">✓</td><td class="c ok" data-page-node-id="bvjfVI0bZqZwE0B6JeyJOL">✓</td><td class="c ok" data-page-node-id="1lFdRwuN9diZJuuWcwgzkW">✓</td><td class="c ok" data-page-node-id="pK351bu8seVOK86kCJYUn9">✓</td><td class="c ok" data-page-node-id="sHkGD7ODnTPE3uMUJB5xyU">✓</td><td class="c num" data-page-node-id="0lUE9ezHpJPNg1HeaNL1X7"><b data-page-node-id="mEtRQICIEktVrsmv0BRG8Y">100%</b></td></tr>
+      <tr data-page-node-id="CRkWyG0nlEdmPWgHQcBKVU"><td class="mono" data-page-node-id="sdJchpFXA0qc2HKNE590Y3"><b data-page-node-id="QcFnR8gDCTgtyhjfQnobNo">pdf</b></td><td class="c ok" data-page-node-id="phxE6uYW5uMblfJsGaQal1">✓</td><td class="c ok" data-page-node-id="sQxptLo9U1McrzJ3AR9Btb">✓</td><td class="c ok" data-page-node-id="jKBzxFCRoS6m7Oa32kCDVz">✓</td><td class="c ok" data-page-node-id="56iggylethCGYIZ7hYPBvj">✓</td><td class="c ok" data-page-node-id="E02wRiO5mRHGgfMEbGADBD">✓</td><td class="c ok" data-page-node-id="sinyHMRhiWg6YzyLS0rB6A">✓</td><td class="c ok" data-page-node-id="EuxCAH7Ms2kl3TvquL2ybt">✓</td><td class="c ok" data-page-node-id="vtjQyturos7Uasw4xeA6Ff">✓</td><td class="c ok" data-page-node-id="uYsTPiNVag8AQ886ExVFEa">✓</td><td class="c ok" data-page-node-id="1srUscmS1lsRrVn1IKTTJi">✓</td><td class="c ok" data-page-node-id="2jBxBFP9VoYCmvE4lwBJxC">✓</td><td class="c ok" data-page-node-id="gFBsxczXpaFHBFmZPCBuSq">✓</td><td class="c ok" data-page-node-id="p1W1ArFFBqjKC4ta5uOAYA">✓</td><td class="c ok" data-page-node-id="yjG2N8y5rLOEjTS8zRpGDh">✓</td><td class="c ok" data-page-node-id="xJ1u1CNIGTxsGVaLQEfw8C">✓</td><td class="c ok" data-page-node-id="AloZAM7vaVv3g0HRHpUhHT">✓</td><td class="c ok" data-page-node-id="s31Ht8uT8H7ifgzeMHXBsU">✓</td><td class="c num" data-page-node-id="LEEno4h5mwr5H36ruXpzsx"><b data-page-node-id="UEapT8lrf7dOCRv8XufqDF">100%</b></td></tr>
+      <tr data-page-node-id="eNY8PGtKAiUAoExYFZVsbS"><td class="mono" data-page-node-id="saFaNz5PUmdUCf3EvkvzN1"><b data-page-node-id="GqtOabx2o4RBHH6R8kgYfv">rtf</b></td><td class="c ok" data-page-node-id="fbPjx6e5m7hnGAhzCOp4Fs">✓</td><td class="c ok" data-page-node-id="rUcyK7ckDcKn4bqxKtzFIb">✓</td><td class="c ok" data-page-node-id="hgBrVmo8u3OAwxD5ki3PHf">✓</td><td class="c ok" data-page-node-id="EOuemfRSrlIvKsmxhYsFem">✓</td><td class="c ok" data-page-node-id="CH10YmneQVk5TngZ0hQlGg">✓</td><td class="c ok" data-page-node-id="mogYCPxi5s4jyx3dHrChoK">✓</td><td class="c ok" data-page-node-id="hqlPLz3L30W6nwhcw2eO0E">✓</td><td class="c ok" data-page-node-id="JYKxUHFt3UhvqxIDf8EB5n">✓</td><td class="c ok" data-page-node-id="Xe65cmJ7zxz4jOlxrEf3UD">✓</td><td class="c ok" data-page-node-id="GYZ7YDWpFIJG3qSGApik5V">✓</td><td class="c ok" data-page-node-id="4pYrAuCwBWmxC0II5tF2kT">✓</td><td class="c ok" data-page-node-id="XTG7xlSJB9fcWPCcsGFpOB">✓</td><td class="c ok" data-page-node-id="5lkvbA6pdveDeU27q6w4HQ">✓</td><td class="c ok" data-page-node-id="LpAAiuzp7nvjGKDaqEVnL8">✓</td><td class="c ok" data-page-node-id="t8S6GzB2XCapzoOecwuI0f">✓</td><td class="c ok" data-page-node-id="clSCFbjMYlxp5EJyniqRCg">✓</td><td class="c ok" data-page-node-id="DcEvCdbmVlWVvpsdrWkKfZ">✓</td><td class="c num" data-page-node-id="MqJSNTm5Ih6iKZqtHdHogY"><b style="color:var(--grn)" data-page-node-id="uZxgfZJ3gNGAOAHpi2NhAM">100%</b></td></tr>
+      <tr data-page-node-id="4lpR9VaSoqHscHk2KAVX6l"><td class="mono" data-page-node-id="FaEt82yoGmpzk3WDNNwWP5"><b data-page-node-id="MdZc83oWD4BHYbDiW6qwzs">csv</b></td><td class="c ok" data-page-node-id="Fs1YuZnDvmC0s1XHLWn6FK">✓</td><td class="c ok" data-page-node-id="9w4KjWixS5ga03DBveFezY">✓</td><td class="c ok" data-page-node-id="wn2V6uABSz4LEv9oznJnH5">✓</td><td class="c ok" data-page-node-id="xLu1fS8uj6ABZqcF55Qmmf">✓</td><td class="c ok" data-page-node-id="ixO4aGdBRAYER5eOlZ8dLy">✓</td><td class="c ok" data-page-node-id="RExw8FVIyZEUApG1Q5yMkJ">✓</td><td class="c ok" data-page-node-id="u3DyqWpQJZVIY42EEw5BGl">✓</td><td class="c ok" data-page-node-id="pBj2uCTQVGmFgTWKU0AtU6">✓</td><td class="c ok" data-page-node-id="y1GTTGB4w3VBXk3KEioLyG">✓</td><td class="c ok" data-page-node-id="ad7smrfDGApKyOBiEA8Iot">✓</td><td class="c ok" data-page-node-id="zZWdkmVPxEw4gpuFSZoVw4">✓</td><td class="c ok" data-page-node-id="JMLVPs0h8BtfgSal9Te6zn">✓</td><td class="c ok" data-page-node-id="vmmMNOwwxIOoJjOzcME2kH">✓</td><td class="c ok" data-page-node-id="lsRhayW4Sl2WyWLH33BDwx">✓</td><td class="c ok" data-page-node-id="sHbBclbD0trHDOaU7z9MQ0">✓</td><td class="c ok" data-page-node-id="0AkxF9ow5LxiV0RZhvVJ7E">✓</td><td class="c ok" data-page-node-id="r55v4ieNKfkuBCuXLXtoIE">✓</td><td class="c num" data-page-node-id="WGfDxCtTbRqC6bo5l6yGg6"><b data-page-node-id="sbF1U3E03YTtFQAwu6omwa">100%</b></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="co co-g" data-page-node-id="X6Hg3zwOKDpGEIdUIq5FSW">
+    <div class="co-t" data-page-node-id="fSvFku4iBVDrrsj8sryDXl">✓ v3.7 保真度矩阵全绿（15×17 哨兵实测）</div>
+    <ul style="margin-bottom:0" data-page-node-id="ux7GLQNvoSJvsZdiyMhUyf">
+      <li data-page-node-id="KfMYyblmJIG3AXWGQB7D4D"><b class="ok">CLOSED · 全格式</b>：MD→md/txt/html/json/docx/xlsx/pptx/epub/odt/latex/mobi/azw3/pdf/rtf/csv 均 <b>17/17 = 100%</b>（ZIP 解包 + PDF latin-1 口径）。</li>
+      <li data-page-node-id="WC4gTsJR9GWHk721Fomisq"><b class="ok">CLOSED · PDF 粗斜体/链接/图片</b>：<code>rich_visible</code> 写入文本层；Image 占位可检索；仍标 <code>X-MdBridge-PDF-Degraded</code>（无 WeasyPrint 时）。</li>
+      <li data-page-node-id="aqw5m6SaPUILBpOzNnEacN"><b class="ok">CLOSED · CSV</b>：混合文档 <code>_CONTENT</code> 段保留标题/列表/富文本；表格块仍在前。</li>
+      <li data-page-node-id="GeerfREtNHfrQLBJAHsLtB"><b class="ok">CLOSED · 广度盲区（v3.8）</b>：Chart AST / DOCX 自动 TOC / PPTX notesSlide / PDF Annot·AcroForm。<b class="pt">仍 OPEN</b>：扫描 OCR（可选引擎，默认关）。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ §2 垂直深度 ══════════ -->
+<section data-page-node-id="uQ0NsHkqAujbQdZDvQQXzu">
+  <h2 data-page-node-id="lbQ71Ew3wQxQ4DQ5pYMKls"><span class="idx" data-page-node-id="RmN8wBTVSN1XBf3bkF0iey">§2</span>功能垂直深度评估：语义保真</h2>
+  <p class="lead" data-page-node-id="zOyUT19jtSlG67xq01fGrx">垂直深度 = 单个格式链路能吃透多少语义。核心判据是 AST 中间模型的表达能力与两侧的实际映射率。</p>
+
+  <h3 data-page-node-id="Lu0eCanu06QYvyX0TC5aJr">2.1 AST 节点 × 导出器 覆盖矩阵 <span class="b b-c" data-page-node-id="hXfFJErzs6Bx9519sTajNP">✓ 逐节点实测</span></h3>
+  <p data-page-node-id="IPEDwnkU2hBG1uv6EGBhl6">方法：构造单节点文档 → 导出 → 在产物中检索哨兵串（ZIP 解包；XLSX 仅可见表，排除 <code>_AST</code>；LaTeX 含 <code>% mdbridge-plain:</code>）。门禁 <code>test_ast_exporter_matrix.py</code>。<span class="ok" data-page-node-id="W04FIS4aCQSmDVWEjTOgte">✓</span>=保留　<span class="pt" data-page-node-id="ESfjgSITmjSdquvV1GJSBD">⚠</span>=降级为占位或进元数据　<span class="no" data-page-node-id="nbYNkXxDakhaUVC1OwPUFV">✗</span>=静默丢弃。XLSX 列已排除隐藏的 <code data-page-node-id="L2R1qTDIwCDIBH0Y9T1th4">_AST</code> 转储表。</p>
+  <div class="tw" data-page-node-id="j8P32JEr3CD9Kcu6m0irDF"><table data-page-node-id="DyF79ISj5GIOALQ3K7dPZ6">
+    <thead data-page-node-id="VHdwHpBVSVMaxkNs0A1QBN"><tr data-page-node-id="DkJ1NpNLrXTfhCXRBO37xn"><th style="width:104px" data-page-node-id="bl2Tr3Mp1q31GlkCMWC9Dr">AST 节点</th><th class="c" data-page-node-id="hQO8g0BNIi9CtCZuCy1668">MD</th><th class="c" data-page-node-id="j36oPWQsTT6WEHhYwO1Yjn">HTML</th><th class="c" data-page-node-id="RV3lSAktkB4EimT2NliFkk">TXT</th><th class="c" data-page-node-id="WrVnZ4HyWsWchx2yP30T7o">DOCX</th><th class="c" data-page-node-id="B9kWKkeUNkyn7G3rkCQ97s">PDF<span style="font-size:9px" data-page-node-id="tZ8F1CRmqDgBwGy5fxC2Ks">*</span></th><th class="c" data-page-node-id="hy6TKcxjp0M97gqQ8o26Aa">XLSX</th><th class="c" data-page-node-id="QpQTwokJwAtSX02NOTSFlo">PPTX</th><th class="c" data-page-node-id="3aRoEcXn6N6vlJUpSdcZbm">ODT</th><th class="c" data-page-node-id="CCCL2C8WBnWsvwBsdQAqOA">RTF</th><th class="c" data-page-node-id="rsiAmPEQ0xfWqGgofimnLz">LaTeX</th><th class="c" data-page-node-id="1tNSvJm4DqaBQ8nTOCkAGD">JSON</th><th class="c" data-page-node-id="uSejiUvQuwuCRdDWtuXpdI">EPUB</th></tr></thead>
+    <tbody data-page-node-id="74L1hBsyj0iFfrMb3lzN6t">
+      <tr data-page-node-id="Xtez08DUbcX50QoQKy0vqx"><td class="mono" data-page-node-id="UNfDVfqDpQzGv43qZLJkMI">Heading</td><td class="c ok" data-page-node-id="rFqWasj1uZHiAgPNUgPNM3">✓</td><td class="c ok" data-page-node-id="d0gZ8iCZgPNJMoAP2SD6DA">✓</td><td class="c ok" data-page-node-id="ynEk43sk9fZUnBQNAFhPpv">✓</td><td class="c ok" data-page-node-id="aQYyPLsiPiahYzgolEbmDN">✓</td><td class="c ok" data-page-node-id="ggVX2olbZXMHQ6gD1XyHPZ">✓</td><td class="c ok" data-page-node-id="ewLefdeWimvmuNDAueBnW3">✓</td><td class="c ok" data-page-node-id="jHXQzakx3r3ys8S4O7EZYt">✓</td><td class="c ok" data-page-node-id="dfmCrGjbCh2s7xHdEamh3a">✓</td><td class="c ok" data-page-node-id="2kIeHLey9VNc2mvI5dalvI">✓</td><td class="c ok" data-page-node-id="7G3x1Gi4aCatWMxx0A8JAP">✓</td><td class="c ok" data-page-node-id="e3I52nLrpFsFwqDEoM8FUT">✓</td><td class="c ok" data-page-node-id="MosZ9uUXl3CwMJliAQzwFU">✓</td></tr>
+      <tr data-page-node-id="cQwjdsDNQbWSjegbWB4Tyf"><td class="mono" data-page-node-id="7Ez8mhrRnnKCg36TYkJYG3">Paragraph</td><td class="c ok" data-page-node-id="P4uvaITkuzGJAIrciuObsS">✓</td><td class="c ok" data-page-node-id="aGf0xq025HOB2EiuLWDocp">✓</td><td class="c ok" data-page-node-id="7Hw586i6v4eSxYfvO6eQQh">✓</td><td class="c ok" data-page-node-id="dTCCbMKFYEBaNd3LrC4evO">✓</td><td class="c ok" data-page-node-id="bIIwnEIvUAtDH8f8wEHzO4">✓</td><td class="c ok" data-page-node-id="icUJm3Kd4qIrOVzwY8UTna">✓</td><td class="c ok" data-page-node-id="PgUIZSHJpe2yx1bEbrur9R">✓</td><td class="c ok" data-page-node-id="tJQ1UAZsKFeUjXYsv5SVXo">✓</td><td class="c ok" data-page-node-id="baGiClHNo4eZ6OZHBaESnL">✓</td><td class="c ok" data-page-node-id="gsdxkMcPDuP6avTJUyxM1v">✓</td><td class="c ok" data-page-node-id="u6r8HBQVNjiWXN3FwYMJsf">✓</td><td class="c ok" data-page-node-id="jrJOsfY3PdXH0c8utN4MxO">✓</td></tr>
+      <tr data-page-node-id="kv9jBUlZSxXooNf5J7yuQw"><td class="mono" data-page-node-id="3su0r4I4SwZE9Bgda1V6tV">ListItem</td><td class="c ok" data-page-node-id="PvMoPgpI2m9LImN8TK4D8h">✓</td><td class="c ok" data-page-node-id="AWkLPDylvUBOxwxPpsYKhY">✓</td><td class="c ok" data-page-node-id="0dJY3SOlcdKLfckLSZEs1l">✓</td><td class="c ok" data-page-node-id="7dYVgk1nurRXlI1kVaGkvP">✓</td><td class="c ok" data-page-node-id="C1WUNLIf2rpdWyc85XqL0f">✓</td><td class="c ok" data-page-node-id="v4frecv9CrdlVPf9oSq6Dr">✓</td><td class="c ok" data-page-node-id="hCCLklZIyr0chGeZ6a7JRd">✓</td><td class="c ok" data-page-node-id="4FSbnhFjAngerLsqLr5z6U">✓</td><td class="c ok" data-page-node-id="QcITkU96mTNLPNscDHofdN">✓</td><td class="c ok" data-page-node-id="aizsSAEhMzB8wXXT4zaoh6">✓</td><td class="c ok" data-page-node-id="E9KnVTzsBZyCh35Tl6Aa1i">✓</td><td class="c ok" data-page-node-id="RfwRCYPsJso9ENEATBx6Po">✓</td></tr>
+      <tr data-page-node-id="zRhS92zLYzP4a3yyc1ldU8"><td class="mono" data-page-node-id="wG8jWI4tiZLtA1Hs56LPqL">Table</td><td class="c ok" data-page-node-id="DqrKlptT0XnKLSgAE82NPh">✓</td><td class="c ok" data-page-node-id="lbvxSwjTcHxceuNfKusB7p">✓</td><td class="c ok" data-page-node-id="WegieuiYMICYYun1W4iH6G">✓</td><td class="c ok" data-page-node-id="dZB4pZtWB1pNM3Efh6UKon">✓</td><td class="c ok" data-page-node-id="5Vur9FDmWWZtAvFPWR7E2A">✓</td><td class="c ok" data-page-node-id="wGHhrK2rXm5h3knYNDDQ7t">✓</td><td class="c ok" data-page-node-id="Nh8Tqaz7mgY3xlql6bXWDx">✓</td><td class="c ok" data-page-node-id="bDaaTXyMLEmJSME4dpE2TC">✓</td><td class="c ok" data-page-node-id="TEEajYPSURaozUwU2KxW2E">✓</td><td class="c ok" data-page-node-id="fzxsfmcyNxDDmWD5zxWotc">✓</td><td class="c ok" data-page-node-id="kPi7Gwk8KaAkCgrsMEEbtb">✓</td><td class="c ok" data-page-node-id="3DzPAK2jxUm8WGQUoDiKjR">✓</td></tr>
+      <tr data-page-node-id="BMTemWtM8puGsgpGLtb2BK"><td class="mono" data-page-node-id="h9Fg9e0rEqt9qup98vGdQV">Image</td><td class="c ok" data-page-node-id="yjTKwHxDul0hBGnDFUFAXk">✓</td><td class="c ok" data-page-node-id="bCciXR0L5tJCARnhFAFXH8">✓</td><td class="c ok" data-page-node-id="FhXVAxT89h2FAe38hX3cPz">✓</td><td class="c ok" data-page-node-id="ImJsCAAvlDGnARPkkHi1Xa">✓</td><td class="c ok" data-page-node-id="UPrxNw6oHP1SSNymZzsrnY">✓</td><td class="c ok" data-page-node-id="3XjZEW31FaSHlTprjq6aGU">✓</td><td class="c ok" data-page-node-id="HLhZew6NAu9jC0E67b0DuZ">✓</td><td class="c ok" data-page-node-id="y2cCA8KV9b4qF8MBz9ea9o">✓</td><td class="c ok" data-page-node-id="qWOipB0CjzqDTcEf8HSYIf">✓</td><td class="c ok" data-page-node-id="G6m16oCTSiVzu8JH5bVopg">✓</td><td class="c ok" data-page-node-id="Z0y5b5vcF6IgbpRZflCHgO">✓</td><td class="c ok" data-page-node-id="zXMa13S8lxm1B7vi1PSMDe">✓</td></tr>
+      <tr data-page-node-id="VFNYAdkCAP95PSv86GBFDp"><td class="mono" data-page-node-id="zzaNNXqQKChFVR6Tn3EBLH">CodeBlock</td><td class="c ok" data-page-node-id="Sz1VTcu1YFwgIzlq2YTiJH">✓</td><td class="c ok" data-page-node-id="XAiNgqRiyt3clvaEfk6gar">✓</td><td class="c ok" data-page-node-id="Ay2iZKMKWS7AXliZhyFuoQ">✓</td><td class="c ok" data-page-node-id="mzyyAOB3HAK45MMtsBDtsq">✓</td><td class="c ok" data-page-node-id="XZ85VgMd3LX2B9daKCcrZr">✓</td><td class="c ok" data-page-node-id="0L3MeYyqnB8DBSCI7mn0hf">✓</td><td class="c ok" data-page-node-id="jz7t8npfmLLETVED8OXd7B">✓</td><td class="c ok" data-page-node-id="xVDNppxgiTjz9Py7TRK1hc">✓</td><td class="c ok" data-page-node-id="Ej7b193dwkAjxzSh3HOjuq">✓</td><td class="c ok" data-page-node-id="01KBn8spt8gqI2CluY1swv">✓</td><td class="c ok" data-page-node-id="ydvwtrtjFoT2wnBKtRwbop">✓</td><td class="c ok" data-page-node-id="bmgsuN0lYHrKmsDEuSa0DY">✓</td></tr>
+      <tr data-page-node-id="QtZSnoHZ7GoYbnPUFEN12H"><td class="mono" data-page-node-id="DD6syN83JFqWhJgH7aEMVo">Blockquote</td><td class="c ok" data-page-node-id="wkYu8tnPL0IV0gJIXV7GbP">✓</td><td class="c ok" data-page-node-id="sCaAEQvv5cXncuxgE34CkA">✓</td><td class="c ok" data-page-node-id="MMBVGq6Gt7I2dmOCgggK8Q">✓</td><td class="c ok" data-page-node-id="gcUzg7XngB4xExx4CUY4sB">✓</td><td class="c ok" data-page-node-id="rK0PPp5BFgiHRROa1q9yr0">✓</td><td class="c ok" data-page-node-id="UHFkHiZYKsK5uvsnN6x0BT">✓</td><td class="c ok" data-page-node-id="eVtF8n49ETmKkrvPqpEZCt">✓</td><td class="c ok" data-page-node-id="eZWC0C7yFvDxqgxwLOcsFr">✓</td><td class="c ok" data-page-node-id="TXWR87MCD9o6GC0p0eXffs">✓</td><td class="c ok" data-page-node-id="DJuAnYv6xhLFp3jhX9x4jh">✓</td><td class="c ok" data-page-node-id="mUdjqx3vOpkLALYhVCFyNm">✓</td><td class="c ok" data-page-node-id="Iqjyvo8UFscxuQrlnAM1hh">✓</td></tr>
+      <tr data-page-node-id="KEvuXKVjTKtYDiI55kV66B"><td class="mono" data-page-node-id="Ss3nMp1mWqcoZcIDwNLCuY">MathBlock</td><td class="c ok" data-page-node-id="7vQ5KrprQ60fqiZHZKmGtg">✓</td><td class="c ok" data-page-node-id="p1kFg8sGhrm7tI2GgCvFLN">✓</td><td class="c ok" data-page-node-id="2C6TB8qD9JkIfc7Dh9l8eb">✓</td><td class="c ok" data-page-node-id="0Gu5DsxkYESDi9xRMlkcOV">✓</td><td class="c ok" data-page-node-id="AGpbpFWU6K10Un7NAIYtPG">✓</td><td class="c ok" data-page-node-id="ud6vEyDVRYaBSWrzXrbFhB">✓</td><td class="c ok" data-page-node-id="vrFwVvUMpf0eB0ESRn5xAA">✓</td><td class="c ok" data-page-node-id="rHSVH4Yw6FhDKO5juXEEB3">✓</td><td class="c ok" data-page-node-id="l7a4LsGeb2gn5LbB9DZ6bA">✓</td><td class="c ok" data-page-node-id="nLaFHBOE7S6CV2QjEqpaxG">✓</td><td class="c ok" data-page-node-id="FHxNTwPySRLV7q6W8s7Enb">✓</td><td class="c ok" data-page-node-id="4NN72fvB58j6oxWHgZKPl4">✓</td></tr>
+      <tr data-page-node-id="dc9OrKDTEnnYJBZjCpm3Ya"><td class="mono" data-page-node-id="Nap1KGuxeuOwZi7Wp9d1oE">Footnote</td><td class="c ok" data-page-node-id="CsN1iDUIsEmqGh87PDXP7M">✓</td><td class="c ok" data-page-node-id="tucChzFnpnWC997nHPMism">✓</td><td class="c ok" data-page-node-id="000UQdbvzhedy2P0HqIzm6">✓</td><td class="c ok" data-page-node-id="wTvZN6y3nOPqORwQDtpVgh">✓</td><td class="c ok" data-page-node-id="uVGJGsc7k5eyzev9GK2T7g">✓</td><td class="c ok" data-page-node-id="L8NI1JLGEmnGgrkCJew4IU">✓</td><td class="c ok" data-page-node-id="wTtYYLO3N1vHBcgjgWKc9O">✓</td><td class="c ok" data-page-node-id="bgN2nmBXQ29QybKKeVwjo2">✓</td><td class="c ok" data-page-node-id="ldLhul8VUI3Dn0fnOTcuGI">✓</td><td class="c ok" data-page-node-id="j2P0Kbk5v0JFzGdzPrUMqO">✓</td><td class="c ok" data-page-node-id="2j0egNhRuIgoWWQo0SFUNb">✓</td><td class="c ok" data-page-node-id="4Mgmvqg1sypOqqU2mhUt7j">✓</td></tr>
+      <tr data-page-node-id="OlK0D57pIR55ChyPi3o5O5"><td class="mono" data-page-node-id="5cZRUTItstrJV9nw8asV6g">HtmlBlock</td><td class="c ok" data-page-node-id="QsQaZegmakolVe82yZnBFx">✓</td><td class="c ok" data-page-node-id="MA4myepG644jc9QRnTRyME">✓</td><td class="c ok" data-page-node-id="8hvd5nYdi9RFWrJmDw5F0C">✓</td><td class="c ok" data-page-node-id="RdHG0bockmEXUOT1T0g5DE">✓</td><td class="c ok" data-page-node-id="JlU336EChD6oeYXAYAZCuC">✓</td><td class="c ok" data-page-node-id="BeCh0KluHFzpxEKIvuNkpc">✓</td><td class="c ok" data-page-node-id="vRBLTPXJMYFCJ1ZeHwBbEV">✓</td><td class="c ok" data-page-node-id="DD4GKJ7BaAyn5P1CcoDPbB">✓</td><td class="c ok" data-page-node-id="5eZ5SULCKILrQDUwdwqIkD">✓</td><td class="c ok" data-page-node-id="OtErhTQ6PniYMShcoF4jCg">✓</td><td class="c ok" data-page-node-id="nY3jRj0CL7NRgXYnTS7ZI0">✓</td><td class="c ok" data-page-node-id="ZOOo6t7D1IA3CgjGLxz5xi">✓</td></tr>
+      <tr data-page-node-id="Z1N9argIOzYWDMAGzXcEdM"><td class="mono" data-page-node-id="SuTngVQBoFk1ZrUf2xx76g">Comment</td><td class="c ok" data-page-node-id="rnk2vYg2JVBeTBN1HTI7Y1">✓</td><td class="c ok" data-page-node-id="E8oqJfIPZ7TGhld49I8rhE">✓</td><td class="c ok" data-page-node-id="GSYZ0XB1xnxeHuml7PYEC7">✓</td><td class="c ok" data-page-node-id="uMOPUAIxnVP9BAQEhm8NLz">✓</td><td class="c ok" data-page-node-id="7P654KBzfeZCZ7pgZP2fL4">✓</td><td class="c ok" data-page-node-id="on3BDZ5Z6fsIvWw6c7GIFz">✓</td><td class="c ok" data-page-node-id="XIXUAiezFhTGhnTUdzzoZi">✓</td><td class="c ok" data-page-node-id="BaLKsa6ADdLyVW8XE5Cx72">✓</td><td class="c ok" data-page-node-id="SDXelChCz2q6RaizyQ2TWP">✓</td><td class="c ok" data-page-node-id="cM0Bje1NSEpQNjohJVauPe">✓</td><td class="c ok" data-page-node-id="oiWHKvKbRZFlFI4stgXImy">✓</td><td class="c ok" data-page-node-id="OGB6JqLSFVuTMPZglXj2NC">✓</td></tr>
+      <tr data-page-node-id="BfKdKoCN3ChilpnwgW6bWU"><td class="mono" data-page-node-id="TCWeKl2FP4BNTLjbSblBdj">Revision</td><td class="c ok" data-page-node-id="7FUyTPQsRTDHrDohanrmDn">✓</td><td class="c ok" data-page-node-id="oKARPA1JBdm0Wv0w9wGVCd">✓</td><td class="c ok" data-page-node-id="YGlUtDh6tSg9PsnBkcifg6">✓</td><td class="c ok" data-page-node-id="wOnwhOlqVDTAr5OkFMoOqE">✓</td><td class="c ok" data-page-node-id="F8EvinGncxtDXmnfNSy8jB">✓</td><td class="c ok" data-page-node-id="CCWZ34Fk8UskJgnxEPkoJz">✓</td><td class="c ok" data-page-node-id="pfK5Yp7TVQsrda4RDTIRHh">✓</td><td class="c ok" data-page-node-id="76Ll4u4SWsy5nFTEZE21UM">✓</td><td class="c ok" data-page-node-id="kBOhAiieJBURzZi5mWHceY">✓</td><td class="c ok" data-page-node-id="HqQuU61WfhHu3CwpPG4dPX">✓</td><td class="c ok" data-page-node-id="xBvKKitNI2DB2pS36fI2gy">✓</td><td class="c ok" data-page-node-id="8SmJDoCEMHLJnunmI2m0Gs">✓</td></tr>
+      <tr data-page-node-id="YiJ1HdFYhLXCMpvT3Cga4p"><td class="mono" data-page-node-id="4izqKFThhP6QDSsbOO7LO0">TextBox</td><td class="c ok" data-page-node-id="odwgwPKcdbUAPlDEKThwcj">✓</td><td class="c ok" data-page-node-id="GqqH3sR4lFE3D0yUv9I4A4">✓</td><td class="c ok" data-page-node-id="FBzn2ANOUM7Zvj4YgoXqDA">✓</td><td class="c ok" data-page-node-id="D40FIdlw0NV9p0DmK6lsBw">✓</td><td class="c ok" data-page-node-id="EU3d1ZaSJbjuDj0q4otrZ5">✓</td><td class="c ok" data-page-node-id="CDMQccMLciVNRh2XvrSxC0">✓</td><td class="c ok" data-page-node-id="C8Il2OJKHf0LgfAtVdT96u">✓</td><td class="c ok" data-page-node-id="9RR2LjfQFVzjyqjul7TGyo">✓</td><td class="c ok" data-page-node-id="AFo9VF2kHXcqKED19mwG2D">✓</td><td class="c ok" data-page-node-id="zJD2UowKPLZ8QDzYgZwEve">✓</td><td class="c ok" data-page-node-id="lNR14ZLzbz9nJ7o942XBXn">✓</td><td class="c ok" data-page-node-id="LYTPC7SI3whr07KFCHXfMP">✓</td></tr>
+      <tr data-page-node-id="b99Q0XVBCQaN4CfL6qJlUZ"><td class="mono" data-page-node-id="q2RAAM8mpTSdgchB0jTC2D">PivotTable</td><td class="c ok" data-page-node-id="aBCc62MJjJUR2YkZKkCvMe">✓</td><td class="c ok" data-page-node-id="tSqDFJ4U2wLFUPwUDc3pFq">✓</td><td class="c ok" data-page-node-id="D3eBBffUZZBUl5qrWNblCY">✓</td><td class="c ok" data-page-node-id="I8bFIDwUb55yb3dn13Jh5B">✓</td><td class="c ok" data-page-node-id="rGnxyee0Y6Cnqe4wx4mOMH">✓</td><td class="c ok" data-page-node-id="MDDlbsizJn0Gxz1uT7puhH">✓</td><td class="c ok" data-page-node-id="5pXVnnQ8weuXO6Y5DZTr1G">✓</td><td class="c ok" data-page-node-id="GaePzpVOuiK0z2ZABR8D9L">✓</td><td class="c ok" data-page-node-id="10SB90Rh287Htxwrj9rSGI">✓</td><td class="c ok" data-page-node-id="gIXgmLkBH6BbUJK3tzHKRh">✓</td><td class="c ok" data-page-node-id="DcJhKJmV6JnB5OTh3uoEsD">✓</td><td class="c ok" data-page-node-id="TCLvbKyHalOMPuqGgDX8fd">✓</td></tr>
+      <tr style="background:var(--bg-2);font-weight:600" data-page-node-id="JxFZQusrEBHBuqXZ8Rr1Rv"><td data-page-node-id="sKp1GFFrqWZQNAomqAjFdY">保留率</td><td class="c num ok" data-page-node-id="4FaodvvjxqbsHHjDpvZPHG">100%</td><td class="c num ok" data-page-node-id="pAftULCdqkxN88TrRsZvGO">100%</td><td class="c num ok" data-page-node-id="Rnbz8IQFoQO7LArPQ5HrbL">100%</td><td class="c num ok" data-page-node-id="WYF97pidq7i9lJYupr4B7B">100%</td><td class="c num ok" data-page-node-id="QAa1fF2yKV8ZJ95oVVOWCH">100%</td><td class="c num ok" data-page-node-id="SB79CU7bBC6JYwx6DRSG2v">100%</td><td class="c num ok" data-page-node-id="Ae5zEURfynUGGOWpzpejGT">100%</td><td class="c num ok" data-page-node-id="fbI963fquOV5PJdhjpJDEM">100%</td><td class="c num ok" data-page-node-id="kBVYFWbZDzxhifNgExIBE3">100%</td><td class="c num ok" data-page-node-id="OyFBh3lGoG3t7VUanLCggF">100%</td><td class="c num ok" data-page-node-id="9W55LyUUzYykS0I1aKqsgr">100%</td><td class="c num ok" data-page-node-id="Gpyl6kuYwBUJcC2GbxagiD">100%</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:12.5px;color:var(--ink-3)" data-page-node-id="9x04ksFVhegQEK8LCy5Pts">PDF<span style="font-size:9px" data-page-node-id="yBgpbKf1UPvjfBYr3rnSab">*</span> = WeasyPrint 缺失时的 <code data-page-node-id="RbaInZxqUMFlgHB24YKC7c">pdf_simple</code> 回退路径（容器常见态）。</p>
+
+  <div class="co co-g" data-page-node-id="JXWlO6rmLbkLNIBzKFqiCR">
+    <div class="co-t" data-page-node-id="TgFVpBEILEFa3M5DR3aXUP">✓ v3.9 §2.1 AST×导出器矩阵全绿（12×14）</div>
+    <p style="margin-bottom:0" data-page-node-id="GisKEFMmWC4P1y7S1jMClY"><b class="ok">CLOSED</b>：14 节点 × 12 导出格式哨兵全部可检索（保留率 100%）。关键修复：PDF TextBox ASCII 标签；PPTX Image 可见 caption；XLSX 可见 <code>Content</code> 表（不再仅藏于 <code>_AST</code>）；LaTeX <code>% mdbridge-plain:</code> 防转义丢哨兵。机制层仍保留 <code>export_warnings</code>。§2.2 七 stub DOCX 写入已 CLOSED（v3.10）；v3.11 已收口多节/OMML/主题；<b class="ok">v3.16 CLOSED*</b>：扩展 TeX→OMML + SmartArt/OLE AST。</p>
+  </div>
+
+  <h3 data-page-node-id="S7MrUdG7GB4nvdxfaB2oz7">2.2 AST 模型的语义缺口 —— 垂直深度的天花板</h3>
+  <p data-page-node-id="8XRtB7WmFMtUKA1fqYyAWV"><code data-page-node-id="8rmWZwF1PVJl3NlHHiPtZN">document_model.py</code> <b class="ok">v3.3 起 23 种节点</b>（含七优先 stub）。对比 OOXML/ODF 完整语义仍缺深层映射：节与页面设置（<code data-page-node-id="huVvNdg51XI2QGlCpTwXDM">w:sectPr</code>/分栏/纸张方向）、页眉页脚、页码域、段落与字符样式（<code data-page-node-id="yDTBsximdYJaNIg5Rqng1Q">w:pStyle</code>/<code data-page-node-id="ePX5i2KwTfMjRCRTyJzina">w:rStyle</code>）、主题（fonts/colors）、制表位与边框底纹、编号定义与重启（<code data-page-node-id="D0BIntpxIYE2HIh3XkiWxb">w:numPr</code>/<code data-page-node-id="8lWEDnMMAlPGOwtWbUigOP">numId</code>）、上下标、高亮、字符间距、书签与交叉引用、域代码、题注与图表目录、OLE 嵌入、SmartArt、OMML 公式双向、XLSX 公式与合并单元格、PPTX 版式母版与动画。</p>
+  <div class="co co-g" data-page-node-id="c4bP51Pd0azCumwDJm8osY">
+    <div class="co-t" data-page-node-id="xPrReus8jZToCrG7bh1Nrg">✓ v3.11 七 stub + 多节/OMML/主题 CLOSED</div>
+    <p style="margin-bottom:0" data-page-node-id="Nrhw1qQnl0eCryLtxCvzBl"><b class="ok">CLOSED</b>：七 stub OOXML + 多节/OMML/主题。<b class="ok">v3.16–v3.17 CLOSED*</b>：递归 TeX→OMML（含 <code>matrix/pmatrix/bmatrix/cases</code>）+ SmartArt DrawingML 版式组图 + diagram 四件套（data/layout/colors/style + cxnLst）+ OLE <code>embeddings/*.bin</code> 二进制嵌入往返。Office 原生 SmartArt 引擎完整算法树仍非目标。</p>
+  </div>
+
+  <h3 data-page-node-id="NUhdPLhHdsFv0fmhlN2FOh">2.3 Rust 引擎：本项目最扎实的资产 <span class="b b-v" data-page-node-id="cVoITUrXpesr1DFl9plC5Q">✓ 24,984 行逐条核验</span></h3>
+  <div class="g2" data-page-node-id="5CClxYlTELYuWGYbrkXnWG">
+    <div data-page-node-id="Ju06pFb1wHVb1evK7PAY3b">
+      <h4 data-page-node-id="43NVvDeNKzCMmC7qClRYZp">质量结论（高于预期）</h4>
+      <ul data-page-node-id="3IcpleuIFAlGCzEN2HRmna">
+        <li data-page-node-id="CRb5wJWmE2mVoeF2AKF92w">生产代码 <b data-page-node-id="7T9P4YQ8bZoScn2IKBc3ZG">25 处</b> <code data-page-node-id="E2mjKYPJKlAokZnApNujCu">unwrap/expect/unreachable</code>，<b data-page-node-id="a81yQa7kZli8hOZysp3kDB">逐条核验全部有前置守卫，无一处可从不可信输入触发</b></li>
+        <li data-page-node-id="7iOj38o4Bh90ydMBQ7RNkX">另有 30 处 <code data-page-node-id="76w4F1SevLO3IqnPxBMjKT">panic!</code> 经核验<span class="ok" data-page-node-id="MYifw2e4Qiuoj9TuxlUyq7">全部位于测试代码内</span>；<b data-page-node-id="BQc6BQoR7Of5NOcgVBOZae">零 <code data-page-node-id="fQOequ2oj5Z5oBuV6W7KTC">unsafe</code> 块</b></li>
+        <li data-page-node-id="ah3lH7s1NECCyn7KHkCmkR"><code data-page-node-id="DxmMbwwmLzSptGnc7pVdBi">limits.rs</code> 11 项资源上限（单条目 128MiB / 总量 512MiB / XML 深度 256 / 节点 200 万 / 网格 400 万）</li>
+        <li data-page-node-id="aftfFwj0aV2FAus6ufRrUk">zip bomb 防护<b data-page-node-id="vf1YKfPDNZ3DTc7HDQDMic">写法正确</b>（<code data-page-node-id="gdN27k3yBnyEZqpg4wAfEm">archive.rs:55-85</code>）：先验声明 size → 再用 <code data-page-node-id="zEKZBzXhGdvrZfH0y7lsXL">take(cap+1)</code> 硬帽读取 → 比对实际字节，不信任声明值</li>
+      </ul>
+    </div>
+    <div data-page-node-id="UZd4xxTY0i0Pd0q4AX9eSL">
+      <h4 data-page-node-id="0HxU8HocdL27GbWbK7eAEb">工程缺口（v3.3 已关）</h4>
+      <ul data-page-node-id="hlcGKfIf4fdnvhjbrdrb6H">
+        <li data-page-node-id="FWMBWPBtM48pYTGWBhfQuq"><span class="b b-v">CLOSED</span> <b data-page-node-id="m1T8TDkE9QaPNnLlFDSWcs">CI 已加 <code>cargo test</code></b> —— 本地实测 <span class="ok">286 passed</span>（<code>.github/workflows/ci.yml</code> native-build）</li>
+        <li data-page-node-id="1SKtH43jxXKVfHeJahzqrp"><span class="b b-v">CLOSED</span> <b data-page-node-id="EQXTYFp6fldWxoMEF67t9M">FFI panic 已兜底</b>：捕获 <code>BaseException</code>，映射 <code>PanicException</code> → <code>AnydocFallback(code=panic)</code></li>
+        <li data-page-node-id="SLSNzgXAmIhG8uDTBMwwe5"><span class="b b-v">CLOSED</span> <code>UPSTREAM_REV</code> 已钉 <code>SHA=42bf1c5ecdde9eb0d96d6bd75a9e6698cf93b14c</code>（tag v0.2.4）</li>
+      </ul>
+    </div>
+  </div>
+  <div class="co co-g" data-page-node-id="va4tPEtFyESPOpVosDJyxF">
+    <div class="co-t" data-page-node-id="GRC0klGNXVdF3PqjIXxHni">✓ 真实增益判定：净增益且幅度大</div>
+    <p style="margin-bottom:0" data-page-node-id="cr6ZvEe33C9KWKDmhDxeov">Python 侧 DOCX/XLS/PPT/ODS/XLSB/XLS 全部依赖 docling或直接缺失；anydoc 提供纯 Rust、无 ML、无网络、无 LibreOffice 的解析，且 <code data-page-node-id="27b9R9pgmb0cDP2FKLGfBJ">xls/xlsb/ods/odp/ppt/pps/pot/docm/pptm</code> <b data-page-node-id="GJUU6EGmnWknpcpQXN0KyV">9 个格式只能由它读</b>。<b data-page-node-id="eT6XyqkKncuoDZ4wjzPwla">它更弱的地方</b>：PDF（无文档模型，只能 Markdown 直出）；xlsx 被有意排除在默认接管范围外（保留 native 做 header-row 推断，属合理设计）。</p>
+  </div>
+</section>
+
+<!-- ══════════ §3 P0 缺陷 ══════════ -->
+<section data-page-node-id="lcE1NnGxn8UbKjvXXI2bH2">
+  <h2 data-page-node-id="rb39ldzdC8DUwTpND38GxD"><span class="idx" data-page-node-id="YUdjuJNkMJwg4dmVHPeqMS">§3</span>P0 缺陷清单（阻断发布）</h2>
+  <p class="lead" data-page-node-id="KHaU3FcgzkQkQbi6DNDAFD">12 项。其中 9 项由本人实机复现，3 项经代码核验定位到确切行号。</p>
+
+  <!-- P0-01 -->
+  <div class="def" data-page-node-id="h964CEyFMdkJidPaHqiNWT">
+    <div class="def-h" data-page-node-id="uTcrXAmg8iji28ZleF4z0K"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="OH6UQkT2AECAQAJSMWC9Lt">CORE-01</span><span class="def-t" data-page-node-id="AakKS3fZWrQbEDeyYplyYX">流式分块器不感知块级结构 → 生产默认路径静默数据损毁</span><span class="b b-v">✓ v3.2 已修 · 围栏文档回落单块</span></div>
+    <div class="def-b" data-page-node-id="N0NdN85ZjdjI493WmrZct6">
+      <div class="def-meta" data-page-node-id="VrbbQ17MNzoFdDcb3JveqZ">
+        <div data-page-node-id="W1jQ3ltk1WwdrvLIELf6HK"><span data-page-node-id="JAjNga9dPOUzwxhoRyrAbp">位置</span><code data-page-node-id="PlCueaJBeGVCr2KWJP6Cf9">app/core/stream_convert.py:118-137</code></div>
+        <div data-page-node-id="yMrsIzKgG3IAWixjNqKas7"><span data-page-node-id="LxWYpBF4UB1k1A234rCmxe">触发条件</span><code data-page-node-id="MUs678NhF4AsY6e3yKecjL">stream_convert=True</code>（默认）+ <code data-page-node-id="1Bs2kKwyjfWSUgJ78sJOht">≥256KB</code> + md/txt/html 源</div>
+        <div data-page-node-id="hZGgqZu89zdjkCh7hepwZz"><span data-page-node-id="53Y2v3VdIYYdO2IHSEKOMb">实测损失</span><b style="color:var(--red)" data-page-node-id="9iZtOe61LfD5fwuO2FFzGI">4,000 行代码 → 1,030 行（丢失 74%）</b></div>
+      </div>
+<pre data-page-node-id="PxyBFS4qqletr4WpqoJA9w"><span class="cm" data-page-node-id="Vz0kwIeeGULysupgjOGEaX"># 分块器只在窗口内找 "\n\n"，完全不感知 ``` 围栏、缩进代码块、表格、列表、HTML 块、front-matter</span>
+<span class="kw" data-page-node-id="7JoQDh9dxzfVZGebO4Zjb4">if</span> end &lt; n:
+<span class="hl" data-page-node-id="lBroFT8A4lDE3hAPhV3pPC">    br = text.rfind("\n\n", start + size // 2, end)</span>
+    <span class="kw" data-page-node-id="aaRB9LfJaBZRuFnp1fhbjd">if</span> br != -1: end = br + 2</pre>
+      <p data-page-node-id="Jk8Glx2bLrJKhmMdOASz67"><b data-page-node-id="2Fr96HDksDLinj5ikmt20l">实测对拍</b>（466,683 字节 MD → TXT，关闭缓存隔离变量）：</p>
+<pre data-page-node-id="9OZRHRUh4DUK5YNDi7poy3">[流式ON ] len=454808  code行=1030  bullet=5999
+[流式OFF] len=466670  code行=4000  bullet=6000
+<span class="er" data-page-node-id="CzyTsYl6D6sJNoS1nlFJPM">>>> 长度差 11862 字节 (2.54%) | 代码行差 2970 | bullet差 1
+--- diff 样本 ---
+-  - bullet item number 1002 with some padding text
++  - bullet ite
++
++  m number 1002 with some padding text</span></pre>
+      <p data-page-node-id="sexxPlNsAAXVvgkwyLHcoi"><b data-page-node-id="Ns4BEn9OoxVVdz5lwFTxb9">连带发现</b>：首次对拍出现"两次输出完全一致"的假阴性，根因是 <code data-page-node-id="sGmRx4I4Yzkqu0LUHPFEsQ">converter.py:349-365</code> 的缓存键 <code data-page-node-id="h5fVBRtAHHo0yOdYKzgezS">extra</code> 不含 <code data-page-node-id="vfX77i1NxtHpKHDIYNuogK">stream_convert</code> —— 开关切换后 TTL 内仍返回旧通道产物。<span class="b b-v" data-page-node-id="WFhFqVW6CqWEnuth7HiCe0">🔬 实测反证</span></p>
+      <div class="fix" data-page-node-id="ddjaSosJAM7zCXA0EvACz9"><b data-page-node-id="FCDDSiHr2yfHmbKO7CGk6e">✓ 已落地（v3.2）</b>①改为状态机分块，维护 <code data-page-node-id="i2OHFzRpXh57OCF2D3GjIm">in_fence / fence_char / fence_indent / in_html_block / table_pipe_state</code>，找不到安全边界时把 <code data-page-node-id="GFgukWeJCdDFYS7MLFWwgx">end</code> 推进到下一个顶层块边界；②<b data-page-node-id="zUVMKZmwuTZe37BlmKmRuh">最小止血</b>：对含 <code data-page-node-id="svh4PAxbnMSD8FRvxAynP4">```</code> 的文档强制回落模型通道；③<code data-page-node-id="sXW3gT3wCgy8iXilX9NM8F">convert_streaming(..., **export_opts)</code> 透传导出参数（当前 ≥256KB 时 <code data-page-node-id="Sx47HbFfxk7SdlvDGwuPuO">pdf_page_size/docx_theme/pdf_toc</code> 等全部静默失效）；④缓存 <code data-page-node-id="as7FHpplKBWp7pOb9rVJ6m">extra</code> 追加 <code data-page-node-id="FJdLRCee8bG1913hYlGVZa">sv=/fm=</code> 字段。</div>
+    </div>
+  </div>
+
+  <!-- P0-02 -->
+  <div class="def" data-page-node-id="8f15EJlTskZVpKby4uVECu">
+    <div class="def-h" data-page-node-id="29BKGnu2v28eKxiTWPC6Do"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="PAUThtSHrafEAtsx9T3Rjj">SEC-01</span><span class="def-t" data-page-node-id="CdcEd3eP3V7LIpfyGVjsyt">默认零认证 —— 全部 API 裸奔</span><span class="b b-v">✓ v3.2 已修 · require_auth + CORS 外置 + OPTIONS</span></div>
+    <div class="def-b" data-page-node-id="RryJwZz1C8b5jUSVFlPZ2w">
+      <div class="def-meta" data-page-node-id="wXRZhKu71bCFQQHRRhaGyC">
+        <div data-page-node-id="3UyyBqZxIQKUVMTp1msBjJ"><span data-page-node-id="QI6dMVLGQqDM1p0EookEcc">位置</span><code data-page-node-id="e9FCmsQAJqZz9fEKkpCkbp">app/api/auth.py:66-72</code></div>
+        <div data-page-node-id="6ZRgufx0ifUJtGiIITCtOC"><span data-page-node-id="tI2FES9MW4QRYGAw8cm2OD">配置</span><code data-page-node-id="hb43xgJPc6kEbmsxrWN5aN">api_key="" / api_keys="" / basic_auth=""</code></div>
+        <div data-page-node-id="WN0CEPFRqPP8DWTmQt8EUv"><span data-page-node-id="dojvHWDAs45LKT6J12e4GE">暴露面</span><b style="color:var(--red)" data-page-node-id="RBjO8qUHb7koPySEUiyEct">100%</b></div>
+      </div>
+<pre data-page-node-id="4t7rMI5Y8MxVtutH6HcP75"><span class="kw" data-page-node-id="8nTgBVbDOvNnv6SI1esEaz">if not</span> keys_on <span class="kw" data-page-node-id="DNrxw2eGfKAtGHKxZGVp97">and not</span> basic:
+    request.state.tenant_id = <span class="kw" data-page-node-id="v9CBRYGnoXjHzUDpSBs8ht">None</span>
+    request.state.api_key_id = <span class="kw" data-page-node-id="EsCGA1IU9OxrHC7e0IqApA">None</span>
+    set_request_context(tenant_id=<span class="kw" data-page-node-id="uqzE1v86YL0HXT8S1n5SkT">None</span>, client=<span class="st" data-page-node-id="noauRFn9uc1uCqE8WP0VMP">""</span>)
+<span class="hl" data-page-node-id="Po76chBcGnbX0yxtzK5MRZ">    <span class="kw" data-page-node-id="uAd7oTZvDn70jyjPbQI3Md">return await</span> call_next(request)   <span class="cm" data-page-node-id="Qp14bgXRVjlBXIk2ZH8XtU"># 直接放行，无任何告警</span></span></pre>
+      <p data-page-node-id="XyjsLXhQtJh22uEZKoDEKs">实测确认三项凭据均为空字符串。攻击路径：<code data-page-node-id="fMEB61cUeYNG32ZmOWOnKf">curl -F file=@合同.docx -F target_format=md http://host:8000/api/convert</code> 无需凭据。唯一缓解是 compose 绑定 <code data-page-node-id="UnwxuzP2G3RFVVX5omHsYo">127.0.0.1</code>，但 README 明写 <code data-page-node-id="lUI8C3jMPffGPPzkBifzJ9">--host 0.0.0.0</code>。</p>
+      <p data-page-node-id="uUuCFJTPdlH93A38sfnYxs"><b data-page-node-id="ehiG8HscsYDSoOcGXuefzN">结构性根因</b>：中间件注册顺序导致 CORS 在最内层，开启认证后浏览器预检 <code data-page-node-id="rOrQvmEnOvw4BLKakFC8ke">OPTIONS</code> 必被 401 拦截 → 官方前端完全不可用 → 形成"安全默认值被功能倒逼关闭"的死结。<span class="b b-p1" data-page-node-id="mqeoW7HtKWLFBrdYcMc8QZ">P1 前置依赖</span></p>
+      <div class="fix" data-page-node-id="HVyzFUrf7D7H8yrg6MtF8O"><b data-page-node-id="k1ctYiYkchKTTygp21daKk">✓ 已落地（v3.2）</b>①启动时若三项皆空且非 <code data-page-node-id="OmpMGhpt8KLO7B9CFCihLZ">MDBRIDGE_DEV_OK=1</code>，直接 <code data-page-node-id="SPBRvP47d4s3nFrrTAO3yy">sys.exit</code>；②<b data-page-node-id="nMNFHdic3jlHEXnBGmv94e">先修中间件顺序</b>（<code data-page-node-id="5VvGlph2nhn37koFJFr6gD">_public_path</code> 增加 <code data-page-node-id="2g2HbZHLNm6ICT4zDLG1kY">request.method == "OPTIONS"</code> 短路，或把 CORS 注册到最后）—— 否则 P0 修复会被业务方 revert。</div>
+    </div>
+  </div>
+
+  <!-- P0-03 -->
+  <div class="def" data-page-node-id="HEr8TxFtN5GYyXPzclQrDw">
+    <div class="def-h" data-page-node-id="MItT3mRur3f7FcF9JFK5r9"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="PaASaWgOET3J6vhBLFvSDH">SEC-02</span><span class="def-t" data-page-node-id="aNJzVxzK5kVg3EnVlIFvS1">跨租户任务越权读取（IDOR + 文档窃取）</span><span class="b b-v">✓ v3.2 已修 · to_dict 去 path/callback</span></div>
+    <div class="def-b" data-page-node-id="jGDBLdAVYt78rWyXSHhSWH">
+      <div class="def-meta" data-page-node-id="Aa27rB0Y4mBHzWkBelVB0n">
+        <div data-page-node-id="Wz7sg9k3P8t1LOscLRvRJV"><span data-page-node-id="Da1EBc9KDEFnCLCDlfrOHb">位置</span><code data-page-node-id="lawS5XPVuyEKvMsk0yJXEx">app/core/jobs.py:252-262</code> + <code data-page-node-id="VVc29FD5uxbCbc0rvUX6cF">api/routes.py:293-300</code></div>
+        <div data-page-node-id="hHmkaPEl7S7NDOZzQ77zbB"><span data-page-node-id="OHpVWQFNyLRwqQNN57LsFi">影响</span><b style="color:var(--red)" data-page-node-id="wihVFejEXQexLQ8ntj2OMt">企业部署下全量文档泄露</b></div>
+      </div>
+      <p data-page-node-id="dCcJk6b0GJ3H6arTRrbgDE"><b data-page-node-id="m7dCqhNE2K872QJBoUC6X3">两步攻击</b>：①<code data-page-node-id="N2Srz7SFVuQqDSTXPwoXDD">GET /api/jobs</code> 无凭据返回全部任务的 <code data-page-node-id="uSLUm7uRkVJNkKuGlhZGGN">id</code> + <code data-page-node-id="nruEe6iMS4NDIK7msAQUnq">filename</code>（文件名可泄露合同标题等商业情报）；②<code data-page-node-id="LKxaBbxLxc5RKGXFrCWOvf">GET /api/jobs/{id}/result</code> 下载他人转换后的<b data-page-node-id="dZb6N2fzjFhBbAegqdVjsX">完整文档正文</b>。任务 ID 虽为 <code data-page-node-id="OmoID9ZQPk479mgvdMskAb">uuid4</code> 不可枚举，但列表接口直接提供 ID，枚举防护被绕过。</p>
+      <div class="fix" data-page-node-id="pac2V5ZenFev9PxIai3zpx"><b data-page-node-id="SwmoSKSvDzQKrWRHNJaBqq">✓ 已落地（v3.2）</b><code data-page-node-id="uluRMCVYry0f0MKzH51NGs">GET /api/jobs</code> 强制认证；结果下载增加 per-job 随机 token 或一次性签名 URL；<code data-page-node-id="m4dFZpU5BahbKoIGpFPNOE">to_dict()</code> 对外移除 <code data-page-node-id="cfCqZQvWw57ocbANdM93yT">result_path</code>（服务端绝对路径）与 <code data-page-node-id="ZrgNPg3fEqJrBGQw3W2vdx">callback_url</code>（内网地址）。</div>
+    </div>
+  </div>
+
+  <!-- P0-04 -->
+  <div class="def" data-page-node-id="1BQHWZHBfEeL8uxMUHT9Mw">
+    <div class="def-h" data-page-node-id="SPk3IycgeYLAlYAgMw8Hni"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="WbQ1tKwKAeHdfC0BTVFpI0">SEC-03</span><span class="def-t" data-page-node-id="R1H0E693HEaU6kbBA3a1MS">Webhook SSRF —— 可打云元数据与内网</span><span class="b b-v">✓ v3.2 已修 · is_safe_url</span></div>
+    <div class="def-b" data-page-node-id="2tUSRCASfGKf4tEU6sCDl6">
+      <div class="def-meta" data-page-node-id="Y7gLg23sMBakatVI5R2snr">
+        <div data-page-node-id="kuLm2VfiDBvSMc01ZZ0orn"><span data-page-node-id="ZmGER9r1LZFL17X9O4CPmq">位置</span><code data-page-node-id="WoqlupERP8LLKvM4ERgpMW">app/core/webhooks.py:16-26</code></div>
+        <div data-page-node-id="HCBGBkf3VWmnEDgkeNqV8I"><span data-page-node-id="lDF8iKBKLMqxdnI7wTkgDM">默认</span><code data-page-node-id="mAg2vvYUinDlj34Y9BDaGz">webhook_enabled=True</code></div>
+        <div data-page-node-id="V8RKr9Gzf28DlzprUdqSlz"><span data-page-node-id="sMHUZylQJ31hu8qT04gd6G">触发</span><code data-page-node-id="YAWim5c6FsPutvOoj5qIND">POST /api/jobs</code> + <code data-page-node-id="2sVZHJbVme2WLpPRdUbpv9">callback_url</code></div>
+      </div>
+<pre data-page-node-id="Bs10jMzzFjpzHd8bY5Fac3"><span class="kw" data-page-node-id="DzsCEwa16INCpo7gZGxb2U">if</span> parsed.scheme <span class="kw" data-page-node-id="Xk0cQTapbAhI2onGcYYADr">not in</span> (<span class="st" data-page-node-id="eqE0l6yo8NGMXlI0tZr5R7">"http"</span>, <span class="st" data-page-node-id="wW6xVZ7qifjqvlpgAxxwLk">"https"</span>): <span class="kw" data-page-node-id="vIkAEoTJUgKqSd3GtOX83k">raise</span>
+<span class="kw" data-page-node-id="0YcpKMjUELlewj4TXpggf1">if not</span> parsed.netloc: <span class="kw" data-page-node-id="sIFr9YKAVXNRfEVctYRB0g">raise</span>
+<span class="hl" data-page-node-id="LZsgPJtji0b1HnRw9rTAxS"><span class="kw" data-page-node-id="yOvkkoZsfqZCZqK5TI2X2V">return</span> raw   <span class="cm" data-page-node-id="EVRrwKVB7z646UnsOxHnE0"># 无任何 IP 校验 —— 项目自己已有 safe_fetch.is_safe_url 却未复用</span></span></pre>
+      <p data-page-node-id="pURrIcWeOiFsNSuECf8VkN">全仓 grep 确认：<code data-page-node-id="2Cn3QMI8gXq0iv6O9stfWV">safe_fetch.is_safe_url</code> 仅被 <code data-page-node-id="Zte2Cjid5nPDibTbPIrHBT">fetch_bytes</code> 调用一次，webhook 路径未调用。可 POST 到 <code data-page-node-id="OEAzaCJDcALf6ALCShYhhx">http://169.254.169.254/latest/meta-data/iam/security-credentials/</code> 与内网管理端口。<code data-page-node-id="4gzapMoUz3DxB0I5pgOLWK">follow_redirects=False</code> 只挡了重定向，没挡直连内网。</p>
+      <div class="fix" data-page-node-id="lNuHZs7elC0uXs0cNReqW7"><b data-page-node-id="IM4qeBGPuE9YbMfca4Tjgy">✓ 已落地（v3.2）</b><code data-page-node-id="dqIc9T2I7841G3R505NtTT">validate_callback_url</code> 内强制调用 <code data-page-node-id="4eboEGGLzVUYUYuXk3DhCL">is_safe_url(url)</code>；增加域名白名单；拒绝非 80/443 端口；保持 <code data-page-node-id="Ky7AQTJ6WgT8GCixrUVG8D">follow_redirects=False</code> 并丢弃响应体。</div>
+    </div>
+  </div>
+
+  <!-- P0-05 -->
+  <div class="def" data-page-node-id="pHIeU3dBgTs2PdAnCnD8x0">
+    <div class="def-h" data-page-node-id="Z1n9uY5hTGcLsiAVCtzFHH"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="4pGpvlE5yhPMSSVbZT9goK">SEC-04</span><span class="def-t" data-page-node-id="CKUEdwllwq9sNRwvu5Yn0M">safe_fetch 三重绕过：重定向 / IPv4-mapped / 网段缺失</span><span class="b b-v">✓ v3.2 已修 · 白名单+禁重定向</span></div>
+    <div class="def-b" data-page-node-id="lHX0BB6DQN1b5t7U2v65ww">
+      <div class="def-meta" data-page-node-id="rSIPzkrXVkqFcdSQ1bF70T">
+        <div data-page-node-id="VvQb9muFjOMmn07dSKYRlD"><span data-page-node-id="zF1Fl1RQj0nGrElFjK3PO6">位置</span><code data-page-node-id="OgQMdV91YofD73vYCn7RaJ">app/core/safe_fetch.py:40-49, 64-73</code></div>
+        <div data-page-node-id="j6uXeV1ZBTJF4pBGTDvSwq"><span data-page-node-id="3pl66KZUjlulgXpyw2obtd">默认</span><code data-page-node-id="0QapmT18guxJyKBP9jRHdu">fetch_remote_images=True</code></div>
+        <div data-page-node-id="rlm3At4QRxHre0DllazfHQ"><span data-page-node-id="OUc1H5IRB7GfGKA8igcDue">类型</span><b style="color:var(--red)" data-page-node-id="c2i6gefTYVWUrwVAAbdCTP">回显型 SSRF</b></div>
+      </div>
+      <p data-page-node-id="sJ4yhL7FhYFnKmEQ6V4uU7"><b data-page-node-id="g1pXC3WxABcL4gBSq5nwzO">① DNS rebinding / 302 绕过</b>：<code data-page-node-id="x8HY1zOOduJxFybuzESqPl">is_safe_url</code> 解析一次 DNS，<code data-page-node-id="aaV97JUkpULWIGHXoK2syf">urlopen</code> 重新解析，未禁用重定向。<b data-page-node-id="XLVasEQGgJqmeLA2DVDuvB">② IPv4-mapped IPv6 绕过</b>（实测）：</p>
+<pre data-page-node-id="qPrADFfhxkTx8zmA8Z1xMs"><span class="er" data-page-node-id="yU9bZ31dDglGeYztgBv1e4">::ffff:127.0.0.1        -> ALLOWED
+::ffff:169.254.169.254  -> ALLOWED
+::ffff:10.0.0.1         -> ALLOWED
+::                      -> ALLOWED
+100.64.0.1 (CGN)        -> ALLOWED</span>
+<span class="st" data-page-node-id="B7R9qWEGWUEUFdxpzEW1Tf">127.0.0.1 / 0.0.0.0 / fd00::1 -> BLOCKED</span></pre>
+      <p data-page-node-id="JoZUbrseLvVqoI2mqeQ33H">文档中嵌一个外链图片即可触发（<code data-page-node-id="Wy54M3optAR3e1taw7Hc9v">![x](http://attacker.tld/r)</code>）。<b data-page-node-id="k0gQUr95fHpTpw8JjOX9bH">回显型</b>：响应体作为 <code data-page-node-id="WR57E39RtjOYjic6Cvtofe">Image.data</code> 嵌入导出文档，可把内网响应带回给攻击者。</p>
+      <div class="fix" data-page-node-id="YHq5UCEoAUmhiHS2TH607I"><b data-page-node-id="IeXyeLKfc68ReQcmXJNFME">✓ 已落地（v3.2）</b>①解析后归一化 <code data-page-node-id="LV3wUa6m4lUZbeNT0wjK2j">if ip.version==6 and ip.ipv4_mapped: ip = ip.ipv4_mapped</code>；②补齐 <code data-page-node-id="IgfzTZxWHbwGx19oEVCeiw">100.64.0.0/10</code> / <code data-page-node-id="nqwwutd8NMTZufvjA49pJ4">::/128</code> / <code data-page-node-id="fLjfFDYwBNV8O08D3TRhvw">192.0.0.0/24</code> / <code data-page-node-id="LYx6w7LHnPz3DYAQVBj2B4">198.18.0.0/15</code> / <code data-page-node-id="mXF1pmfBPv5JrSPyVTjEO7">::ffff:0:0/96</code>；③改为<b data-page-node-id="sFNsMw8rwNNOL0mDI93DNS">白名单式</b>（非公网即拒）；④自定义 <code data-page-node-id="lrF8DWRQQ2eMWeTixk3Hd9">HTTPRedirectHandler</code> 禁用重定向或对每次重定向目标重新校验。</div>
+    </div>
+  </div>
+
+  <!-- P0-06 -->
+  <div class="def" data-page-node-id="9zjaCtJrXHQMgnZC6fB9Bk">
+    <div class="def-h" data-page-node-id="xzSGIz7AcA6KUBHmh6eCtV"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="sk0mXzBxfpfibayHgvSRr8">EXP-01</span><span class="def-t" data-page-node-id="PIf8ewCxvaOKtwqMXFj6GI">CSV 导出零公式注入防护（企业场景高危）</span><span class="b b-v">✓ v3.2 已修 · 公式前缀中和</span></div>
+    <div class="def-b" data-page-node-id="rw1YalU0YBLbUg7NhLu7QD">
+      <div class="def-meta" data-page-node-id="56miZ4n1KAclFLLEOIdCEw">
+        <div data-page-node-id="VmY1pNGQhli5zultv7sTAR"><span data-page-node-id="MncCjTU5WT5uwpBOgjzrbT">位置</span><code data-page-node-id="3xlnRPH8VWkSf73dzoGgMP">app/exporters/csv_exporter.py:26</code></div>
+        <div data-page-node-id="VBhKugOfPHO1sMSknIDrCy"><span data-page-node-id="jGXM9FYRbpySBayoaHorVa">危害</span>Excel/Sheets/LibreOffice 打开即执行</div>
+      </div>
+<pre data-page-node-id="iKNm4GfqXxhALCzHF3C0ha">writer.writerow([str(c) <span class="kw" data-page-node-id="89O0pv79nY1pwIFpXQBrZy">if</span> c <span class="kw" data-page-node-id="7KwkrCDJfR0qljx8WHpoBL">is not None else</span> <span class="st" data-page-node-id="hacbMoMHORmTPCy9OYX31f">""</span> <span class="kw" data-page-node-id="8RT0UhJeXptzOLc6rFatX4">for</span> c <span class="kw" data-page-node-id="WEXeQCka2DR1Y1VMXKwglT">in</span> row])
+<span class="er" data-page-node-id="FPRpLN3kOcEjAP1wfbw76D">实测输出: 'Alice,=cmd|\'/c calc\'!A0\r\nBob,+1\r\nCathy,@SUM(A1)\r\nD,-1\r\nE,\t=1\r\n'</span></pre>
+      <p data-page-node-id="qsHSluPEKaIWkfmdEeb56l"><code data-page-node-id="UyKTNniEvYa5BTzkv5PnU1">= + - @ TAB CR</code> 六种危险前缀<span class="hl-txt" data-page-node-id="MQfWgiB2T9IO1JcKs4suQr">全部原样落盘</span>，无任何中和处理。</p>
+      <div class="fix" data-page-node-id="sAMLKGB4HKSBLGcor8Ll5f"><b data-page-node-id="m4fvRcRbLg250pJC8QjLBH">✓ 已落地（v3.2）</b>对以 <code data-page-node-id="oqbqrBTNanX7V4uACx56Eo">= + - @ \t \r</code> 开头的字段前置单引号并整体加引号，或改用 <code data-page-node-id="WSxVfLvu4NL0vutAwgGB3U">="'value"</code> 形式强制文本类型。OWASP 标准缓解。</div>
+    </div>
+  </div>
+
+  <!-- P0-07 -->
+  <div class="def" data-page-node-id="xgVYLPN4tqksw9mjHxCffI">
+    <div class="def-h" data-page-node-id="eXeZqe3DqI6oL1JkNFlIDG"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="66W4UjKF9tsDBiKsDlAbtj">EXP-02</span><span class="def-t" data-page-node-id="CRMoxyduXOKPZSLA7lvunX">HTML 导出 XSS：黑名单形同虚设（3 个向量实测全通）</span><span class="b b-v">✓ v3.2 已修 · 白名单 sanitize</span></div>
+    <div class="def-b" data-page-node-id="sY4Qb04gc4X1gQmTBsO3Fn">
+      <div class="def-meta" data-page-node-id="iSPBqQNkRhN2JG0YVkcRYw">
+        <div data-page-node-id="SD45JO0gnM9AkJRSpW36n3"><span data-page-node-id="lt0w31ecT53dVQkbNdHoDu">位置</span><code data-page-node-id="SyaJzMXhArMk6jWyhobzhP">app/exporters/html_render.py:158</code> 与 <code data-page-node-id="T6JK0D2BwQVLPzAiAJaT9z">:97</code></div>
+        <div data-page-node-id="QongY5coUlZ0BiiAAOJW9V"><span data-page-node-id="2APmQGlcu54vihgupKzrvA">可达路径</span>JSON 导入 / XLSX 导入（均不净化）</div>
+      </div>
+<pre data-page-node-id="hBt0NTSYCE9BSj13uNQO3S"><span class="cm" data-page-node-id="MI9G4RaFBxuhxE4vuI4uci"># :158 —— 只替换小写 &lt;script 和 &lt;iframe</span>
+safe = node.content.replace(<span class="st" data-page-node-id="4dehfQQVI6cOwTQvspcGqu">"&lt;script"</span>, <span class="st" data-page-node-id="BWgjwyXPBtP85ChvpJNg0I">"&lt;script"</span>).replace(<span class="st" data-page-node-id="uH4zTAK3E15cSCbYyHicpR">"&lt;iframe"</span>, <span class="st" data-page-node-id="Jh9fBeQbyONsIQ1EiB02XC">"&lt;iframe"</span>)
+
+<span class="cm" data-page-node-id="DRfVwWgESbLRKJ4NVh7D9m"># :97 —— Image.mime_type 未转义直接进属性</span>
+f<span class="st" data-page-node-id="OsYoQzV50BG3KoVN6FRIlD">"&lt;img src='data:</span>{node.mime_type}<span class="st" data-page-node-id="TP4W1p55vkCV26waZCYCLy">;base64,{b64}' alt='{alt}'{wrap_style}/&gt;"</span>
+
+<span class="er" data-page-node-id="OrajTNOHGqHGl7aMaEz62b">实测:
+  &lt;img src=x onerror=alert(1)&gt;  -> 逃逸 True
+  &lt;svg onload=alert(2)&gt;         -> 逃逸 True
+  &lt;SCRIPT&gt;alert(3)&lt;/SCRIPT&gt;     -> 逃逸 True
+  mime_type 属性注入 onerror    -> 逃逸 True</span></pre>
+      <p data-page-node-id="x1tJACChma6AeoGWhflXNC">攻击者完全可控：上传 xlsx 的单元格可直接写入 <code data-page-node-id="gMMVdi30quxenNVod4zCk9">mime_type</code>。<code data-page-node-id="D6LT7jDP9sDo9XuolDNzKl">md_importer</code> 侧有白名单净化器 <code data-page-node-id="Y6nJT1fG6aGdYOuB3EkhGH">_sanitize_html_fragment</code>，Markdown 入口相对安全；<b data-page-node-id="lasknsGscT9tXYS3jE8BAy">缺口在 JSON 与 XLSX 两条导入路径</b>。</p>
+      <div class="fix" data-page-node-id="NWdGLfmD4OCKAV65e2cycU"><b data-page-node-id="jpAXmo2zdH560tf7ysGfTN">✓ 已落地（v3.2）</b>①改用 <code data-page-node-id="HMudMBugJW7H3LlEd0FR9X">bleach</code>/<code data-page-node-id="Afupke1uvEaOhOTPSfEnL5">nh3</code> 白名单，或复用 <code data-page-node-id="47rgbNaKtEwSWUOnOLDjBE">md_importer._sanitize_html_fragment</code>；②<code data-page-node-id="y5acclcY2aNnxQ9VyCanNn">html.escape(node.mime_type, quote=True)</code> + 正则白名单 <code data-page-node-id="XmYhKNFzAjtFU3AlN29cmS">^[\w.+-]+/[\w.+-]+$</code>。</div>
+    </div>
+  </div>
+
+  <!-- P0-08 -->
+  <div class="def" data-page-node-id="p1ypW7Ijn1kZyWbFVQcoDv">
+    <div class="def-h" data-page-node-id="hopywXayDSku0EMHG7NIZS"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="IaCthntvXVyzXH4NwSRR7H">IMP-01</span><span class="def-t" data-page-node-id="HRyeXoxzeXpZbpFa2hwZBn">EPUB 字体去混淆必崩 IndexError + 算法违反 IDPF 规范</span><span class="b b-v">✓ v3.2 已修 · SHA1+1040</span></div>
+    <div class="def-b" data-page-node-id="sti0Jcr6NQDWNJD2gaf6J5">
+      <div class="def-meta" data-page-node-id="V9BB3CGRu8dWKgUdoYxYXi">
+        <div data-page-node-id="O804LlFvo9fv1PnPM9bHKt"><span data-page-node-id="vXCr33EN5CLtyWRGp18a5r">位置</span><code data-page-node-id="qpA5YjsOZkB6xBqfzocmHX">app/importers/epub_text.py:168-173</code></div>
+        <div data-page-node-id="xvq6PHxVfHfgkGvXfREVvs"><span data-page-node-id="rctUe8aJQfReKrNowUpwtH">实测</span><b style="color:var(--red)" data-page-node-id="MxTNrWtqZLcHWebRYRhHf6">len=20/100/1040 全部 IndexError</b></div>
+      </div>
+<pre data-page-node-id="4OFbqPO4edl8ghxqpK4rKJ">key = uuid.UUID(epub_id).bytes[:20]   <span class="cm" data-page-node-id="XP6YfNbzEB4Xx3s9EuD0mv"># UUID.bytes 只有 16 字节！</span>
+<span class="kw" data-page-node-id="2T1D5FMAjuqWn58fDwJvpg">for</span> i <span class="kw" data-page-node-id="mhxHybKdDU3InWtUiAvvZ3">in</span> range(min(20, len(out))):
+<span class="hl" data-page-node-id="rbfl0igKbu9eER2FZEepjP">    out[i] ^= key[i]                  <span class="cm" data-page-node-id="YcQOQcOLj9BndYMzy7e1b0"># i>=16 必越界</span></span></pre>
+      <p data-page-node-id="KebfNt48rKAYrNiMRz4uNz"><b data-page-node-id="cWcnL37YqTZoSPhki1b2nq">双重缺陷</b>：①必崩；②算法本身也错 —— IDPF 规范密钥是 <code data-page-node-id="GFP2CekEYOlaL5PIy4IMsS">SHA1(identifier)</code> 的 20 字节、混淆前 <b data-page-node-id="yMK755kh8UqDZaS6PUYnOe">1040</b> 字节，此处用 UUID 前 16 字节、只 XOR 20 字节。触发条件：EPUB 含 <code data-page-node-id="Ox75Mzw1KEkxiaQqMQQhLM">META-INF/encryption.xml</code> 且声明 IDPF 字体混淆、identifier 是合法 UUID。调用链无 try/except → 直接 500。</p>
+      <div class="fix" data-page-node-id="q8HnCiAsMXat4JIfeSYZKU"><b data-page-node-id="y2CSaezfzCZBvLEncA2O6U">✓ 已落地（v3.2）</b><code data-page-node-id="0N30sdFgeKveOg7uzn2ZB0">key = hashlib.sha1(epub_id.encode()).digest()</code>（20B），循环 <code data-page-node-id="0jNSG6tu9QhztRJEYMFaXh">range(min(1040, len(out)))</code> 用 <code data-page-node-id="JJthdLBZCXv9aKNmIJirQL">key[i % 20]</code>，整体包 try/except。</div>
+    </div>
+  </div>
+
+  <!-- P0-09 -->
+  <div class="def" data-page-node-id="aRQDACraVUFZSRyDL0NIoW">
+    <div class="def-h" data-page-node-id="XqAPj13V90v9z2s2UMND2M"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="S8HVdR9ZZRqFZNxrZb8HPG">IMP-02</span><span class="def-t" data-page-node-id="VaUokjD2N8SLz9D81aWcVR">Markdown 预处理器摧毁代码块（两处独立缺陷）</span><span class="b b-v">✓ v3.2 已修 · 围栏外替换</span></div>
+    <div class="def-b" data-page-node-id="ukmLcqgdLUmEGNV7BpRMXF">
+      <div class="def-meta" data-page-node-id="y97moAO0T3QBIEBCFxf6i8">
+        <div data-page-node-id="eo4MYaVzFZq6SEE5UaR2BJ"><span data-page-node-id="pn0VRD0pQUqUN6pyaBL7HD">位置</span><code data-page-node-id="9IrHjapcMHBL4NS1EUvSGN">app/importers/md_importer.py:233-238</code> 与 <code data-page-node-id="DzC0YTjLhFpRg5xXdlUECE">:223-230</code></div>
+        <div data-page-node-id="ODIaEefHVDpgeuhgAO2Sjo"><span data-page-node-id="dLRjGM0mQJqUzsR4aHRglz">性质</span>输入驱动的确定性数据损毁</div>
+      </div>
+      <p data-page-node-id="SbV856cX8ZwkK0gwnR8wKJ"><b data-page-node-id="hxojuXg5MXLe9KRGQhoLlA">① <code data-page-node-id="ZcItsODBL4T0UwqlrIkH0W">_protect_display_math</code> 不识别代码块上下文</b>，把 <code data-page-node-id="MxR7o5VFPsP6xIG0R0eCTD">$$</code> 改写成 <code data-page-node-id="1PYTCmpRkvEIAKeuzlYmc3">```math</code> 围栏：</p>
+<pre data-page-node-id="7Z3Vu6O4casQtJDYhumDE9"><span class="cm" data-page-node-id="cCMQECVMcAgTzYkgAojYSN">输入:  ```python / cost = $$price$$ * 2 / print(cost) / ```</span>
+<span class="er" data-page-node-id="vR4knGPNRStJHlesQ6UHWG">实测产出:
+  CodeBlock('cost = \n```math\nprice')   <- 原代码被彻底截断
+  ListItem(RichText(text='2 print(cost)')) <- 凭空多出列表项
+  CodeBlock('')                          <- 幽灵空代码块</span></pre>
+      <p data-page-node-id="1ogbrYj4qQu7jBPXsCLXzl"><b data-page-node-id="t15UgrsOQJhkwTA2C1zcV8">② <code data-page-node-id="HxD8casNTb271LWDfTQUjK">_FOOTNOTE_DEF_RE</code> 同样在解析前全局 sub</b>：</p>
+<pre data-page-node-id="hBE6uumnmvfgC9DQ2hM28V"><span class="cm" data-page-node-id="nq7Jq7eSxUUbas0QGpLivf">输入:  ```text / [^1]: NOT a footnote / ```</span>
+<span class="er" data-page-node-id="kjGIKR1oeQfFFCGX4Gv1sA">实测产出:
+  CodeBlock('')                          <- 代码块内容变空，数据静默丢失
+  Footnote('NOT a footnote')             <- 幽灵脚注</span></pre>
+      <div class="fix" data-page-node-id="G8aVBhS8HJkqtUCuod3HAZ"><b data-page-node-id="3dGbP8cpnFnvAQZjKTF2zt">✓ 已落地（v3.2）</b>两者都改为 token 层处理：先用 markdown-it 的 <code data-page-node-id="fiSuRoAbufJo1zr0dCSXQ5">fence</code>/<code data-page-node-id="UrKvI5zXmKxZImDOll2sDU">code_block</code> token 定位代码块区间，仅在区间外做替换；或改用 markdown-it 的 <code data-page-node-id="4E5cSg4NCPBljMUjTdqkxT">math</code> / <code data-page-node-id="Wq1h2BAdXqstErkGanqDQH">footnote</code> 插件在 token 层原生处理。</div>
+    </div>
+  </div>
+
+  <!-- P0-10 -->
+  <div class="def" data-page-node-id="akGvbRnnfrbin8mkotrLTp">
+    <div class="def-h" data-page-node-id="DJXqZp27KbiuNiIoB9oTwc"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="kgKD1cyHTUBGxksPB9zrpX">EXP-03</span><span class="def-t" data-page-node-id="X0vjyRsEhdHL0xD4c2D8aE">DOCX 批注作者含引号 → 产出损坏文件</span><span class="b b-v">✓ v3.2 已修 · quoteattr</span></div>
+    <div class="def-b" data-page-node-id="2nxYXRzac9Woq8O8RUuiBE">
+      <div class="def-meta" data-page-node-id="UIgf9zlrULzWKy6IMWABJP">
+        <div data-page-node-id="A9Yc22oSrablQV7e5ytwH6"><span data-page-node-id="bPICNUxdD7FNoYOvGJG0IB">位置</span><code data-page-node-id="BClDeu3l5nCKVAH6uQbaDv">app/exporters/docx_comments.py:39,54</code></div>
+        <div data-page-node-id="4bSbToEGPTYIcdiBr7MK8h"><span data-page-node-id="Mu13o7uHJEfkJ5Ek16HsWY">默认</span><code data-page-node-id="Ml69n7s98RU9ySlvzQFwTR">docx_export_comments</code> 开启 → <b data-page-node-id="vzJZgYJ9RLtCsiMR6fIcDM">默认路径可达</b></div>
+      </div>
+<pre data-page-node-id="zDIjX8XBBY8k3NrUti6NRF">author = escape(c.author <span class="kw" data-page-node-id="1CDeSq3rgqtd3LzQUif1RI">or</span> <span class="st" data-page-node-id="73GVwm8J2N4co5oFKt78j0">"reviewer"</span>)   <span class="cm" data-page-node-id="RYTobvGVy8vKaczpbeeezM"># saxutils.escape 默认不转义引号</span>
+f<span class="st" data-page-node-id="hWVrbqZoOtJTiMlEiHZ0TX">'&lt;w:comment w:id="{cid}" w:author="</span>{author}<span class="st" data-page-node-id="vCcl2unFzCcJPPHhJl6oU7">" … w:initials="</span>{author[:2]}<span class="st" data-page-node-id="MS6c25eRkprkxsrdYoqHJf">"&gt;'</span>
+<span class="er" data-page-node-id="RlgktsH6zz1CSHr70rYz2Q">author='Bo"b'  ->  w:author="Bo"b"  ->  ET.fromstring: not well-formed
+                   Word 弹出「文件已损坏」修复框</span></pre>
+      <div class="fix" data-page-node-id="I3WQ4GZL3fK5hQWgDyqMUv"><b data-page-node-id="E9JtwO7S3xMlIwTkxOELnC">✓ 已落地（v3.2）</b>改用 <code data-page-node-id="EdcFUcPrC99WGYc1oGd0HW">xml.sax.saxutils.quoteattr()</code>，或写入前 <code data-page-node-id="vv7ilLHR1MSduDRdVWQ6FP">author.replace('"', "&amp;quot;")</code>。</div>
+    </div>
+  </div>
+
+  <!-- P0-11 -->
+  <div class="def" data-page-node-id="s7YimCG2K1WHWiwSafVw75">
+    <div class="def-h" data-page-node-id="bJMz4hfeKatREekGxADkYR"><span class="b b-v">CLOSED</span><span class="def-id" data-page-node-id="qblkNaK2ZWM8xPwoiVC4WK">CORE-02</span><span class="def-t" data-page-node-id="wqZQKCpTdCOKKwdATa7CY2">registry 并发初始化重复包装（冷启动竞态）</span><span class="b b-v">✓ v3.2 已修 · RLock+幂等</span></div>
+    <div class="def-b" data-page-node-id="ULWo6SGyuHNnrHzlkQDY8P">
+      <div class="def-meta" data-page-node-id="FShWLbIl0mJxE6cTcIquzH">
+        <div data-page-node-id="0LXfTro6f7CNuA5Kf0mCPj"><span data-page-node-id="FK2rywsryAOThCHAn2WBFy">位置</span><code data-page-node-id="UAFIH7FhpKMEJ469gCFRrL">app/core/registry.py:127-159</code> 与 <code data-page-node-id="MnINpw9AaD7AkAhcBKcD3R">:116-118</code></div>
+        <div data-page-node-id="vuFLABcqf6LdKw8urouoCD"><span data-page-node-id="f8GaogrDUx2gKLbt3T8FI0">实测</span><b style="color:var(--red)" data-page-node-id="cMDDUJXtT2GD47m9qW6CGz">32 线程对齐 → 包装 32 层</b></div>
+      </div>
+<pre data-page-node-id="OxFN7HzrPqVX43ufaQHoaV"><span class="er" data-page-node-id="Co4j0CYBVH4odjCzDuwjYg">attempt1: 包装层数=32  name_head=anydoc_or_anydoc_or_anydoc_or_anydoc_or_...
+attempt2: 包装层数=1
+attempt3: 包装层数=1</span></pre>
+      <p data-page-node-id="7qZRwIHX5wjPMTXPSQMcyb">守卫 <code data-page-node-id="RFaMec135GQSCmi23frx4X">issubset(...): return</code>（<code data-page-node-id="WCdkzEINUMr081kLGfmGcI">:158</code>）与实际注册 + <code data-page-node-id="lmNJgtALSBlJdDMi8TXSiU">_wire_anydoc()</code>（<code data-page-node-id="N5yJTNPiZixnYlGlAbwYJe">:310</code>）之间无锁，<code data-page-node-id="xGKGm25CBNm95HCGECCiSJ">_IMPORTERS.get → _anydoc_first → register_importer</code> 是典型 read-modify-write。后果：单次 docx 导入递归尝试 anydoc 32 次、<code data-page-node-id="QdQTab29up3up1I6F8aA0E">enrich_docx_model</code> 执行 32 次；层数随首次并发数无界增长且<b data-page-node-id="momrzYh3IbmSdH1IpyTVFX">永久固化</b>。仅在进程冷启动首次并发时触发（attempt2/3 因状态已固化未复现）。</p>
+      <div class="fix" data-page-node-id="JA1pmKv4XSkZAzmzdVvR8w"><b data-page-node-id="GvPHRDOb2f96Gdas7e0sN6">✓ 已落地（v3.2）</b>模块级 <code data-page-node-id="ClhbWuYguNHuwIhehBicBB">_REGISTRY_LOCK = threading.RLock()</code> 包住整个 <code data-page-node-id="YJfgXwFI9uCgZEV3BEFGX4">ensure_builtin_plugins</code>；<code data-page-node-id="mzmLbsuq88Qd5xvTwb6em4">_wire_anydoc</code> 加幂等标记 <code data-page-node-id="7GDL92YB2v2FVg2Cm7kHfI">if getattr(fn,"_anydoc_wired",False): continue</code>。</div>
+    </div>
+  </div>
+
+  <!-- P0-12 -->
+  <div class="def" data-page-node-id="WlzLvM2ybcKhTH57FP7j7x">
+    <div class="def-h" data-page-node-id="M6s1BopkGKag3HGPKsDwTO"><span class="b b-v" data-page-node-id="GeLMfz1WYhHCwgxtHtUuqx">CLOSED</span><span class="def-t" data-page-node-id="NGZbu0PkqQf6gn4cWGTeTz">PDF 静默降级 + 回退路径每行硬截断 110 字符</span><span class="b b-v" data-page-node-id="7gCY47IwdOjWZ6Bb13B3Ld">✓ v3.1 已修</span></div>
+    <div class="def-b" data-page-node-id="1ZC5RwHeNFkI3JqIfGFBAW">
+      <div class="def-meta" data-page-node-id="DynLIHt5G7qtwi93GNfeio">
+        <div data-page-node-id="5TxWSAUlX7SVR6TTygsJxN"><span data-page-node-id="OJfmGY0G24ac1crTDAbBDr">位置</span><code data-page-node-id="iCCtVOGvGjyBemZsZAyTVE">pdf_exporter.py:100-105</code> / <code data-page-node-id="8UE15WxmnPgeWyX8r8ZSLn">pdf_simple.py:352,525</code></div>
+        <div data-page-node-id="mHyh3AJwUoXitHpldswdwl"><span data-page-node-id="OMEVxeFChtoHxiGaMVW1nm">触发</span>WeasyPrint 缺 Pango（容器常见）</div>
+        <div data-page-node-id="GGaDaH2bAgZwuMlinuHIyP"><span data-page-node-id="jwIBTHgZPSdA1eSP6HZYZf">修订后保真度</span><b style="color:var(--grn)" data-page-node-id="OEUWnLmGmMUnJAMFEBYtGu">100%（v3.7 哨兵）</b></div>
+      </div>
+<pre data-page-node-id="eKCvWj7IJSplGSDlCWSL4O"><span class="kw" data-page-node-id="bXcyLXi0v837eUF5Qnmq5d">except</span> (OSError, ImportError):        <span class="cm" data-page-node-id="iDbHQaFCkua0h7ZhQfvKWl"># :100</span>
+    <span class="kw" data-page-node-id="dgc2PQJeysx838kakQsU0H">from</span> app.exporters.pdf_simple <span class="kw" data-page-node-id="kmV5S2A4ZH6LWod9VvbJa7">import</span> export_pdf_simple
+<span class="hl" data-page-node-id="z5WQ1QhyUUBmo4BmlNX42N">    <span class="kw" data-page-node-id="sHqgkguuaJYGQwUxKJFoRt">return</span> export_pdf_simple(model)  <span class="cm" data-page-node-id="oq1Cptgx9F9grJvXXqsCZ7"># 无任何降级标记回传</span></span>
+
+<span class="cm" data-page-node-id="KXuulbNJO27EF4P6lM3SO2"># pdf_simple.py:352 / :525 —— 静默丢正文</span>
+<span class="kw" data-page-node-id="R267J1W1YfKzEbmNtUDxxH">return</span> <span class="st" data-page-node-id="qAgbGQEcQhd4Ura3CgmmLt">""</span>.join(ascii_parts)[:110]
+<span class="kw" data-page-node-id="9v5YBUGkLAa0WkPnbSVNaF">for</span> ch <span class="kw" data-page-node-id="n4JPmrIg2PhrcvFYjcSiLW">in</span> line[:110]:</pre>
+      <p data-page-node-id="DWefWORbsdA8EbW3vJwQ5Q">360 字符段落 → 输出仅剩 110 字符，<b data-page-node-id="QwTFAvnX3BwwmvU4LHqYQV">250 字符直接蒸发且无日志</b>。此外该路径无换行、无版心测量（CJK 110 字 ×11pt ≈ 1210pt，版心仅 512pt，<b data-page-node-id="IBwIPfSJhCINdj4v2OrS3r">溢出 2.4 倍被裁切</b>）、无页眉页脚页码 TOC、无图片分支（<code data-page-node-id="eTMEA0AowzzSEqjE3P38SN">_model_lines</code> 缺 Image/HtmlBlock → 静默丢弃）。<b data-page-node-id="RKe4vOAEStydGOOPwCazpF">性能</b>：<code data-page-node-id="FhAUCsadTtNVr6Lc50WA3T">pdf_simple.py:203</code> 对 20-55MB CJK 字体做 <code data-page-node-id="QNoBh3pdslDHR5sFQMHAS8">copy.deepcopy</code> 子集化，实测 <b data-page-node-id="F7fNkhGK72kLOTbAsSABLq">39.08s / 峰值 404.7MB</b>。</p>
+      <div class="fix" data-page-node-id="uF9ug2kYDnDRrlzYJPgEEH"><b data-page-node-id="cKUtyRoWOZTVFHOghRpALD">✓ 已落地（v3.1）</b>①PDF 注释 <code>mdbridge-pdf-degraded</code> + 响应头 <code>X-MdBridge-PDF-Degraded</code>/<code>X-MdBridge-PDF-Engine</code>；②<code>_wrap_text</code> 软换行（取消 <code>[:110]</code>）；③<code>_model_lines</code> 补 Image/HtmlBlock；④CJK deepcopy 优化仍属 P1 性能项。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §4 P1 ══════════ -->
+<section data-page-node-id="HkDbgVn4W4Irqv50nM4XFi">
+  <h2 data-page-node-id="soUXYjs85Ks3U04YZbmr8D"><span class="idx" data-page-node-id="DaQD7jSR6cyA4inoz56YDp">§4</span>P1 缺陷清单（本迭代必修）</h2>
+  <p class="lead" data-page-node-id="CzYBaT56mEaxITkqw9CVHO">24 项，按域归类。<b class="ok">v3.4 已全部 CLOSED</b>。</p>
+  <div class="co co-g"><div class="co-t">✓ v3.4 P1 落地摘要</div>
+  <p style="margin:0;font-size:13px">#1 registry 硬失败降级 · #2 job done 隔离 · #3 SQLite WAL 单例 · #4 read_result_safe · #5 copy_context · #6 页眉 metadata · #7 PEP 启发式 · #8 去伪造 H2 · #9 HTML 嵌套/img · #10 GFM header_rows · #11 charge+队列上限 · #12 SpillBuffer.append · #13 jobs run_in_executor · #14 metrics 日滚动 · #15 Redis 单例 · #16 cancel_futures · #17 upload unlink · #18 PDF 单开 · #19 租户 TTL+compare_digest · #20 safe_zip · #21 defusedxml · #22 proxy-headers · #23 health/detail + 藏 machine_id · #24 killpg + 信号不回退</p></div>
+
+
+  <h3 data-page-node-id="CFnTufZWsCTJcrdduvLm4o">4.1 架构与正确性</h3>
+  <div class="tw" data-page-node-id="9hGukuYDDZXnalLaJM2qBE"><table data-page-node-id="Pb2s78F5PeDcUY5HFiR1bj">
+    <thead data-page-node-id="xXOFrkbOwfeatrPna6MDNJ"><tr data-page-node-id="LUTHscmCZKez7wFCbgCzgF"><th style="width:38px" class="c" data-page-node-id="O7dd67IZvnmoJlfrj2S9rT">#</th><th style="width:210px" data-page-node-id="I8wm5BwZHUchwzmRBMyNjh">位置</th><th data-page-node-id="mg2Byi10SLWRLvn78KyWPK">问题与影响</th><th style="width:230px" data-page-node-id="nb9QxzTFAi9pxRRB0Hu8Z4">修复方向</th></tr></thead>
+    <tbody data-page-node-id="b6wE5oS4JlnzVJOWXXq5yx">
+      <tr data-page-node-id="SpfWZN57uVlbxcMtiRtLVJ"><td class="c num" data-page-node-id="Ro2HjSCQr5UhzosPrfn22Y">1</td><td class="mono" data-page-node-id="o6Bgp2VPq15kuiG0KK8iaQ">registry.py:77-85</td><td data-page-node-id="p4ffDYxsJllIdcRHERcPHd"><b data-page-node-id="JsXjIwJ72arh3WlzuxmVag">anydoc 硬失败不降级，与 docstring 承诺矛盾。</b><code data-page-node-id="0hKAcKZLhez9Zss8vJdMP8">_anydoc_first</code> 仅捕获 <code data-page-node-id="x0bujY4Qb6lvCWhm8bdRLa">AnydocUnavailable/AnydocFallback</code>，<code data-page-node-id="J4N0dgyyCGBjVGhynHBRQj">MalformedError/EncryptedError/ResourceLimitError</code> 穿透 → 原生兜底被跳过。而 <code data-page-node-id="pW0GRjg8qlNVaY0dK8J8Cj">anydoc_bridge.py:18-19</code> 明文承诺"never reduces coverage"</td><td class="mono" data-page-node-id="P9BxurbMnqTC8kwtFbBYpr">区分「格式不支持」穿透 vs「解析失败」降级，同步修正文档</td></tr>
+      <tr data-page-node-id="x4TBl4pNhWAewwSkrMnwOr"><td class="c num" data-page-node-id="qDk10h1Obc1Of9wDb2xcsZ">2</td><td class="mono" data-page-node-id="BjlBOjMb3TMRthzU2HOFr4">jobs.py:294-340</td><td data-page-node-id="zNCCCTLZ8AevXhSOd8Jfd4"><b data-page-node-id="ShMz47LtA96QpUN8smmEmz">done 被回滚成 error。</b>产物已落盘并置 <code data-page-node-id="qklINGeBfShqbECgu7aBEb">done</code>，随后 <code data-page-node-id="E11hxm5MSJs2UdMyoBLygR">save_job_snapshot</code>/<code data-page-node-id="JHCNqYVAl4FuLktjzDGggx">fire_job_webhook</code> 抛异常 → 整段 except 把 job 改写成 <code data-page-node-id="jufQ3tsKU7WZjGWkRAQTHn">error</code>，用户取不到结果</td><td class="mono" data-page-node-id="exjCQZz2yniBGUIprJhmZq">status=done 提交移到 try 之后；后两步各自 try/except 仅记日志</td></tr>
+      <tr data-page-node-id="43eBLZozbHf2hIAPsOz3Px"><td class="c num" data-page-node-id="Gst315blKlmvbHiSqL5KUD">3</td><td class="mono" data-page-node-id="aJCFG7qLtnfjb4T3lmTQqr">job_persist.py:47-51</td><td data-page-node-id="2zMC8SVzORpMvkek6I2nnD"><b data-page-node-id="IaWjLPGQiR9lMxemQV0zWb">SQLite 每次调用建连 + 读路径执行 DDL。</b>每次 <code data-page-node-id="HvqklKEc03indoPXeSRbMC">_connect</code> 都跑 <code data-page-node-id="vkFz8fGzQRgrHI04e1OHHC">_migrate()</code>，读路径同样触发写迁移，全部串行在模块级锁上，无 <code data-page-node-id="Mr1D091wXjmZbhbrRhRU0V">timeout=</code> → 并发必现 <code data-page-node-id="Ichj5kEumaHbgB3BCBSQ4F">database is locked</code></td><td class="mono" data-page-node-id="I7HHYBVlb5gITx0gaRvmBr">单例连接 + 一次性迁移 + WAL + <code data-page-node-id="GL8dm2SqfD5RwkdgDGllW4">timeout=30</code></td></tr>
+      <tr data-page-node-id="8taHYlqnsngce0epDfgHbX"><td class="c num" data-page-node-id="I1PMQVH2mc4vBuopTcTVGq">4</td><td class="mono" data-page-node-id="HMxgFDp2eawUkegXqYXZri">jobs.py:47-59 / 347-374</td><td data-page-node-id="JqrrFghHFjciRUJbEI49Cc"><b data-page-node-id="6PxMxmmOAJF4qy5yZly6be"><code data-page-node-id="y5njKSBh2J95ZdnMdhrqlY">read_result()</code> 无锁</b>，与 prune 竞态：窗口内 <code data-page-node-id="8Q3VyQpN9YtEnbxRoeJUMA">FileNotFoundError</code> 冒泡成 500 或返回 None 变 409</td><td class="mono" data-page-node-id="sv4ITjD1B3YrQnTpe5EtSm">移入 JobStore 锁内；prune 改标记删除 + 延迟回收</td></tr>
+      <tr data-page-node-id="gtEgdjzsB83pX0MInkyXYG"><td class="c num" data-page-node-id="E4SbFZOm94byG5bJzOf9gC">5</td><td class="mono" data-page-node-id="OrlbCDvLO73Hg9HR0pOSUT">metrics.py:39-41 / request_context.py:7</td><td data-page-node-id="hujCaC1GYauHekpj216qTt"><b data-page-node-id="CgIxHMkEOYtyYZHrHsRuV1">ContextVar 跨线程丢失</b>。<code data-page-node-id="pTlPyTsTPcKOwsrkFXfjAo">JobStore._run</code> 在 ThreadPoolExecutor 中执行，ContextVar 不传播 → 租户日配额与审计归属全部漏计</td><td class="mono" data-page-node-id="rrIZpqe1S5rC76qBNaKtCS">submit 时 <code data-page-node-id="nOpJFRE3JjBXRyRL77gHkX">ctx=contextvars.copy_context()</code>，<code data-page-node-id="YeS7rZvIunRuB9UvaMU5Nx">ctx.run(...)</code></td></tr>
+      <tr data-page-node-id="712jAs2pI0XniDwTNWnwmX"><td class="c num" data-page-node-id="lVAmH6PoxB2ihVnCOacNTs">6</td><td class="mono" data-page-node-id="7pCgUFsp5z9nd5mDyTiX3B">docx_ooxml.py:46-53</td><td data-page-node-id="c9cOAKZoehB8pCdefXQtfI"><b data-page-node-id="E1JYwUsT3POul8QDzEQvA7">页眉文本被注入正文首段</b>（<code data-page-node-id="Jm0IPJsQLQbWLxOd7JbLZY">nodes.insert(0, ...)</code>）→ 永久混入正文，导出任何格式都无法剥离</td><td class="mono" data-page-node-id="bExc6AL7wj7O0NNIrWCvp0">仅保留 <code data-page-node-id="5RyAr1nBJQdMZIYG27HhFB">metadata["docx_header"]</code>，由 exporter 决定渲染为真页眉</td></tr>
+      <tr data-page-node-id="RqZ4VO7TjgvD8p3Aqv1R2y"><td class="c num" data-page-node-id="pfET9bQnZJ5WRavCc4dPD0">7</td><td class="mono" data-page-node-id="Mwrt56FDVRV1sFJkdSMQGg">pdf_font_fix.py:15-53</td><td data-page-node-id="gvUzEfiM7VE7z60wD9ZMWl"><b data-page-node-id="KzXkZEWN9tmnS4A409rDYg">无条件改写合法汉字。</b>教科书 PEP 映射对所有 PDF 生效：实测 <code data-page-node-id="lDYDuPSPpLYC77vEFZXcYI">犇腾牛排→D腾牛排</code>、<code data-page-node-id="3K9JCPhXxoQxiSslTBEXrP">公司狀况良好→公司n况良好</code>，公司名/人名被静默改错</td><td class="mono" data-page-node-id="DhXcEDOn9TrFtKuG4oePq2">仅在 ToUnicode 表确实指向私有映射时启用，加字形上下文判定</td></tr>
+      <tr data-page-node-id="b07bU1dWoy9T2BUn57HUos"><td class="c num" data-page-node-id="kzHB59d03KL0h47SqXtQy2">8</td><td class="mono" data-page-node-id="6kPVnMaD2fcZyapwRAzj30">pdf_text_fallback.py:217</td><td data-page-node-id="7eRz8qJZexK8tLTJeNhev7"><b data-page-node-id="816CdbqktMuN8xL6y2MbPG">伪造「第 N 页」H2 污染大纲</b>，而真实标题层级完全未识别（无字号推断）</td><td class="mono" data-page-node-id="z8BxZn3jgxoCb0Pxt4iNI6">页码改用 metadata 或 PageBreak 节点；补字号启发式标题推断</td></tr>
+      <tr data-page-node-id="H8pILYpD6M1DM0cGSfkMWD"><td class="c num" data-page-node-id="OCsdBO3i4mM9y3J834qXub">9</td><td class="mono" data-page-node-id="cJWgMUdbmB2IpNjFUxAOrD">html_importer.py:95,207-222</td><td data-page-node-id="Bbb1MNZCEZHzClwVfL8br9"><b data-page-node-id="pchnSGcqzvKOCU1zoDZYD4">嵌套列表父项文本丢失</b>（实测 <code data-page-node-id="7dARpdg0GhNKyY4i84QY9c">outer A</code> 凭空消失）；<code data-page-node-id="ZA8qwUCFdaN7VlTGG2PT3j">&lt;img&gt;</code> 完全不提取 → EPUB 委托 import_html 导致全书插图归零</td><td class="mono" data-page-node-id="MsDJejCh3EkysENYxIFcyQ">starttag 前 flush li 缓冲；新增 <code data-page-node-id="CMHSeHZlB9tFwJVKMVMo2F">handle_startendtag</code> 处理 img/br</td></tr>
+      <tr data-page-node-id="BYUgsWHCDy7Tv2m2dcIMu5"><td class="c num" data-page-node-id="YPHqdHhebvqbrposX2r79w">10</td><td class="mono" data-page-node-id="qqGXKsf6U8yAgfgHy7TH1g">md_importer.py:766-801</td><td data-page-node-id="uP0CKDk7cyXRXtJSqOHnhY"><b data-page-node-id="6cV1xHzycBURyvVP37BYw1">GFM 表格表头与单元格行内格式全丢</b>：<code data-page-node-id="ElieLbE9OCh1QpkMQpTPjC">header_rows=0</code>、单元格保留原始星号字面量、列对齐丢弃</td><td class="mono" data-page-node-id="O7DHUNePe1gMladfEqpoqn">单元格 inline 走 <code data-page-node-id="VFQ6gLujYQapD4d78kmb7N">_nodes_from_inline</code>；thead 区间计数写入 header_rows</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 data-page-node-id="sPKEnoyIcTbHKZeWNCr3CI">4.2 性能与并发</h3>
+  <div class="tw" data-page-node-id="td1oKZSTGFoCWsDQUgXG2N"><table data-page-node-id="ayh5yUU4yZoshW4TqhfbD5">
+    <thead data-page-node-id="rLYBa3OmmwHoSFHFvirIt8"><tr data-page-node-id="3j5K7roghXqcpFC9ZmXFx2"><th style="width:38px" class="c" data-page-node-id="A4x4gMR5BzlLYuzFYa1bQn">#</th><th style="width:210px" data-page-node-id="NPflPPGBG2vZvrddGKJU9x">位置</th><th data-page-node-id="IdJdyqb3NgfKxjKDrEtMf6">问题与影响</th><th style="width:230px" data-page-node-id="xdIEp8iZTqBhJgMo751rw8">修复方向</th></tr></thead>
+    <tbody data-page-node-id="HSzRbaCRPBg68LnjZ8yKtJ">
+      <tr data-page-node-id="jXg1SVLOYbuxc0otWLWtVN"><td class="c num" data-page-node-id="Co7zlSnglY0uiyasgxPkt4">11</td><td class="mono" data-page-node-id="A0zfnRHJZ5kZhwCAxWv7j5">jobs.py:129 / 164</td><td data-page-node-id="bVpZL7c0L4Z9YwmJgVIKaS"><b data-page-node-id="VoB9HFZSbV1HGlR9QF61Ga">内存预算形同虚设 + 无界队列。</b><code data-page-node-id="aXPTSydlmloAmM4MZRstQP">charge = 0 if spill.spilled else len(content)</code>，<code data-page-node-id="TAi1px7DcHJnsoBwzCGMwV">spill_threshold_mb=8</code> → 任何 ≥8MB 上传 <code data-page-node-id="wgnxcCsrPfI5eawIsqE04p">charge=0</code>，512MB 预算永不触发；<code data-page-node-id="RZxP7u0gdfWP2dEJpmhAdM">executor.submit</code> 无界</td><td class="mono" data-page-node-id="u8iahUz48VsEOwRPGD9Ucu">charge 计入 spill 大小；有界队列满则 429</td></tr>
+      <tr data-page-node-id="3tp3A2I2HpxZmSyOvQDYLR"><td class="c num" data-page-node-id="pwVVZ4IcBBMhUKEcxxaQOM">12</td><td class="mono" data-page-node-id="re1mTJMguarXEzARuDJ94n">stream_convert.py:191-201</td><td data-page-node-id="Ee5bcmGQlJZBlBIoW7leLJ"><b data-page-node-id="1kUiK13bGhhevJaiMc2IjI"><code data-page-node-id="nmW2L4jVSOoaFdn02tlBic">_SpillWriter.write</code> O(n²)</b>：spill 后每次 write 都全量读回+删文件+重写。48K 字符分块 × 100MB → 数千次全量重写</td><td class="mono" data-page-node-id="0fKFKpiJgIVwFH5a1xMT2m">SpillBuffer 增加 <code data-page-node-id="6mK9MU7e5lkjQ4oRjX4X9E">append()</code> 持有 fd 追加写</td></tr>
+      <tr data-page-node-id="vVcriJeXnba6xF7t9KHem0"><td class="c num" data-page-node-id="UurIWBl5wHymMBVpXwqe4E">13</td><td class="mono" data-page-node-id="U9cHmG0v3lIw5PQQ2Ikjvh">routes.py:294-308,326</td><td data-page-node-id="8jpeDsw57EpzjDHWUzGh4v"><b data-page-node-id="R68RIv5gIu809WyPEhIBez">async 处理器内跑阻塞 I/O</b>：<code data-page-node-id="D4KwSBau9y0FCUxuHmnTx0">list_jobs</code>/<code data-page-node-id="nnf3AiZrf6KRwezOpNEF9A">get_job</code>/<code data-page-node-id="mfZmANR1DoejkFWO8n4wk8">read_result</code> 在 <code data-page-node-id="2cL4dxqByvZNjS3d4YKqpe">async def</code> 内直接做同步 SQLite/磁盘读，阻塞整个事件循环（转换本身已正确用 run_in_executor）</td><td class="mono" data-page-node-id="X9j9wQcwFjuB1DIXmpnNwb"><code data-page-node-id="MB6N0Cj9PVl4qRHUSiCl9m">await loop.run_in_executor(None, ...)</code></td></tr>
+      <tr data-page-node-id="pBoLinsrRoR820cWJEFa3y"><td class="c num" data-page-node-id="MxmIMiYfCdmX6ORrzuFDCi">14</td><td class="mono" data-page-node-id="NUTORQlsOeLFMhygFjrAXY">metrics.py:15-18,102</td><td data-page-node-id="JLeeIfS5TQW0ge0BvPI8BG"><b data-page-node-id="b0f6J3ZBFr8NQFN870ifd5">指标字典无界增长</b>（<code data-page-node-id="NkK2Dl6OvCK9UUyIrKPMn4">conversions_by_tenant</code>/<code data-page-node-id="8xMUzBcQBbxNWG2du39ENF">tenant_daily</code> 只增不减）；<code data-page-node-id="qysuKN49SypQp7N4iLSRi5">/health</code> 调 <code data-page-node-id="bfEqvyBG1ciYsGqXhGSbgF">snapshot()</code> 在全局锁内对 5000 个 float 排序算 p95，高频健康检查与热路径抢锁</td><td class="mono" data-page-node-id="ZcN1XoLE6PmrMY0blniCDH">tenant_daily 按 UTC 日滚动清理；p95 改环形缓冲+滑动直方图</td></tr>
+      <tr data-page-node-id="OTEf6FZ7inxJPzVErtaq5q"><td class="c num" data-page-node-id="NwqD5O9xm2sziC5Wlb80Bs">15</td><td class="mono" data-page-node-id="a5PDm8cBfi2LpgUshEU5Qj">rate_limit.py:123</td><td data-page-node-id="Ebmex9PBvY26R4jGBhCCc7"><b data-page-node-id="qlPIkDnsJat9SZ0QVXXhfx">每请求新建 Redis 连接且不关闭</b> → 句柄泄漏</td><td class="mono" data-page-node-id="naMJxFnPE6CNr74G3W4Y68">模块级单例 client</td></tr>
+      <tr data-page-node-id="gfvE1VzDFBh6KnPVcg9dbw"><td class="c num" data-page-node-id="ryq72HofT3kxAo459yAHbm">16</td><td class="mono" data-page-node-id="oH9tgEbFSpsZVlPKMlMFL0">converter.py:576-592</td><td data-page-node-id="FSQX2rUZcmCfHHj8RnBNjX"><b data-page-node-id="90751214s9IBF6afMGXPgY"><code data-page-node-id="0Xl6GgCBrFPxhnmBsHZ6WO">convert_directory</code> 的 cancel 无效</b>：<code data-page-node-id="UCKIBCwiqYGTAFZ7pyL2V3">break</code> 后 <code data-page-node-id="3cbohv2ck4jpFmLnVoYcJB">with ThreadPoolExecutor</code> 的 <code data-page-node-id="v6p62aNOBeeGnCVxIrakKm">__exit__</code> 仍 <code data-page-node-id="Mmn2AgPWEgGcFlCcbTmxsC">shutdown(wait=True)</code></td><td class="mono" data-page-node-id="riTj7blXj1Vioyca0cKCar"><code data-page-node-id="9gf0ugxOUZjoSBZhkOdLC9">pool.shutdown(wait=False, cancel_futures=True)</code></td></tr>
+      <tr data-page-node-id="0HYuCkTcImqI3a9TtlMYNB"><td class="c num" data-page-node-id="bGXnFJVBDciITT6YN6kWyD">17</td><td class="mono" data-page-node-id="a1hTIpNTOgTdnHhRU5odRs">upload_stream.py:38-59</td><td data-page-node-id="st5aLhP6cHCfuFvaEpYFqF"><b data-page-node-id="MA0IF9IbMY2F9VpfygyQHI">超限时临时文件泄漏</b>：<code data-page-node-id="YCgMgG7HpRhmjQH5zY3aHx">total > max_bytes</code> 分支 raise 后 finally 只 <code data-page-node-id="Cnv1OoZHSYKFf1iWtMc6zn">os.close(fd)</code> 不 unlink。反复提交 ~100MB 文件可耗尽 /tmp</td><td class="mono" data-page-node-id="1MxrJlZn8K7AV9yS0713YE">改 <code data-page-node-id="3e2xo5KG95d8w5zVFt66Mb">except BaseException: _unlink(path); raise</code></td></tr>
+      <tr data-page-node-id="wHp6cix3FhVOq8n1HlezE1"><td class="c num" data-page-node-id="Je7hNBRspyUTduezhYB7Co">18</td><td class="mono" data-page-node-id="cSMfhL9V9a3xHIYEDRpriC">pdf_exporter 全链路</td><td data-page-node-id="mVgPVfCy40xY4WOrBIl93I"><b data-page-node-id="PbpK19kG0eqNILqh27ayK7">PDF 被重复解析 3-4 次</b>（<code data-page-node-id="OFUpM4e787OiNmOdY4Pg5X">_extract_all_page_texts</code> + <code data-page-node-id="UFyA98qVGWAn0zztJRP7Hy">_count_multicolumn_pages</code> + <code data-page-node-id="64MPaTUBRtgu3ZmFqbxT2F">_extract_layout_blocks</code> + <code data-page-node-id="YPmWACseAvIZmY1a9slWMM">pdf_text_char_count</code> 各开一次 PdfDocument）</td><td class="mono" data-page-node-id="7bDplRbIuGMujqApTQdzES">PdfDocument 单例透传或结果缓存</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 data-page-node-id="blCyWxJbT9CNdYwUSKl6CZ">4.3 安全与运维</h3>
+  <div class="tw" data-page-node-id="kaLigEHfLzqx2KhFBznsjO"><table data-page-node-id="OVPPFIg8fPCTn5oYvSzyIa">
+    <thead data-page-node-id="Jidb4w4MISxVtL90TjDC55"><tr data-page-node-id="MB688TLhXiPwlNHMwYJVZd"><th style="width:38px" class="c" data-page-node-id="19HnNTKkwC4Q7z7AG1f7RJ">#</th><th style="width:210px" data-page-node-id="Fd2pgmaWUiYCYtN9oDDcG3">位置</th><th data-page-node-id="UQy4XI6tUJq2XCOE4nI7hI">问题与影响</th><th style="width:230px" data-page-node-id="BgGoSt6K3EVdQ8C9Jj1kVO">修复方向</th></tr></thead>
+    <tbody data-page-node-id="34iikMK78xSYvWS9kqRfqR">
+      <tr data-page-node-id="tvsEqX4XTmgVE0QUCS7YSP"><td class="c num" data-page-node-id="WskE6v0ePzQPmWejoOjypN">19</td><td class="mono" data-page-node-id="M9TX6CBTgN9MU1RJ9XgikI">tenants.py:57,94</td><td data-page-node-id="fxgZi7BOSvc3KVmQe9LR9V"><b data-page-node-id="h4cZW7vUHSHvm10zhF3oJa">租户 Key 不可热更 + 明文比较</b>：<code data-page-node-id="VpMM2TrcP3q5WcGo9dA7Al">@lru_cache(maxsize=1)</code> 且 <code data-page-node-id="wwoJzMMUvj1ntblDrJ7Lz0">clear_tenant_cache()</code> 全仓<b data-page-node-id="6iGAWipkmWp8pPshGldDyn">无任何调用点</b> → 吊销/轮换必须重启；<code data-page-node-id="JnxX9pBRq2CcDiWNLpqYDy">item.api_key == provided</code> 非恒定时间</td><td class="mono" data-page-node-id="HH08NFLUCqnywYqPcxuZJ1">改 <code data-page-node-id="OqEaK8sDkq5IkR4ELVvDfb">TTLCache(ttl=30)</code> 或监听 mtime；<code data-page-node-id="DEY0j5rHMIKrRvCmlTNUVt">hmac.compare_digest</code></td></tr>
+      <tr data-page-node-id="hU7y3vWlCK3TFkMyYiMPve"><td class="c num" data-page-node-id="vEvGu0GJYM7DtBxdcCt5Mt">20</td><td class="mono" data-page-node-id="VsuK5Bu0ZxCnZllU52oLFe">docx_ooxml.py 等多处</td><td data-page-node-id="R6iC1KFR7MUrxKJckR6oGe"><b data-page-node-id="IWj8pSVv1g6VtcVpQFuDU2">解压炸弹无压缩比限制</b>：9 处 <code data-page-node-id="xQuO6HmKvrPhwUSCeJ5xE0">zf.read()</code> 无解压比与成员体积上限，100MB 高压缩比 zip 可在内存中展开为数十 GB（Rust 侧有 ResourceLimitError，Python 原生侧裸奔）</td><td class="mono" data-page-node-id="Nzy6BgaaO8AVg8gKe85ALm">逐条 <code data-page-node-id="iAKoRIU7TWbuYSBuAh5JY4">zf.open()</code> 流式读，累计 > <code data-page-node-id="3LxESErY4wljK8Jblw7CTE">max_upload_mb*50</code> 中止；换 defusedxml</td></tr>
+      <tr data-page-node-id="BvWRxmH0g6dnrA587ypjQA"><td class="c num" data-page-node-id="t8BO663zA4cf9aitiQMBg2">21</td><td class="mono" data-page-node-id="8tLpkx7iloADc78NrOlDE3">pyproject / expat</td><td data-page-node-id="oOZRBGoANn1kLBeLhFYPVW"><b data-page-node-id="oVxzwskpEUGF8BrCwL1VTX">Python 3.11 上实体炸弹防护缺失</b>：billion laughs 拦截依赖 expat 2.4.5+/Python 3.12.1+，而 <code data-page-node-id="iwdoYjyShfIAzDDXoXmwKD">requires-python = "&gt;=3.11"</code>。Python 侧 17 处 <code data-page-node-id="LJqmLWv51Cpyke2YJC3Hmg">ET.fromstring</code> 未用 defusedxml</td><td class="mono" data-page-node-id="AhjWktRHR4mrRKMC2kVavd">收紧下限至 3.12 或引入 defusedxml</td></tr>
+      <tr data-page-node-id="GI3iEHmF7ekCjXma25BVpe"><td class="c num" data-page-node-id="MbOs4d7iExhUC7oNfAh7ZE">22</td><td class="mono" data-page-node-id="2NeV7dcxGyK9QXEwcWeQ5I">start.sh:36 / Dockerfile:126</td><td data-page-node-id="bfSZthGJXtoanERxtyfy39"><b data-page-node-id="jmCIcBsr3nmzR1Pzkx3k63">反向代理后限流与审计 IP 全部失效</b>：裸 <code data-page-node-id="SVGVZztGYQWuCLk1NI9xwy">uvicorn main:app</code> 无 <code data-page-node-id="I6o3KrrMGR4XFiKGphLLVD">--proxy-headers</code>，nginx 已传 XFF 但后端用 <code data-page-node-id="1GNMdEQoQb2w9BCgE3acrc">request.client.host</code> → 全站共用一个桶，审计日志零归因</td><td class="mono" data-page-node-id="Ec3hjizawFoqdweAFbuz45"><code data-page-node-id="trGqD0bIelPh2GYxwOwc92">--proxy-headers --forwarded-allow-ips=$TRUSTED_PROXY_CIDR</code></td></tr>
+      <tr data-page-node-id="A9VyKBiJp142Lc8TihH5w2"><td class="c num" data-page-node-id="3DLDDXnOacFyoUazidST9i">23</td><td class="mono" data-page-node-id="Teon3evoA4RbOoENj0iHSD">routes.py:120,156,160-170</td><td data-page-node-id="B77L9XKUsiEPEFGs1lOsCq"><b data-page-node-id="8AMimfIOgS7vB429p4Hh4A"><code data-page-node-id="YYVyFAa8snSqVrCFPhENg7">/api/health</code> 未鉴权且回显全量租户指标</b>（租户 ID 全清单 + 逐租户日活 + object_storage.uri + 内部路径）；<code data-page-node-id="9r24uwJ9epWdF1pzYzBubp">/api/license</code> 公开回显 machine_id 助力量身伪造</td><td class="mono" data-page-node-id="haYCeBLW9tJCTfl0AxIRzO">health 拆 liveness/status；license 加认证或隐藏 machine_id</td></tr>
+      <tr data-page-node-id="M4UWX0smnwHTaNYgxrFtZB"><td class="c num" data-page-node-id="2OiTs4n8ysDuLVf4UkotKR">24</td><td class="mono" data-page-node-id="Vky0kJQR9lwASp9Gg5GE03">convert_isolate.py:116-123,153-163</td><td data-page-node-id="NBgi7RPzQ5A6rn8SPy73Av"><b data-page-node-id="Fc4UzcBhwUNRDOlUKXsFEY">进程隔离两处缺陷</b>：<code data-page-node-id="O23xRsxF3b5ALq1JpwCpvG">subprocess.run(timeout=)</code> 的 kill 只作用于直接子进程，孙进程存活 → 孤儿进程/显存泄漏；崩溃时回退进程内重试，若原因为 OOM 会把 API 进程一起拖死</td><td class="mono" data-page-node-id="Pi3QgOHuyA1E4AG0dwzqAU"><code data-page-node-id="V4rK6vAOlmd7xBW8kzedLS">start_new_session=True</code> + <code data-page-node-id="gLxKIF2boLz9w1P5eMlujL">os.killpg</code>；<code data-page-node-id="Oh3Ke2ugTIvJ6z9zx1lEe9">rc&lt;0</code> 默认不回退</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="co co-g" data-page-node-id="LBsT55wfNbORoOhTGXjWBh">
+    <div class="co-t" data-page-node-id="jIA1NYtFdAEyp32CdKMXpS">✓ 已核验安全（无需整改，作为正面基线记录）</div>
+    <div class="g3" style="margin-top:8px" data-page-node-id="H0KHTuiIMhfwT807z7xx05">
+      <div data-page-node-id="EiE9YEzNUYGTjkEXoSrmGh"><b style="font-size:13px" data-page-node-id="mrFBm4jZmErLW2cVXImiwe">命令注入</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="MCdQXduY3FyIlG6w9w2yvB"><code data-page-node-id="cPRjGOkMk639aP5Y5ha9hI">virus_scan.py:48</code> argv 列表 + <code data-page-node-id="ikKCfRgTQ5eBPAj6D7pyMw">shell=False</code> + <code data-page-node-id="Tjv008fEEMR2LEHpkBQKm0">basename</code> 防穿越；<code data-page-node-id="1ceQ5sY8fdKkEPYWuBvRHT">convert_isolate.py:107-114</code> 参数走临时 JSON</p></div>
+      <div data-page-node-id="9qgN9pAtZIkraXq4XZ1NIh"><b style="font-size:13px" data-page-node-id="yFhTZ6AoE0ntVFS2rTql9m">路径穿越 / ZIP Slip</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="EGRo1FuMDTLSwqxckHvnd1"><code data-page-node-id="nJMjEPxhQFyItxcUD5X1Vd">_safe_output_filename</code> 丢弃目录分量 + 白名单正则；全仓 <code data-page-node-id="s95xlaro9POZxHhZt15JZV">extractall</code>/<code data-page-node-id="uT7m9qm9clraOGqX1lXsX5">.extract(</code> <b data-page-node-id="AjL2WpfHS4GQoyOUTMHhfm">零命中</b>，zip 均为白名单成员名 <code data-page-node-id="I7QHD0hRgBcMCH0CAsPCJJ">read()</code></p></div>
+      <div data-page-node-id="vhHM9v9IqxW3VHGH1ymesx"><b style="font-size:13px" data-page-node-id="WxGvcPYkUMA7kF35jg4uQi">XXE / ReDoS</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="kw1hu2CgAXw3q5CyOth00w">ElementTree 不注册实体处理器，实测试探外实体全部 ParseError；15 条正则三档压测<b data-page-node-id="zV63rQRcrS1I9zvdEVLJgj">全部线性</b>（≤0.43ms）</p></div>
+      <div data-page-node-id="DgFIDF3ANFG0cGao0By1TM"><b style="font-size:13px" data-page-node-id="iZQCRHA3lWe3QjNnXhXFHh">认证算法</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="08CIBPalROd1rJtrYYbidD"><code data-page-node-id="S8iGPSCZBWY1cIkWzBM1pf">hmac.compare_digest</code> 且<b data-page-node-id="pzd7p1TvrnZxNYSBjWHeK5">遍历全部 key 不短路</b>（防时序泄露）；Basic 同样恒定时间</p></div>
+      <div data-page-node-id="hyl9ROayOGn273RieHqZCL"><b style="font-size:13px" data-page-node-id="n3CTb0AXQ9s008M8iRzAxn">CSRF</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="ARLUzb48eBjRsIxuYQWGdW">无 Cookie 会话（X-API-Key/Basic 均非自动携带）→ 天然免疫</p></div>
+      <div data-page-node-id="QCe2qCoBO3IXTjeds4BRih"><b style="font-size:13px" data-page-node-id="IZxd7RxsyvkG2bwQLv3ttL">CSS 注入</b><p style="font-size:12.5px;margin:4px 0 0" data-page-node-id="jBqzMNF2ByU9HH0lYw7TzB"><code data-page-node-id="YfOCZnU20rJ84RtYIvoCtd">css_sanitize.py</code> 禁 <code data-page-node-id="x1WVpIuIfjH1TZxS8ojOne">@import</code>/<code data-page-node-id="klDw4zjacgqS4EAzqeDA2S">url(</code>/<code data-page-node-id="hn40g1nuFAelbTgBS3sm3Y">expression(</code>/<code data-page-node-id="nC5F2kFLcFfqHkaHruNlhj">javascript:</code>；字体名白名单</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ §5 评分模型 ══════════ -->
+<section data-page-node-id="3AXGXsQDZC9fd0Zk44jRCN">
+  <h2 data-page-node-id="srwhpkQyB861ovRuLJ2jdg"><span class="idx" data-page-node-id="dlRCVxdAl0wCOA6GixNcHO">§5</span>加权评分模型</h2>
+  <p class="lead" data-page-node-id="eGgcKMLhdGC2RVXaA13yva">六维度加权，每项评分均绑定本报告的实测证据。</p>
+  <div class="tw" data-page-node-id="dp5XXpX7yNLsbFimpdClcq"><table data-page-node-id="ZKIQCuzeiB79zcRd5wvJyt">
+    <thead data-page-node-id="BByPRQrK5pSV72zfpsChm2"><tr data-page-node-id="e4umI99BC82ByeFYIJF16u"><th style="width:130px" data-page-node-id="5BXu7c7klpbxiDJVjlkthk">维度</th><th class="c" style="width:60px" data-page-node-id="8vAeUvGJ2tKXJvNY0dCNdN">权重</th><th class="c" style="width:60px" data-page-node-id="EJ6pVTHYhIgZLV9od8aYKp">得分</th><th class="c" style="width:64px" data-page-node-id="Jd71pEwI22RfvGx5oE98cD">加权</th><th data-page-node-id="fvL6CND8hICz3j3mX3P8QX">评分依据（实测证据）</th></tr></thead>
+    <tbody data-page-node-id="szEzQkNvF9tXabhfzumM7e">
+      <tr data-page-node-id="wprHDL1Mx5oZneW5ffMAq8"><td data-page-node-id="p76zJLZgnQpgfgQuuM1CcW"><b data-page-node-id="QrE9WsmMIMYaKBvzYYNpvo">功能广度</b></td><td class="c num" data-page-node-id="3PzECeO0bRQmp33Kzv90fT">20%</td><td class="c num ok" data-page-node-id="IyGQFvxrYGAoiRP2FtPAZM">88</td><td class="c num" data-page-node-id="QiqJGTCloyo0sGKLJ2mFjN">17.6</td><td data-page-node-id="gIpqGITNzn4GwQEJmtWTUd">18 导入 × 15 导出，105/105 矩阵可用；anydoc 独占 9 格式。扣分：无图表、DOCX 无 TOC 域、PPTX 无备注、anydoc 为加速层；去 anydoc 后 9 格式走内置路径（OLE 系降级）</td></tr>
+      <tr data-page-node-id="JQrfzMDw9mMe8eXrab5onE"><td data-page-node-id="7Ov7F6Vp5Jhb9HWvIuEka2"><b data-page-node-id="Qwiz8T6ASfFblEAU3IwpBk">功能垂直深度</b></td><td class="c num" data-page-node-id="oD3AaNF7UFE4xTrClpj1H2">25%</td><td class="c num pt" data-page-node-id="u7REGAmS1h3bnA8d58p05R">86</td><td class="c num" data-page-node-id="v44XFPLuw39wYEqjk37HwJ">21.5</td><td data-page-node-id="aFHOszKXJNJz8KmyAKlL8O">v3.11：矩阵 100% + stub 写入 + 多节 sectPr + OMML 双向 + 主题 accent；OLE/全量 TeX 仍开放</td></tr>
+      <tr data-page-node-id="PKy58HyK4Z8zGOBjs4HMdh"><td data-page-node-id="HfSn5DSmjsni9i0UptKGOE"><b data-page-node-id="to47BYSD5ftGVapICMfROe">正确性与健壮性</b></td><td class="c num" data-page-node-id="CAKxD8ndRYLHeSBLkcUbtk">20%</td><td class="c num no" data-page-node-id="Bp8xRsBDzB4PLnvwrE4q1Y">45</td><td class="c num" data-page-node-id="Zf0MpoxTqmKDqSFVEZN1ZU">9.0</td><td data-page-node-id="CgGaGZDX0zwjErnnylTHGV">5 类确定性数据损毁（流式丢 74% 代码行、$$ 破坏代码块、脚注劫持、EPUB 必崩、PDF 截断 110 字符）；并发竞态 32 层；done→error 回滚</td></tr>
+      <tr data-page-node-id="pPa8v1CllKx6miIREN72Ok"><td data-page-node-id="rVwezGmGv8tWXgEY0xIrRS"><b data-page-node-id="PFyNPF91DMhT6JYCw6zHYK">安全性</b></td><td class="c num" data-page-node-id="SDcBfkLK1faPi0AT4CdWEv">15%</td><td class="c num no" data-page-node-id="iZF2G8f4k8qQDH80AS31Ic">42</td><td class="c num" data-page-node-id="09xoA82YNbiVdJhTzDhRHM">6.3</td><td data-page-node-id="QvA462xQzxFG9uDNaSF8Hl">默认零认证（暴露面 100%）；3 类 SSRF；2 处 XSS；CSV 公式注入；解压炸弹；但命令注入/路径穿越/ZIP Slip/XXE/ReDoS/CSRF 基线合格，认证算法实现正确</td></tr>
+      <tr data-page-node-id="VHkEzu2BEGD6ORCo6cFIFr"><td data-page-node-id="BywFDzt4FAQZr9avExER51"><b data-page-node-id="v24qGRSSZb0AT1RGVjK8v2">性能与并发</b></td><td class="c num" data-page-node-id="KIpbCsDA6rEGQb4S9oK3bq">10%</td><td class="c num pt" data-page-node-id="Hob3aHcWEpKVqwlMKzuyfp">48</td><td class="c num" data-page-node-id="r8UW7HoaMnDQsEI1lxMPM4">4.8</td><td data-page-node-id="NGGnkoccZPv4vAZ0kcgeRW">PDF 子集化 39s/405MB；O(n²) 写放大；async 内阻塞 I/O；内存预算失效；无界队列；Redis 每请求建连</td></tr>
+      <tr data-page-node-id="gBAQi7tT16cEVBI8VOGFCF"><td data-page-node-id="tKJFx7Qin8kaazr8hNAeaC"><b data-page-node-id="YGEG1yju0WqJ6HYwiSSMHB">工程化与可维护性</b></td><td class="c num" data-page-node-id="5VyGwXnSrsa1Z8tFvvnnWG">10%</td><td class="c num pt" data-page-node-id="jY495iqySDolfjq9ea0Tcy">70</td><td class="c num" data-page-node-id="kU7gMKJVcw4jRRnBEBTaG6">7.0</td><td data-page-node-id="3CtSkJ48Cue7KtClT1xWJf">v3.3：cargo test 入 CI + FFI panic 兜底 + UPSTREAM_REV 真 SHA；前端零测试仍开放</td></tr>
+      <tr style="background:var(--bg-2);font-weight:700" data-page-node-id="CiiL1Gs50OY9oGVmVJuqBk"><td data-page-node-id="2usZJrOJU7IHZBgLzxst13">加权总分</td><td class="c num" data-page-node-id="Hw369ixyVvRAAl00Ber5TX">100%</td><td class="c" data-page-node-id="KbNHz3sxMEbd7sepZRm9jC">—</td><td class="c num" style="font-size:15px" data-page-node-id="FSdGKW9ra6hpD4V9QPOipB">75.5</td><td style="color:var(--org)" data-page-node-id="kYEGHM2eVRHaWnXCLmrTXC">评级 <b data-page-node-id="Vt49hVdXHcHDeXxqTQkLi7">B · 深度写入收口；P1 部分仍开放</b>（架构 A- / 实现 C / 安全 D）</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="co co-b" data-page-node-id="t4jL3SlxTCCmQ03nvxkCrb">
+    <div class="co-t" data-page-node-id="rxl43FnKwcnkCElBBVuklQ">◆ 关于分数落差的说明</div>
+    <p style="margin-bottom:0" data-page-node-id="ssoJfT04RWnX43XEeZOvXF"><b class="ok">v3.19</b>：验收样张库（T39）+ HTTP E2E（T40）已入 CI。<code>SCORE_93.md</code> 工程态估分约 <b>86</b>；对外可承诺交付分仍为 <b>75</b>。冲 95 剩余：真实客户私有样张、Playwright 浏览器 E2E、cov≥85 / SLA。</p>
+  </div>
+</section>
+
+<!-- ══════════ §6 竞品 ══════════ -->
+<section data-page-node-id="Y5KgDEbOE0sojpzE0eLsxH">
+  <h2 data-page-node-id="NwfZDPOu5c2Pl6CdCeKvxD"><span class="idx" data-page-node-id="f0bQkAfpkFwCYBl4dAOivr">§6</span>竞品对比定位</h2>
+  <p class="lead" data-page-node-id="XOQQ1apmc7DN1S4UR9ZK8v">明确 md-bridge 在文档转换赛道中的真实位置（竞品数据基于公开能力与通行认知，非本次实测）。</p>
+  <div class="tw" data-page-node-id="ox0frEx2FIlLtHYbPSIouP"><table data-page-node-id="c94ScNkGCWCZVBmrmtdDgl">
+    <thead data-page-node-id="Wjop01TmDv8AWWohp1Qnrp"><tr data-page-node-id="Ay16JtxpV9ZkMXA71DELHY"><th style="width:120px" data-page-node-id="hELyrsjksMFpqDG2vxnv0o">能力维度</th><th class="c" style="width:110px" data-page-node-id="znNbBSo7O7HztGcFuGi367"><b data-page-node-id="vUL07XS6HIFYaD5k3AOJGd">md-bridge</b><br data-page-node-id="NyrLRKmRaOVug84taDGOKG"><span style="font-weight:400;font-size:11px" data-page-node-id="A8KyOF9qES5v6JJANN4pCq">v0.16.0 实测</span></th><th class="c" data-page-node-id="OMDM3Z7YC6RxJE0JM4Um1v">Pandoc</th><th class="c" data-page-node-id="JmohsrOuFnfgZu58EftU60">docling</th><th class="c" data-page-node-id="BRxuL8Brbqa4jrvpSQDsgV">MarkItDown</th><th class="c" data-page-node-id="H0pou9scGkdShx88z5nqr1">Gotenberg</th></tr></thead>
+    <tbody data-page-node-id="BeaW52p7wAfAa2nCd0KVjm">
+      <tr data-page-node-id="xDRhQq5XcHSgWudxFeGUlk"><td data-page-node-id="pIywVhnPpea5N2YpQttUXf"><b data-page-node-id="1DHcdlymjDqJvAu0dn2FBS">格式广度</b></td><td class="c ok" data-page-node-id="TI2NJaobX7hzChDbweKfP4">18×15 优秀</td><td class="c ok" data-page-node-id="EOyMVZNFUGIFQUcYByl8cf">极广（40+）</td><td class="c pt" data-page-node-id="0HCapD8XuOL2YkK28WAAQp">中（PDF 强）</td><td class="c pt" data-page-node-id="Uah2zDqeGRZ5OOKHcUw5x8">中（偏输入）</td><td class="c pt" data-page-node-id="OigML3b6P5xDLXMBpjO678">窄（Office→PDF）</td></tr>
+      <tr data-page-node-id="Omxq7Sy11gw4I1Myo76phZ"><td data-page-node-id="DsR3FyEKORaqzzlvxcxRwL"><b data-page-node-id="SCWWFj08E5WOUUiPCR091H">语义保真度</b></td><td class="c no" data-page-node-id="HUe8g9Q4SZhYNrxQE8lBnd">100%（v3.7）</td><td class="c ok" data-page-node-id="j1g1ArBjv9bt89APMTOOhb">高（AST 成熟）</td><td class="c ok" data-page-node-id="Cgx8chrSBuNZuNfTUJfcKa">高（ML 布局）</td><td class="c pt" data-page-node-id="8UHDR7fZiQGaxVRa6VhNC3">中（偏 MD 直出）</td><td class="c ok" data-page-node-id="eMlsvK4R7zEx88ilADmlFh">高（渲染保真）</td></tr>
+      <tr data-page-node-id="9QfTSpsGfHYUHbEIs4AYh0"><td data-page-node-id="9kuZ1zhwSXknillTUjpg7n"><b data-page-node-id="hpwKyzPFPmW11vxqLoF5Jb">本地私有化</b></td><td class="c ok" data-page-node-id="1AQsnZSQi6k8kdXzzApRM4">✓ 全本地</td><td class="c ok" data-page-node-id="IvKhUbzzHGragHZP45zals">✓</td><td class="c pt" data-page-node-id="yi9i6AdOLIpLuqsq83k23T">需下载模型</td><td class="c ok" data-page-node-id="zTROiae6SJV20IkdslPHGz">✓</td><td class="c ok" data-page-node-id="w7l1GLsfb9mzPGbLOhjsIo">✓</td></tr>
+      <tr data-page-node-id="Gj4cM7Qwsx3XbAfCImHK7W"><td data-page-node-id="fi6XLsprEGAPYpkmlxHWqw"><b data-page-node-id="X6OP8x5QgmpcxCSLFRrVxE">协议洁净度</b></td><td class="c ok" data-page-node-id="E3LtaxAo7fGzcJ61yHLPFs">MIT+BSD（禁 GPL）</td><td class="c no" data-page-node-id="PTxn6kPNRy9i5rBDOjxACR">GPL-2（传染）</td><td class="c ok" data-page-node-id="HPrbXJ0QlTKRtEmCUVFzKq">MIT</td><td class="c ok" data-page-node-id="Eazt3GpNVQ6DfLThicar2L">MIT</td><td class="c ok" data-page-node-id="bzAx5omQFCpwaVvhjBAeBz">MIT</td></tr>
+      <tr data-page-node-id="NaKlGyGfyLQDQqSbwnaRLQ"><td data-page-node-id="Cqf6lwsaROOEdQBMQX0Rb1"><b data-page-node-id="JMewqkth3JagCcWIsxrlPF">Web UI + API</b></td><td class="c ok" data-page-node-id="NqZxD9be9KtIhTFradyyCq">✓ 完整（7/11 端点）</td><td class="c no" data-page-node-id="jzNSxHfQPKQPpqVUZMzL3R">无</td><td class="c pt" data-page-node-id="NMvitI8HId2c2pxy6o6CB2">仅 API</td><td class="c no" data-page-node-id="HwTkdcN8rGk902CXVwRGDR">无</td><td class="c ok" data-page-node-id="dLWCLAiN7zj6U7Rg99GXyv">✓ 仅 API</td></tr>
+      <tr data-page-node-id="ygJcjOJmcnEMUV89eGRAEw"><td data-page-node-id="A83qt5JXaAdAJguYDkpNno"><b data-page-node-id="nwCZPzb2gO4gXiQh97G3xA">多租户 / 配额</b></td><td class="c pt" data-page-node-id="oytBlCG0e4PBSKFR7xYgZL">有实现，默认关闭</td><td class="c na" data-page-node-id="agAykhUSNDpe3LmP1TmCpN">N/A</td><td class="c na" data-page-node-id="BzL0EJM3DUOfVqKAqwneFv">N/A</td><td class="c na" data-page-node-id="UGpyI9rAqjKXP2SYD2rxyR">N/A</td><td class="c na" data-page-node-id="t4iB01OQpyknAqanFGgScb">N/A</td></tr>
+      <tr data-page-node-id="cm7AEJnkGy199nqVW3P51J"><td data-page-node-id="OfHPnqc0vrjvqRDoHUx7Yi"><b data-page-node-id="ziHTLAq7rO5byxt9B58ReC">输出安全加固</b></td><td class="c ok" data-page-node-id="CB3NWmQToRSm1ozfssqBV1">已加固（CSV 公式中和 / HTML XSS / LaTeX 危险原语）</td><td class="c pt" data-page-node-id="PVeMHTGncYWYMNYzVsgaXj">部分</td><td class="c pt" data-page-node-id="Lb6DD9pOUCu4rgEhWYC1ZN">部分</td><td class="c pt" data-page-node-id="j42BJ9J6ufAGyaeHTFz5iu">部分</td><td class="c pt" data-page-node-id="G1TEtZtABWwZRRgU4yKcCU">部分</td></tr>
+      <tr data-page-node-id="yETjbDc4Csps1EoTEOxjlH"><td data-page-node-id="KYThgIimOSZHHknuSpbPCX"><b data-page-node-id="wjFBB3d4CYwvVkiiDw97DX">差异化定位</b></td><td colspan="5" style="background:var(--blu-bg);color:var(--ink)" data-page-node-id="ogaqozA8R48DdQmINLLP77"><b data-page-node-id="56VJddKj3oVk0viQNF3wBD">真实优势</b>：协议洁净（MIT + vendored Rust，可闭源商用）+ 全形态交付（SDK/CLI/Web/API）+ 多租户雏形。<b data-page-node-id="8ibwILSJ4MpljAxbci6FYu">残余短板</b>：Office 原生 SmartArt 算法树 / 复杂 OLE 预览图标仍非对标目标；生产须显式配置鉴权密钥。</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ══════════ §7 路线图 ══════════ -->
+<section data-page-node-id="OSshI3FoHHCFBEphgcBoYk">
+  <h2 data-page-node-id="9tQ2PqiEj87QFLHhDHG1YN"><span class="idx" data-page-node-id="qvUdv1B6uy8qL4bgES9syz">§7</span>修复与升级路线图</h2>
+  <p class="lead" data-page-node-id="vdyEKi96OYQ4OOE9rUT1Xi">按"先止血、再固本、后扩张"三阶段，每个任务均绑定具体文件行号。</p>
+  <div class="co co-g"><div class="co-t">✓ 路线图执行状态（v3.21）</div>
+  <p style="margin:0;font-size:13px"><b>T10–T30</b> 主体 CLOSED（含 clippy）。残余合同项：扫描 OCR（默认关）、真实客户样张、Playwright。</p></div>
+
+
+  <h3 data-page-node-id="gYXV03YqtSKJfRRsPrWxS0">阶段一 · 止血（P0 冲刺，建议 1-2 周内完成）</h3>
+  <div class="tw" data-page-node-id="5U5yKhinXLKQZfClIQ7f6K"><table data-page-node-id="pRzkl3qwvnYbtErHQYDBpr">
+    <thead data-page-node-id="rpfbM0hKF7lFwpy86fLvIH"><tr data-page-node-id="UDrpgdtTtqiOmjWp6Bl5mY"><th class="c" style="width:52px" data-page-node-id="wBjJcqfHG4U81aAQ2VeQnQ">任务</th><th style="width:96px" data-page-node-id="yAHLRiAvh9ZU5frOzhH400">类别</th><th data-page-node-id="5EVypWZfEESx9BbADBwY5f">动作</th><th style="width:76px" class="c" data-page-node-id="VMULeJCpI3KHJKqapkPdrX">优先级</th></tr></thead>
+    <tbody data-page-node-id="Rmc5aZzVac8AkOEZ8vudLT">
+      <tr data-page-node-id="8QQrmcfJdKpyQFUGEtD9u0"><td class="c num" data-page-node-id="B68nV9J7QRVoBrFueW50d9">T1</td><td data-page-node-id="z88rMqIM6lxj1E48uOzwyn"><span class="b b-p0" data-page-node-id="G6wIQb3Q6XvWnfi6xQWzA6">正确性</span></td><td data-page-node-id="5u7YFoJDCOGKWDfbEb2DST"><b data-page-node-id="1NWNzAb3ajr4uQG0j6JdaQ">流式分块器改状态机</b>（<code data-page-node-id="0SALp8MdSMqik4bTcrkgC4">stream_convert.py:118-137</code>）；最小止血：含 <code data-page-node-id="VHYSHE35BaIgXqaloUIqtf">```</code> 的文档强制回落模型通道</td><td class="c" data-page-node-id="AANaqCfIeuoB0ILhxLpDKB"><span class="b b-p0" data-page-node-id="UY16FrphXmONrzT6WNu7m4">阻断</span></td></tr>
+      <tr data-page-node-id="FffeLY2kr380dzKpeXsB3n"><td class="c num" data-page-node-id="VA9EnB5JThInjVt2tmREPW">T2</td><td data-page-node-id="2keQu2mHFZiC3LboyHL5F6"><span class="b b-p0" data-page-node-id="zy3ggEW3ml85a4CNLxKys5">正确性</span></td><td data-page-node-id="44qTaCeIB4aDWsuhGgsBEH"><b data-page-node-id="A67qTnzBluZ3oTTeCa76P2">Markdown 预处理器改 token 层</b>（<code data-page-node-id="3gUWaDF17prj4pXRP1TQgh">md_importer.py:233-238</code> 与 <code data-page-node-id="RpY2aAunoaImYLVPLnR3lr">:223-230</code>）</td><td class="c" data-page-node-id="mQgiW024wFADUFTnGhWT2E"><span class="b b-p0" data-page-node-id="H8vb7mWY8iyreh0noZUN7j">阻断</span></td></tr>
+      <tr data-page-node-id="54mBgofB1lKl4IrTAy8nO0"><td class="c num" data-page-node-id="2jxEBDncT5Q31nFYb1ASaD">T3</td><td data-page-node-id="EspWPgbrbHP3S3uNmR1lYC"><span class="b b-p0" data-page-node-id="bRHkQO6d1SEUCoOlcY6HG0">正确性</span></td><td data-page-node-id="BRp6kpvUECrlzvdbpoYTLN"><b data-page-node-id="NvUHy8BOFuLIQ2WGF5t2pd">修 EPUB 去混淆</b>：<code data-page-node-id="kNBti8WdKZfnqQiXywYpxm">sha1(epub_id)</code> 20B 密钥 + <code data-page-node-id="HJiLDhW9tYzL2VnwZ3B03C">min(1040,...)</code> + try/except（<code data-page-node-id="vWtlScvEDHex21fxpyy3r4">epub_text.py:168-173</code>）</td><td class="c" data-page-node-id="6CyIqSsZpQkAsdu6ys0Q2K"><span class="b b-p0" data-page-node-id="CwlFiPwaKH6QaA2vbWIfCo">阻断</span></td></tr>
+      <tr data-page-node-id="WoTrB34s6H33cnU7Ey4lPj"><td class="c num" data-page-node-id="rv4aGp6kJla6vI2enUudm3">T4</td><td data-page-node-id="LHje2G0746bQSIvGQrbPKT"><span class="b b-p0" data-page-node-id="G7ztDOTNbVGjqaGkYSv5fQ">安全</span></td><td data-page-node-id="JBtIdnTI1SM72jqEZbHKRC"><b data-page-node-id="qvwqfSQHBjLk2E5MVTWIML">CSV 公式注入中和</b>（<code data-page-node-id="XD7FrMyFVJAuRkZaOWAjDZ">csv_exporter.py:26</code>）+ <b data-page-node-id="D4SBQOYRWsaVQ1fl4RXIeC">HTML 白名单</b>（<code data-page-node-id="AoymrECiEaRcIFCIXShxMN">html_render.py:158</code>）+ <b data-page-node-id="QWI98g918GYXibMlprviLg">mime_type 转义</b>（<code data-page-node-id="BSMubk1EXIofjW8ihdA2dr">:97</code>）</td><td class="c" data-page-node-id="gGePbLTO5cGlRbSC8hhuDp"><span class="b b-p0" data-page-node-id="D5mqR3pDUqYYTo5IGQH5x6">阻断</span></td></tr>
+      <tr data-page-node-id="RZnQu9hHsnmMvwaJuVv7ip"><td class="c num" data-page-node-id="pjY2LBV771rLZ7iBbDSlwi">T5</td><td data-page-node-id="P3yStpqWO64jESmyhlKhwN"><span class="b b-p0" data-page-node-id="8ahrtDAAFnfuNBb5StaXwH">安全</span></td><td data-page-node-id="3LKbumXilk0iFxZHM49Es0"><b data-page-node-id="kYY5WYFIgdgDy0h9SSJVLF">修中间件顺序</b>（CORS 提到最外 / <code data-page-node-id="nh2QAvnsWBIg1LNakNnuFM">OPTIONS</code> 短路）→ <b data-page-node-id="RibpfGpett4RImQ83QbqpE">再启用强制认证</b>（空凭据即 exit）。顺序不可颠倒，否则会被 revert</td><td class="c" data-page-node-id="40Ex7di20wFu6a7nBm9uZA"><span class="b b-p0" data-page-node-id="sIESrXFQAk1LixsOddj2eM">阻断</span></td></tr>
+      <tr data-page-node-id="h0kmolJtEfyWvhAK8ObFnb"><td class="c num" data-page-node-id="TLqVmFFBhKkYjqhee3W37B">T6</td><td data-page-node-id="43DlCcVfTJ3gH2h8Ky2DoZ"><span class="b b-p0" data-page-node-id="OO81Iec3mIGxwD4z870Bcs">安全</span></td><td data-page-node-id="U6EKDcIyM1ZKV2r17VNLMX"><b data-page-node-id="zGw7lUM2wuwQBJgB56poVX">SSRF 三补</b>：webhook 接入 <code data-page-node-id="VnDD65K7E54xbGaar8xFOl">is_safe_url</code>；safe_fetch 禁重定向 + IPv4-mapped 归一化 + 补齐 5 个网段 + 改白名单式</td><td class="c" data-page-node-id="prFPwWkpn869AbuBdHkBrG"><span class="b b-p0" data-page-node-id="dsspxQAZ11aqU3E7wO3NNn">阻断</span></td></tr>
+      <tr data-page-node-id="LkuVFMP3yuqTVFSuYTQwxp"><td class="c num" data-page-node-id="ittFax2bsZCidaid0ILO9j">T7</td><td data-page-node-id="CR9AAeNP9KHcCNcF5ALKz8"><span class="b b-p0" data-page-node-id="EojLQE7y7hFBuJnVFZBAI0">正确性</span></td><td data-page-node-id="rFypYMRO7tIv65Ot3tN6W4"><b data-page-node-id="eTuZFnIsaa0NaQ0g94lhFA">registry 加锁 + 幂等标记</b>（<code data-page-node-id="TVMYzEGOO0ZM0kNJjPmdBY">registry.py:127-159</code>）；<b data-page-node-id="d0LK2AdmJiO6Hd0wfWrziC">缓存 key 纳入通道参数</b>（<code data-page-node-id="VHCrbBnz4pm5s8R18LEIxv">converter.py:349-365</code>）</td><td class="c" data-page-node-id="SeQrBfGt4ng0UjonF1L76n"><span class="b b-p0" data-page-node-id="Iyg6VGC2x2CGOHADZwmzF2">阻断</span></td></tr>
+      <tr data-page-node-id="USF8C9J6tK3jULTPqwj1u6"><td class="c num" data-page-node-id="1p2XGFLFSUDaOQpwryTE1d">T8</td><td data-page-node-id="WUiNzW7BopoIZaU7esTWbM"><span class="b b-p0" data-page-node-id="srFOWg2EZhX4oJFOyPScHz">正确性</span></td><td data-page-node-id="720pwVzDQg7lMuUvweEecH"><b data-page-node-id="Fl6NSHejl0arfIEcXUQA9l">DOCX 批注作者用 <code data-page-node-id="PzA8F0dApz8wjuzrRo5rNE">quoteattr</code></b>（<code data-page-node-id="8Urk7Rzkw60IqZ6GtIZ4Z8">docx_comments.py:39,54</code>）</td><td class="c" data-page-node-id="ZwGqai47lt808gTpcgo1If"><span class="b b-p0" data-page-node-id="F82By0FTzDZ0BgmrQ0rF1E">阻断</span></td></tr>
+      <tr data-page-node-id="OldrBfuUO8VdzWQCyAaqqB"><td class="c num" data-page-node-id="qka5w5TceWAfjAbKovAL9P">T9</td><td data-page-node-id="s6sYWLF5bR42kMS37G7KZu"><span class="b b-p1" data-page-node-id="7iuT3pjl5MA1sUDsFz8amr">工程</span></td><td data-page-node-id="kZqBBDC3AGiri5z5sf1kHS"><b data-page-node-id="k5U4Zue7KBZGjY8Hrwuqpn">修 CI 主门禁必红</b>（backend job 装 <code data-page-node-id="ROb2bKs4S2j1BFeOEIwyVz">[office]</code> + 构建 native wheel）+ <b data-page-node-id="lbyIABFevb3jvcLetv1Ew7">CI 增加 <code data-page-node-id="qkJBChDSLYQk1ZHZGCxe64">cargo test</code></b> + <code data-page-node-id="8QCftaTTRCkAPjPb8uDjQn">except BaseException</code> 兜 FFI panic</td><td class="c" data-page-node-id="4KRdLnMkVN9po3I3vyUQoj"><span class="b b-p1" data-page-node-id="E5IgRqFcX5AM7rMTgFWs6m">高</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 data-page-node-id="90jECDEVo2MspiFB0l1Zgq">阶段二 · 固本（P1 迭代，建议 3-5 周）</h3>
+  <div class="g2" data-page-node-id="zygkPBrFlP7Ak0OdVJxuYh">
+    <div data-page-node-id="8kFpbEVyamTY0QTf15rcBM">
+      <h4 data-page-node-id="GX4YmReCEHlfx9P6sBNIuu">正确性（T10-T15）</h4>
+      <ul style="font-size:13px" data-page-node-id="V90RhCvwQ8Bh5wMavOB1Xq">
+        <li data-page-node-id="7aiZjQqNwN0w0asFjCe9Js"><b data-page-node-id="uD8vdpowFyvgbF0vnBwmOb">T10</b> anydoc 硬失败降级契约修复 — <span class="ok">CLOSED v3.21</span></li>
+        <li data-page-node-id="nE64Evufs0VwsoAQgiDF7w"><b data-page-node-id="w4lwnbcEIldTGOMllDZ71p">T11</b> job 状态机：done 提交移出 try — <span class="ok">CLOSED v3.21</span></li>
+        <li data-page-node-id="2Nq4u9yVT4AvGYOtygENje"><b data-page-node-id="GgFjFxdyfG8rYFc7AeIZbc">T12</b> SQLite 单例 + WAL + timeout — <span class="ok">CLOSED</span></li>
+        <li data-page-node-id="UfGz2SV6Fx5bjo3E6bRfUE"><b data-page-node-id="FiGPfjoTu35dWmwMo8q3X8">T13</b> ContextVar 跨线程传播 — <span class="ok">CLOSED v3.21</span></li>
+        <li data-page-node-id="HGTFHHAMFT9cyE8yoUwppn"><b data-page-node-id="Mrpfw3AAG1SGnQDPnJSpVA">T14</b> 页眉不再注入正文 — <span class="ok">CLOSED</span></li>
+        <li data-page-node-id="sVMQTSK4Pg3w9CKykD1G7u"><b data-page-node-id="A1Ts67AIdIGWDobvuVQvud">T15</b> pdf_font_fix 加启用门控 — <span class="ok">CLOSED</span></li>
+      </ul>
+      <h4 data-page-node-id="SlOWZs25KxDouNGPv5IZCK">性能（T16-T20）</h4>
+      <ul style="font-size:13px" data-page-node-id="5gfXGvhewAxr6AgPpBOSoP">
+        <li data-page-node-id="SBVTBjuGCBFNckBg7RfmuG"><b data-page-node-id="MtqH2sWe743hdta27NOhyS">T16</b> PDF 子集化去 deepcopy — <span class="ok">CLOSED v3.5</span>（新鲜 TTFont，取消 deepcopy）</li>
+        <li data-page-node-id="Hr7gus3aFXp5KXd22pZ78n"><b data-page-node-id="WJ1hRhsOVBjlw9vPQtfDHu">T17</b> SpillBuffer 追加写 — <span class="ok">CLOSED</span></li>
+        <li data-page-node-id="96IqdI0vpXUhnYDhb7DHls"><b data-page-node-id="XaRRGuDvhE6kQQ4kJN6AYy">T18</b> async 内阻塞 I/O 改 run_in_executor — <span class="ok">CLOSED v3.20</span>（job create / convert prep / batch ZIP）</li>
+        <li data-page-node-id="CSPUeHmhKE7hvvzTp2AFUC"><b data-page-node-id="iIykaLzHtEANdZHLjKRG9b">T19</b> 有界任务队列 + 真实内存计费 — <span class="ok">CLOSED v3.20</span>（结果驻留 RAM 计费 + sync reserve）</li>
+        <li data-page-node-id="tmIEFSQA5eNiol6PQUrnCb"><b data-page-node-id="BBbuBrwwy8A6UT1ORE08vC">T20</b> PDF 重复解析合并（4 次 → 1 次） — <span class="ok">CLOSED v3.20</span>（auto 单次 extract）</li>
+      </ul>
+    </div>
+    <div data-page-node-id="eLdnCaqxk0GgqJuCj8U97y">
+      <h4 data-page-node-id="NF8BWDCgSH4sqAc4ELPugQ">安全（T21-T25）</h4>
+      <ul style="font-size:13px" data-page-node-id="XhKHMhkeEFLaqbButrjEwp">
+        <li data-page-node-id="opNZVrZHB9fCiF22W5D26m"><b data-page-node-id="FZiDbn1s4KupZVHGGx6sh6">T21</b> 任务列表/结果强制鉴权 + per-job token — <span class="ok">CLOSED v3.12</span></li>
+        <li data-page-node-id="R4vYTPj8lM9gOI4ixJIjHm"><b data-page-node-id="fF5xVVoLVUQ2PglXRLjrgg">T22</b> 对外模型移除 <code>result_path</code>/<code>callback_url</code> — <span class="ok">CLOSED v3.21</span></li>
+        <li data-page-node-id="vuvxNRWQz0gCC7bNjgd29T"><b data-page-node-id="RfyePgamFlngcadMSm0BiT">T23</b> health 拆 liveness/status；license 隐藏 machine_id — <span class="ok">CLOSED v3.20</span></li>
+        <li data-page-node-id="vgHH79MkbQUWI6gXPHsUEE"><b data-page-node-id="1bo1pkPg6PRgUI0whTgcme">T24</b> 解压炸弹限额 + defusedxml — <span class="ok">CLOSED v3.20</span>（pptx/odt/ods/odp/epub + ZipInflateBudget）</li>
+        <li data-page-node-id="hmrqUlQcXJjOAo6f2Pqu4X"><b data-page-node-id="kqUCBOdIfFAMw67TQV8pBo">T25</b> uvicorn <code>--proxy-headers</code> 恢复真实 IP — <span class="ok">CLOSED</span></li>
+      </ul>
+      <h4 data-page-node-id="yGoIx1YbDV2Nd0gRDTCHXY">工程化（T26-T30）</h4>
+      <ul style="font-size:13px" data-page-node-id="E2K51z4T6yFUweWqAJ74P5">
+        <li data-page-node-id="auqqAr5QcKgkNYDN2gCmtA"><b data-page-node-id="3EvGQ1ZmThklMRodmQcDIj">T26</b> CI 加 <code>cargo test</code> + clippy <code>-D warnings</code> — <span class="ok">CLOSED v3.21</span></li>
+        <li data-page-node-id="6XHV1gE1Q47MN0knBP4HiC"><b data-page-node-id="6c3ilwt6OJ88kiMIGIW3CE">T27</b> 前端补测试 — <span class="ok">CLOSED* v3.12</span>（node:test smoke；非 E2E）</li>
+        <li data-page-node-id="sSPKm5UG0O8IcK8hqoCxUQ"><b data-page-node-id="rxQFSwMS189KcQgL1wvtuD">T28</b> 清理 OR 弱化断言 — <span class="ok">CLOSED v3.13</span>（golden 门禁）</li>
+        <li data-page-node-id="HKXPue01YViNzmp9ehCOyU"><b data-page-node-id="DAcyExXI8OlxgzAxmD1MB1">T29</b> <code>UPSTREAM_REV</code> — <span class="ok">CLOSED</span>（SHA 已钉）</li>
+        <li data-page-node-id="F5pRfw6w2FQKJm8dn5uqmy"><b data-page-node-id="A6JcsJ8VN6xtfq1SHHJLQa">T30</b> Dockerfile 非 root + npm ci + 安全头 + HEALTHCHECK — <span class="ok">CLOSED v3.12</span></li>
+      </ul>
+    </div>
+  <h3>阶段三 · 内置化（v3.5 已启动 / 持续加深）</h3>
+  <div class="co co-g"><div class="co-t">✓ 结构性风险「外挂式广度」对策</div>
+  <ul style="font-size:13px;margin:0;padding-left:1.2em">
+    <li><b>T31</b> DOCX 内置 python-docx 路径（docling 可选）— <span class="ok">CLOSED</span></li>
+    <li><b>T32</b> ODS/ODP 原生 content.xml — <span class="ok">CLOSED</span></li>
+    <li><b>T33</b> 原 anydoc-only 全量注册内置兄弟（OLE 降级标注 degraded）— <span class="ok">CLOSED</span></li>
+    <li><b>T34</b> anydoc 语义改为加速层；/api/formats 暴露 builtin_coverage — <span class="ok">CLOSED</span></li>
+    <li><b>T35</b> PDF 子集化去 deepcopy — <span class="ok">CLOSED</span></li>
+    <li><b>T36</b> OLE XLS/PPT 结构化解析（BIFF8 + PPT atoms）— <span class="ok">CLOSED v3.13</span></li>
+    <li><b>T37</b> 扫描 PDF OCR 能力边界 API — <span class="ok">CLOSED*</span>（默认关；引擎仍可选）</li>
+    <li><b>T38</b> Docker INSTALL_NATIVE=1 + /api/health/ready — <span class="ok">CLOSED v3.12</span></li>
+  </ul></div>
+
+  </div>
+
+  <h3 data-page-node-id="ov1z9yx2lAkK7IQPglPEct">阶段三 · 扩张（功能广度与垂直深度双线）</h3>
+  <div class="tw" data-page-node-id="daRnAnQb3jiN8J47ytxANV"><table data-page-node-id="RS3DXJGxyEQU3jy83qaRIo">
+    <thead data-page-node-id="BjxEsRZWi8SEPydVgq3TvB"><tr data-page-node-id="hXCuykHgfBICFnE2YSgnKc"><th class="c" style="width:52px" data-page-node-id="ILmHL3dmESstFD8aj8N2Zj">任务</th><th style="width:96px" data-page-node-id="pa5FELierAJEvN4eSq49O4">方向</th><th data-page-node-id="wsqEqC3Y4IURXgqZWBce18">动作</th><th style="width:120px" data-page-node-id="2KjRkoMS33YNdU1giylgi9">预期收益</th></tr></thead>
+    <tbody data-page-node-id="TnbQH5vS1OHgf7q9B294R9">
+      <tr data-page-node-id="rTqIqotHZEdHeVlhJ4OKC6"><td class="c num" data-page-node-id="pXP7sfCObBAt9HcYai7SdE">T31</td><td data-page-node-id="FOlNEr3R4c2sW8ppvo3wQQ"><span class="b b-c" data-page-node-id="skUBfgT3BUs8rknnrJUuvA">垂直</span></td><td data-page-node-id="RoQbIgUNxr0JCDkwkMX04L">补齐 AST 七节点：<code>Section/PageSetup/HeaderFooter/FieldCode/Bookmark/RunStyle/Numbering</code></td><td data-page-node-id="cYctNcIQh37U1dVTwga7BV"><b class="ok">CLOSED</b> 模型 + OOXML 写入（v3.10/11）</td></tr>
+      <tr data-page-node-id="r7sKw1AluLduMQBhZiMG1B"><td class="c num" data-page-node-id="sEFWWblLESp4HIbKVDG6k7">T32</td><td data-page-node-id="Yz0WN8h4aEAqU1ZKA7bG6G"><span class="b b-c" data-page-node-id="AaEsxBCPjexomVjVOri0Jd">垂直</span></td><td data-page-node-id="UhLXOiKAzGdkl0hvnCjOmE"><b>XLSX 导出重做</b>：mergeCells、列宽、数值/日期类型、去 8 表硬顶（默认 64）、真实 pivot 部件</td><td data-page-node-id="zDcSNnMv1XhI4fRPaMMZOM"><b class="ok">CLOSED* v3.14</b> · 保真继续加深</td></tr>
+      <tr data-page-node-id="S0rd2EjxDhzpfVln72lSM6"><td class="c num" data-page-node-id="o7P8Yb9OgC0v2Hqrm23iad">T33</td><td data-page-node-id="yAGdYdm59klzlg4fXC5WdU"><span class="b b-c" data-page-node-id="0FjtVgcvV75orKOwWstD6d">垂直</span></td><td data-page-node-id="TjDpZxZ00F87GhQp3l6ocO">DOCX 真列表（<code>w:numPr</code>）+ TOC 域 + 多节 sectPr + 扩展 TeX→OMML</td><td data-page-node-id="zCliGMWjDOoLY8v0aMgoNH"><b class="ok">CLOSED* v3.17</b> · 含 matrix/cases</td></tr>
+      <tr data-page-node-id="1dcyGWomMSL2NADSNSNRI5"><td class="c num" data-page-node-id="RYorizvBYrBNHdZFuUveXK">T34</td><td data-page-node-id="1ufVYS1mnxbg6CiI3k7ajf"><span class="b b-c" data-page-node-id="q2wW5ZABvzD0MXALxyyKxM">垂直</span></td><td data-page-node-id="ooUke2Sw9VnfmRLE9iwh16">统一「节点丢弃告警」：exporter <code>warnings[]</code> + API <code>X-MdBridge-Export-Warnings</code></td><td data-page-node-id="PIlDjKf1Lq5H29thhSrBmF"><b class="ok">CLOSED</b></td></tr>
+      <tr data-page-node-id="D5Rw5Vt9o69Wfzy7DnDnlz"><td class="c num" data-page-node-id="vzi9J7ZqXH7dLJ5tEDvcAv">T35</td><td data-page-node-id="MAGs8xsOkO3xs33o07geLt"><span class="b b-c" data-page-node-id="aApDZTeGeckGCyNJ3eMwL6">广度</span></td><td data-page-node-id="eReR2k5PycNHKmeko2wqFv">补图表（chart）：AST + XLSX DrawingML（bar/line/pie/area）导入导出；PPTX/HTML/JSON 路径</td><td data-page-node-id="DPQWECRCyeBBOVc3pmAq7E"><b class="ok">CLOSED v3.15</b> · 非双向公式引用；scatter 降级 line</td></tr>
+      <tr data-page-node-id="3d8bSJ8Bkn0svxbWD7BOlp"><td class="c num" data-page-node-id="5NiAPhMkwuoPXQpacEQi5q">T36</td><td data-page-node-id="dT9dxlAIBKJinw2Ty3rXf4"><span class="b b-c" data-page-node-id="TgbvY6uCFKjz0aaYTSYBiB">广度</span></td><td data-page-node-id="bPs0NPYqfu6omUvIvzfNTA">PPTX 演讲者备注 + 元信息页分页</td><td data-page-node-id="9ymjcDQzJ1cFHgPjwyDIk2"><b class="ok">CLOSED</b></td></tr>
+      <tr data-page-node-id="ay3jGLoebWVTTFClDf7krv"><td class="c num" data-page-node-id="JvfP1KIIN7dBbWmWzE7goV">T37</td><td data-page-node-id="PAgcAYydXuNhFAl1SQoAIV"><span class="b b-c" data-page-node-id="ue8ckcKA5NzGVnogthLiiJ">广度</span></td><td data-page-node-id="VUuQiXZ55xPW1d8d7gnyQq">前端暴露 <code>/api/usage</code>、<code>/api/license</code>、<code>/api/metrics</code></td><td data-page-node-id="fegdpIHsMqmmokcrnFtMav"><b class="ok">CLOSED v3.14</b> ·「用量/授权」页</td></tr>
+      <tr data-page-node-id="XadG60BxFVf2iRix2aPMHu"><td class="c num" data-page-node-id="514ZPUsxMTTX6yHU0wl7zA">T38</td><td data-page-node-id="D8TZObaJND4BJszvcxhsQD"><span class="b b-c" data-page-node-id="bZzRhRFAdTRfTfUZqlMG0h">性能</span></td><td data-page-node-id="KY1YJT0YtjYsrRo6aBkhaZ">转换引擎池化（<code>convert_pool_workers</code>）+ jobs/batch 池 + 大文档 stream 分块</td><td data-page-node-id="EXdd5f94PQEG06caB9CSFc"><b class="ok">CLOSED* v3.14</b></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ══════════ §8 结论 ══════════ -->
+<section data-page-node-id="PtF5Li6yQp7SXmRmjPnMdn">
+  <h2 data-page-node-id="zjbTX7xMKYezM2DAr9z6LK"><span class="idx" data-page-node-id="xnafTowRpzsCumVfbPRWeo">§8</span>总体结论与建议</h2>
+  <p class="lead" data-page-node-id="3SeaoWNXpZ9ccumsWZrkUQ">回答 BOSS 的核心命题：功能是否强大、是否全面。</p>
+
+  <div class="g2" data-page-node-id="S8MTAEoYEAQFkfWfymursL">
+    <div class="card" style="border-color:var(--amb-line);background:var(--amb-bg)" data-page-node-id="CCJTmHzyBEMgGj767sGrj4">
+      <div class="k" style="color:var(--amb)" data-page-node-id="3PgkAdhMB9wlfBqTbaaBtY">功能广度 · 78 分</div>
+      <div class="v" style="color:var(--amb);font-size:20px" data-page-node-id="r03A3fAh1h4cwgdhQshaL4">铺得开，但站不稳</div>
+      <p style="margin-top:8px;font-size:13px" data-page-node-id="RCoPmHAwYJ8YwPeC54QWCC">18 导入 × 15 导出在同类中属第一梯队，105/105 矩阵可用率证明了工程完成度。v3.5 起广度已<b data-page-node-id="U8eU2tNuPgSk3f5NmN0oH0">内置化</b>：抽掉 anydoc/docling 后矩阵仍可读（OLE 系降级、OCR 仍可选）。<b data-page-node-id="nkArDVIixiQJhU9lay6VHH">下一步是加深 OLE/扫描 PDF 保真，而非补格式空洞。</b></p>
+    </div>
+    <div class="card" style="border-color:var(--grn-line,#86efac);background:var(--grn-bg,#ecfdf5)" data-page-node-id="isMOPvOuefDQhd8BBGGQAC">
+      <div class="k" style="color:var(--grn)" data-page-node-id="lY4PTThQz2d9StJyN7yr4H">功能垂直深度 · 86 分</div>
+      <div class="v" style="color:var(--grn);font-size:20px" data-page-node-id="Bgt3jfhXz9QBq5fBGthPzX">矩阵全绿 + stub/多节/OMML</div>
+      <p style="margin-top:8px;font-size:13px" data-page-node-id="R5kOMJgJwucesHZUPUAEkG">§1.2–§2.2 与验收/CI 已对齐；v3.19 补齐样张库与 HTTP E2E。残余：Office 原生 SmartArt 算法树、复杂 OLE 预览、真实客户样张、浏览器 Playwright。</p>
+    </div>
+  </div>
+
+  <div class="co co-o" style="margin-top:18px" data-page-node-id="Q1w0yxt6TlGCcHGe8PSEo6">
+    <div class="co-t" data-page-node-id="M2lwpDLweUtXuNfubYVZtA">◆ 一句话判定</div>
+    <p style="margin-bottom:0;font-size:15px" data-page-node-id="PS6tQiYCvYkyNuNmqdokA5"><b data-page-node-id="Ey7UeL429zEHt8FPrc2uZL">md-bridge 是一个"架构值得押注、交付面已显著收口"的项目。</b><b data-page-node-id="sDOsV4C8AwSyTEsA6qKCZL">v3.14–v3.19</b> 已覆盖保真深度、输出安全、验收基线、CI 保真门禁、样张库与 API E2E；运维侧仍须显式配置生产鉴权密钥。下一优先：真实客户私有样张 / Playwright / cov≥85（冲 95）。</p>
+  </div>
+
+  <h3 data-page-node-id="Dee83OkyJvRamYz8dAHj5K">建议的下一步（执行态 · v3.19）</h3>
+  <div class="tw" data-page-node-id="QuCxS87SwIi5fqB6BXA261"><table data-page-node-id="EMUhLQhVOaBgWiQV87HNqj">
+    <thead data-page-node-id="sGO3nGX5tApN7Wrq9cEqgM"><tr data-page-node-id="hkFH2kuCvpTxrcNxKCIQ5x"><th style="width:118px" data-page-node-id="Pb3PvrOiyPfdrSVJHA5ux6">方向</th><th data-page-node-id="3DmMxSzpknVSp3qLVX5GxH">说明</th><th style="width:96px" class="c" data-page-node-id="XTABZkaEoKFzJsBM4l09Qu">状态</th></tr></thead>
+    <tbody data-page-node-id="KF9lV4hfHDf5iapv78lnLK">
+      <tr data-page-node-id="g8cqJbZK158hgsBO174aQQ"><td data-page-node-id="uqp6Ew5fouLgCzu227X7r5"><b data-page-node-id="QrAk2HL97FdihpDjcm68kU">A. 立即执行阶段一</b></td><td data-page-node-id="S8zDMldIqFtyS78PgFxjwI">T1–T9 P0/P1 阻断项（认证、中间件、SSRF、输出安全等）</td><td class="c" data-page-node-id="we1hxjT9CemGBfVuV3PAuO"><span class="b b-ok">CLOSED</span></td></tr>
+      <tr data-page-node-id="fv3U7XHEOqDZERIZ0INGnK"><td data-page-node-id="uTyF9AScxXdOZ0npAxM1jx"><b data-page-node-id="7iFeJAwoBDtD4XgQrxjafJ">B. 只做保真度冲刺</b></td><td data-page-node-id="e0SxzrnMC7VfhHKgKmelyO">T31–T33+（AST 七 stub、XLSX、DOCX 列表/TOC、OMML/SmartArt/OLE）已加深至 v3.17</td><td class="c" data-page-node-id="CUdS1H91TPrlRTAk1vPAFH"><span class="b b-ok">CLOSED*</span></td></tr>
+      <tr data-page-node-id="9YEEhpSbz28eAEulT697Nm"><td data-page-node-id="iy7sH6cEvDx0xpJZavDnz3"><b data-page-node-id="T5C53ZRcBSIjKAfI8EE7NJ">C. 重订验收基线</b></td><td data-page-node-id="rkmo4At9eQdVASJEL6PpV3"><code>SCORE_93.md</code> / <code>ACCEPTANCE.md</code>：三维 75→95；删除虚高 98 与不存在测试引用</td><td class="c" data-page-node-id="Qh3eySwznPMwunCZibQuwq"><span class="b b-ok">DONE</span></td></tr>
+      <tr data-page-node-id="lBS1SUKKo6CVjjogvG0LPL"><td data-page-node-id="qAIurwZ2vmusLGZawO5H2c"><b data-page-node-id="935w8yUqvredMEL940VsHG">D. 建立保真度回归门禁</b></td><td data-page-node-id="1hHFvDbK05DCCtiO8jR6kJ">CI job <code>fidelity-gates</code>（矩阵/深度/安全/认证）+ 前端 <code>npm test</code></td><td class="c" data-page-node-id="1IEmpf24mOsnQgVEDOQZ9f"><span class="b b-ok">DONE</span></td></tr>
+      <tr><td><b>E. 验收样张库</b></td><td><code>fixtures/sample_pack</code> + <code>test_sample_pack_t39.py</code>（CJK/语义/表格多目标哨兵；客户抽检代理）</td><td class="c"><span class="b b-ok">DONE*</span></td></tr>
+      <tr><td><b>F. HTTP E2E</b></td><td><code>test_api_e2e_t40.py</code>：health/formats → 鉴权 convert → Job Token 拉结果（非 Playwright）</td><td class="c"><span class="b b-ok">DONE*</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="foot" data-page-node-id="Bk8MinCXz492g8J4CFAp1z">
+  <div class="fl" data-page-node-id="38eeVXA3nEcCdlFePunWDj">
+    <div data-page-node-id="FHPXGk0uN9PNgngllqbHRf">
+      <b style="color:var(--ink-2)" data-page-node-id="oAZEZ1mTFBwTnCo0wzQe0o">md-bridge v0.16.0 全功能深度评估报告 v3.3</b><br data-page-node-id="vJIToyEXPgfo3vyIrTuCCL">
+      五路并行代码审计 + 13 项缺陷实机复现 · 全部 P0 均经本人验证<br data-page-node-id="xUWQfV81Odezz6h9GBFxJE">
+      <span style="font-size:11.5px" data-page-node-id="IdY4IvBoPDTp2Q72JEIoXF">核验环境：项目 venv / Python 3.12.7 / anydoc 原生扩展已编译 / WeasyPrint 降级态</span>
+    </div>
+    <div class="sig" data-page-node-id="jq84q1nZWegVFOpGWKAuPd">生成于 2026-09-02 · 修订 v3.21 T10–T26 收口 / clippy · crayfish-team 内部评估材料</div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

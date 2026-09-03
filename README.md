@@ -3,14 +3,14 @@
 [![CI](https://github.com/crayfish-team/md-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/crayfish-team/md-bridge/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/md-bridge.svg)](https://pypi.org/project/md-bridge/)
 
-**本地私有化文档交换枢纽** — 把 Office、PDF、电子书、表格、标记语言等文件，经统一 AST 双向转换为 MD / DOCX / PDF / HTML / EPUB / XLSX 等 **16 种目标格式**。提供 Python SDK、CLI、FastAPI 与 Vue3 Web UI；默认纯本地处理，不依赖第三方云端 API。
+**本地私有化文档交换枢纽** — 把 Office、PDF、电子书、表格、标记语言等文件，经统一 AST 双向转换为 MD / DOCX / PDF / HTML / EPUB / XLSX / ODT / ODS / ODP 等 **18 种目标格式**。提供 Python SDK、CLI、FastAPI 与 Vue3 Web UI；默认纯本地处理，不依赖第三方云端 API。
 
 | 指标 | 数值 |
 |------|------|
 | 包版本 | **0.16.0** |
 | 源格式 | **29** |
-| 目标格式 | **16** |
-| 后端测试 | **374** collected（CI 默认跳过 live OCR `@integration`） |
+| 目标格式 | **18** |
+| 后端测试 | **924** collected（CI 默认跳过 live OCR `@integration`） |
 
 ---
 
@@ -120,7 +120,7 @@ md-bridge 不是「又一个格式转换脚本」，而是一套**可部署的�
 | 方向 | 格式 |
 |------|------|
 | **源（29）** | `md` `txt` `html` `docx` `doc` `docm` `pdf` `pptx` `ppt` `pps` `pot` `pptm` `ppsx` `ppsm` `xlsx` `xls` `xlsb` `xlsm` `ods` `odp` `csv` `odt` `rtf` `epub` `mobi` `azw3` `kf8` `latex` `json` |
-| **目标（16）** | `md` `txt` `html` `docx` `pdf` `pptx` `epub` `mobi` `azw3` `kf8` `latex` `csv` `odt` `json` `xlsx` `rtf` |
+| **目标（18）** | `md` `txt` `html` `docx` `pdf` `pptx` `epub` `mobi` `azw3` `kf8` `latex` `csv` `odt` `ods` `odp` `json` `xlsx` `rtf` |
 
 运行时列表：`GET /api/formats` · `mdbridge formats` · 源码 `backend/app/core/converter.py`
 
@@ -252,7 +252,7 @@ md-bridge/
 │   ├── app/core/            # AST, convert, jobs, metrics, security
 │   ├── app/importers/       # anydoc_bridge, docx, pdf, ocr, …
 │   ├── app/exporters/       # md, docx, pdf, xlsx, table_span, …
-│   ├── tests/               # 374 项回归 + 金样 + OCR fixtures
+│   ├── tests/               # 924 项回归 + 金样 + OCR fixtures
 │   └── Dockerfile           # 多阶段 native + 运行时
 ├── frontend/                # Vue3 Web UI
 ├── native/anydoc/           # vendored Rust → mdbridge_native._doc
