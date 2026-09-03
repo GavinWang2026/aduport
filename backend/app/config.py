@@ -249,6 +249,11 @@ class Settings(BaseSettings):
     # Master switch for trusted in-process path (False = always isolate when on).
     convert_trusted_inprocess: bool = True
 
+    # Optional LibreOffice headless bridge (v8 §D) — never bundled; call-out only.
+    libreoffice_enabled: bool = False
+    libreoffice_bin: str = ""
+    libreoffice_timeout_seconds: float = 120.0
+
     # Optional virus scan (ClamAV)
     virus_scan: bool = False
     virus_scan_fail_closed: bool = True

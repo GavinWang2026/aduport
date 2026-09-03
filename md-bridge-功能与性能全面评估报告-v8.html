@@ -414,26 +414,26 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <h3 data-page-node-id="4VjUxZbAwAoz5TMTh7TBpz">B. 完善（2–4 周）— 本轮已启动</h3>
 <ul data-page-node-id="vWBjNwomHuY0UMs33nOZWx">
 <li data-page-node-id="ywt6UyDF7WEDJnaKxuj6g7"><b data-page-node-id="2WlbsYTMzF3u3b1qIKP0Dz">v8 阻断红灯已进 fidelity-gates</b>（golden xlsx / header / xlsb）；其余历史红灯继续清零固化</li>
-<li data-page-node-id="kwicChbWPkVPbszitCDyfi"><b data-page-node-id="dqFGM0kpNkBuXbsd0kxZDC">xlsx 垂直深度转正</b>：列宽/行高 + 跨 sheet 公式引用 + 图表坐标轴（mergeCells 已落地）——进行中</li>
+<li data-page-node-id="kwicChbWPkVPbszitCDyfi"><span class="badge b-ok">推进中</span> <b>xlsx 垂直深度</b>：列宽/行高 roundtrip + 跨 sheet 公式盲传 + 图表 catAx/valAx 标题（mergeCells 已闭环）——见 <code>test_v8_bcd_depth_roadmap.py</code></li>
 <li data-page-node-id="QKvMZYkY6IUFYjaf5pIiiV"><span class="badge b-ok">已启动</span> <b>docx 自研降级</b>：<code>docx_text</code> mammoth-lite style-map（Heading/Quote/List + 行内 marks）；关 anydoc 仍可保留结构</li>
-<li data-page-node-id="wfPqu14zskmogs3km2bfKm"><span class="badge b-ok">已固化</span> <b>PDF 三态</b>：text / docling / ocr（+auto）；见 <code>enterprise/PDF_TRISTATE.md</code>；metadata <code>pdf_pipeline</code></li>
-<li><span class="badge b-p2">P2·战略</span> <b>竞品生态</b>：非代码缺陷。路线写入 <code>enterprise/ECOSYSTEM_STRATEGY.md</code>——示例仓 / 贡献指南 / 「中台 vs 单向库」叙事；禁止用生态计划抬分</li>
+<li data-page-node-id="wfPqu14zskmogs3km2bfKm"><span class="badge b-ok">已固化</span> <b>PDF 三态</b>：text / docling / ocr（+auto）；docling 表映射去 origin 误判、可吃 rowspan/colspan；版面「2 Paragraph」仍靠 docling 全量映射加深</li>
+<li><span class="badge b-p2">P2·战略</span> <b>竞品生态</b>：<code>CONTRIBUTING.md</code> + <code>ECOSYSTEM_STRATEGY.md</code> + <code>enterprise/samples/</code>——非代码缺陷、不抬分</li>
 </ul>
 
 <h3 data-page-node-id="KgLHsm9IdiHY3UPpn9l3Om">C. 优化（性能与稳定性）— 本轮已启动</h3>
 <ul data-page-node-id="nktZWvlUU0NcpQG9O1D93t">
-<li data-page-node-id="TW4WoGkrM5RK46uK443oQ2"><span class="badge b-ok">已落地</span> 隔离分级：<code>MDBRIDGE_CONVERT_TRUSTED_CLIENTS</code> → 进程内；其余走 ProcessPool（<code>convert_isolate.convert_isolated(trusted=…)</code>）</li>
-<li data-page-node-id="dbIIw5yRdhug4DAe4QvCC4"><span class="badge b-ok">已公布方法</span> ProcessPool + Weasy 压测曲线：<code>enterprise/WEASY_PERF_CURVE.md</code>（示意量级，非 SLA）</li>
-<li data-page-node-id="gHDeB7YHZs7Wo3DlM3loGc">PDF 流式/分页降内存；大文件 stream 阈值以上走流式双通道验证（持续回归）</li>
+<li data-page-node-id="TW4WoGkrM5RK46uK443oQ2"><span class="badge b-ok">已落地</span> 隔离分级：<code>MDBRIDGE_CONVERT_TRUSTED_CLIENTS</code> → 进程内；其余走 ProcessPool</li>
+<li data-page-node-id="dbIIw5yRdhug4DAe4QvCC4"><span class="badge b-ok">已公布方法</span> ProcessPool + Weasy：<code>enterprise/WEASY_PERF_CURVE.md</code></li>
+<li data-page-node-id="gHDeB7YHZs7Wo3DlM3loGc"><span class="badge b-ok">回归门禁</span> 大文件 stream 双通道（<code>test_stream_dual_path_above_threshold</code>）；持续盯 v3 曾丢 74% 场景</li>
 </ul>
 
-<h3 data-page-node-id="xibC87HZw39XWnf0pPe4na">D. 升级（下一季能力）</h3>
+<h3 data-page-node-id="xibC87HZw39XWnf0pPe4na">D. 升级（下一季能力）— 骨架已落</h3>
 <table data-page-node-id="PPv1eHie5QtJBrbP5tVLNj">
-<tr data-page-node-id="ZwQyttrxvbB1K4Nxq1DzI9"><th data-page-node-id="z1tU8sQLvOyYIIyE3L5bs2">方向</th><th data-page-node-id="roU2p7hoJuIQnc8NsI1u8F">理由（对标）</th><th data-page-node-id="lD7bou34EEmSVb7J0egarg">建议</th></tr>
-<tr data-page-node-id="KafxCKwHt0ITQAxIACVOCU"><td data-page-node-id="1v195RnzD1dnqQvx3qBVtW"><b data-page-node-id="Xi88RPiESx7pA7CdrSvpwY">LLM/RAG 适配层</b></td><td data-page-node-id="gN0uAfwBo4xglmJq5Q5Ryo">markitdown 17.8 万星证明「喂 LLM 的干净 md」是最大增量市场</td><td data-page-node-id="vRsaXgo0SKsasT3pvsSNsd">AST→GFM 快通道质量对齐 markitdown；提供 chunk/element 契约输出；可选 LLM 图注</td></tr>
-<tr data-page-node-id="NMQAsEiNzYdHHqtxhCJJiD"><td data-page-node-id="H2sL0EILEoLT1Nb7SlSoWK"><b data-page-node-id="KMCYQQotE3xhV6GhByEvgq">docling 深度映射</b></td><td data-page-node-id="Y491SrcCVi5wTMfE0Y1FaC">docling 的 AI 版面/表格模型是 PDF 深度最优解</td><td data-page-node-id="zdn4eDasEqUE7iYucKZxPp">把 DoclingDocument 全量映射进 32 节点（现仅部分），PDF 深度借力不重复造轮子</td></tr>
-<tr data-page-node-id="IDRp3HoDA8D0ztshfDKitH"><td data-page-node-id="EQZphrdackFzoMdCWmZWmY"><b data-page-node-id="JXWBSayEYuGfNgu7kFFcTl">可选排版引擎</b></td><td data-page-node-id="tvJEaEx162b6EdG7s0YeRu">LibreOffice 排版级保真是语义 AST 补不上的</td><td data-page-node-id="kyKE63dbrGGmLS3ZXxpgJ9">以「可选子进程/容器」形态接入（合规调用，不打包），专攻 docx/xlsx→pdf 像素保真需求</td></tr>
-<tr data-page-node-id="VDKODK8GvJgfa3QcgcDQwh"><td data-page-node-id="91fmxLdKjdhtoARXqvyKxb"><b data-page-node-id="f4dkHpQzhYaPIsT7xRgETI">企业纵深</b></td><td data-page-node-id="Q5ajsMfa1nezValSyAv3bR">已有 license/quota/audit/webhook 骨架</td><td data-page-node-id="QzCap1ecXcdzhEufbzMGDf">补齐 SaaS 控制台、租户隔离压测、SLA 可观测面板；把 93 分自评换成「实测 66→目标 75」诚实基线</td></tr>
+<tr data-page-node-id="ZwQyttrxvbB1K4Nxq1DzI9"><th data-page-node-id="z1tU8sQLvOyYIIyE3L5bs2">方向</th><th data-page-node-id="roU2p7hoJuIQnc8NsI1u8F">理由（对标）</th><th data-page-node-id="lD7bou34EEmSVb7J0egarg">状态 / 建议</th></tr>
+<tr data-page-node-id="KafxCKwHt0ITQAxIACVOCU"><td data-page-node-id="1v195RnzD1dnqQvx3qBVtW"><b>LLM/RAG 适配层</b></td><td data-page-node-id="gN0uAfwBo4xglmJq5Q5Ryo">markitdown 热度证明 LLM 语料赛道</td><td data-page-node-id="vRsaXgo0SKsasT3pvsSNsd"><span class="badge b-ok">骨架</span> <code>exporters/rag_elements.py</code>（Title/NarrativeText/Table…）；下一刀对齐 GFM 质量 + 可选 LLM 图注</td></tr>
+<tr data-page-node-id="NMQAsEiNzYdHHqtxhCJJiD"><td data-page-node-id="H2sL0EILEoLT1Nb7SlSoWK"><b>docling 深度映射</b></td><td data-page-node-id="Y491SrcCVi5wTMfE0Y1FaC">AI 版面/表格是 PDF 深度最优解</td><td data-page-node-id="zdn4eDasEqUE7iYucKZxPp"><span class="badge b-ok">推进</span> 表 span 感知 + pipeline 戳记；继续把 DoclingDocument 全量映射进 32 节点</td></tr>
+<tr data-page-node-id="IDRp3HoDA8D0ztshfDKitH"><td data-page-node-id="EQZphrdackFzoMdCWmZWmY"><b>可选排版引擎</b></td><td data-page-node-id="tvJEaEx162b6EdG7s0YeRu">LibreOffice 像素保真</td><td data-page-node-id="kyKE63dbrGGmLS3ZXxpgJ9"><span class="badge b-ok">钩子</span> <code>libreoffice_bridge.py</code>（默认关；可调用不可打包）</td></tr>
+<tr data-page-node-id="VDKODK8GvJgfa3QcgcDQwh"><td data-page-node-id="91fmxLdKjdhtoARXqvyKxb"><b>企业纵深</b></td><td data-page-node-id="Q5ajsMfa1nezValSyAv3bR">license/quota/audit/webhook 骨架</td><td data-page-node-id="QzCap1ecXcdzhEufbzMGDf">控制台 / 租户压测 / SLA 面板；对外仍锚 66.2</td></tr>
 </table>
 
 <!-- ================= 6 POSITION ================= -->

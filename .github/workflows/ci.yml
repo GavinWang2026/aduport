@@ -103,7 +103,8 @@ jobs:
             tests/test_golden_ast_xlsx.py \
             tests/test_exporter_spans.py \
             tests/test_v11_features.py \
-            tests/test_v8_bc_roadmap_gates.py
+            tests/test_v8_bc_roadmap_gates.py \
+            tests/test_v8_bcd_depth_roadmap.py
 
   # Optional customer acceptance corpus (defaults to in-repo sample_pack proxy)
   private-samples:

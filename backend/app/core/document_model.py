@@ -100,6 +100,9 @@ class Table(BaseModel):
     kind: str = "data"
     # Spreadsheet sheet / table caption (xlsx round-trip)
     name: str = ""
+    # xlsx vertical depth (v8 §B): OOXML col width / row height round-trip
+    column_widths: list[float] = Field(default_factory=list)
+    row_heights: list[float] = Field(default_factory=list)
 
 
 class TableCell(BaseModel):
@@ -303,6 +306,9 @@ class Chart(BaseModel):
     chart_type: str = "bar"  # bar | line | pie | scatter | area | other
     categories: list[str] = Field(default_factory=list)
     series: list[dict[str, Any]] = Field(default_factory=list)
+    # Axis titles (xlsx DrawingML catAx/valAx) — v8 §B vertical depth
+    x_axis_title: str = ""
+    y_axis_title: str = ""
     # Optional embedded preview image
     preview_mime: str = ""
     preview_data: bytes = b""

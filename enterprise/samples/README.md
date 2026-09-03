@@ -2,6 +2,8 @@
 
 本目录为**可复现的验收样张库**，替代对外承诺中的「客户样张抽检 ≥90%」在仓库内的工程代理。
 
+生态战略（非抬分）：见根目录 `CONTRIBUTING.md` 与 `enterprise/ECOSYSTEM_STRATEGY.md`。
+
 | 路径 | 说明 |
 |------|------|
 | `backend/tests/fixtures/sample_pack/` | 样张源文件 + `manifest.json`（**v1.2**：ods/odp + txt 冷路径 + audit_proxy_min_pass_rate） |

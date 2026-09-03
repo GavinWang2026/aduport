@@ -972,7 +972,7 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             root = xml_safe.fromstring(budget.read(zf, sheet_path))
         except (ET.ParseError, Exception):
             continue
-        rows, cells, has_formula = _parse_sheet(root, shared)
+        rows, cells, has_formula, col_widths, row_heights = _parse_sheet(root, shared)
         if not rows:
             continue
         sname = sheet_names[idx] if idx < len(sheet_names) else f"Sheet{idx + 1}"
@@ -1285,6 +1285,8 @@ def import_xlsx(source_bytes: bytes, filename: str = "input.xlsx") -> DocumentMo
             cells=cells if use_cells else [],
             name=sname,
             header_rows=1 if len(rows) > 1 else 0,
+            column_widths=col_widths,
+            row_heights=row_heights,
         )
         nodes.append(tbl)
     existing_pivot_names = {n.name for n in nodes if isinstance(n, PivotTable) and n.name}
@@ -1617,14 +1619,22 @@ def _sheet_xml(table: Table, *, drawing_r_id: str | None = None) -> str:
     header_rows = max(0, int(table.header_rows or 0))
     cell_grid = table.cells if table.cells else None
     ncols = max((len(r) for r in matrix), default=1)
+    # Prefer explicit column_widths (import round-trip); else heuristic.
     col_widths = [10.0] * ncols
-    for row in matrix:
-        for c_idx, val in enumerate(row):
-            if c_idx >= ncols:
-                break
-            w = min(48.0, max(8.0, len(str(val)) * 1.15 + 2.0))
-            if w > col_widths[c_idx]:
-                col_widths[c_idx] = w
+    if table.column_widths:
+        for i, w in enumerate(table.column_widths[:ncols]):
+            try:
+                col_widths[i] = max(1.0, min(255.0, float(w)))
+            except (TypeError, ValueError):
+                pass
+    else:
+        for row in matrix:
+            for c_idx, val in enumerate(row):
+                if c_idx >= ncols:
+                    break
+                w = min(48.0, max(8.0, len(str(val)) * 1.15 + 2.0))
+                if w > col_widths[c_idx]:
+                    col_widths[c_idx] = w
     cols_xml = "".join(
         f'<col min="{i + 1}" max="{i + 1}" width="{w:.2f}" customWidth="1"/>'
         for i, w in enumerate(col_widths)
@@ -1651,7 +1661,15 @@ def _sheet_xml(table: Table, *, drawing_r_id: str | None = None) -> str:
                         end = f"{_col_name(c_idx + cs - 1)}{r_idx + rs - 1}"
                         merges.append(f"{ref}:{end}")
             cells_xml.append(_sheet_cell_xml(ref, val, formula=formula, style=style))
-        row_xml.append(f'<row r="{r_idx}">{"".join(cells_xml)}</row>')
+        ht_attr = ""
+        if table.row_heights and r_idx - 1 < len(table.row_heights):
+            try:
+                ht = float(table.row_heights[r_idx - 1])
+                if ht > 0:
+                    ht_attr = f' ht="{ht:.2f}" customHeight="1"'
+            except (TypeError, ValueError):
+                pass
+        row_xml.append(f'<row r="{r_idx}"{ht_attr}>{"".join(cells_xml)}</row>')
 
     merge_xml = ""
     if merges:
@@ -1833,11 +1851,27 @@ def _chart_space_xml(ch: Chart) -> str:
 
     axes = ""
     if ctype not in ("pie", "doughnut"):
+        x_title = escape((ch.x_axis_title or "").strip())
+        y_title = escape((ch.y_axis_title or "").strip())
+        x_title_xml = (
+            f"<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>"
+            f'<a:p><a:r><a:t>{x_title}</a:t></a:r></a:p>'
+            f"</c:rich></c:tx><c:overlay val=\"0\"/></c:title>"
+            if x_title
+            else ""
+        )
+        y_title_xml = (
+            f"<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/>"
+            f'<a:p><a:r><a:t>{y_title}</a:t></a:r></a:p>'
+            f"</c:rich></c:tx><c:overlay val=\"0\"/></c:title>"
+            if y_title
+            else ""
+        )
         axes = (
-            '<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
-            '<c:axPos val="b"/><c:crossAx val="2"/></c:catAx>'
-            '<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
-            '<c:axPos val="l"/><c:crossAx val="1"/></c:valAx>'
+            f'<c:catAx><c:axId val="1"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
+            f'<c:axPos val="b"/><c:crossAx val="2"/>{x_title_xml}</c:catAx>'
+            f'<c:valAx><c:axId val="2"/><c:scaling><c:orientation val="minMax"/></c:scaling>'
+            f'<c:axPos val="l"/><c:crossAx val="1"/>{y_title_xml}</c:valAx>'
         )
 
     return (
@@ -2007,11 +2041,18 @@ def _nodes_from_content_sheet(rows: list[list[str]]) -> list:
 
 def _parse_sheet(
     root: ET.Element, shared: list[str]
-) -> tuple[list[list[str]], list[list[TableCell]], bool]:
+) -> tuple[list[list[str]], list[list[TableCell]], bool, list[float], list[float]]:
     rows_map: dict[int, dict[int, tuple[str, str]]] = {}
+    row_heights_map: dict[int, float] = {}
     for row in root.findall(".//m:row", _NS):
         r_attr = row.get("r")
         r_idx = int(r_attr) if r_attr and r_attr.isdigit() else (max(rows_map) + 1 if rows_map else 1)
+        ht = row.get("ht")
+        if ht:
+            try:
+                row_heights_map[r_idx] = float(ht)
+            except ValueError:
+                pass
         for c in row.findall("m:c", _NS):
             ref = c.get("r") or "A1"
             col = 0
@@ -2026,7 +2067,7 @@ def _parse_sheet(
             formula = (formula_el.text or "").strip() if formula_el is not None else ""
             rows_map.setdefault(r_idx, {})[col] = (val, formula)
     if not rows_map:
-        return [], [], False
+        return [], [], False, [], []
     max_col = max((max(cols) for cols in rows_map.values() if cols), default=0)
     result: list[list[str]] = []
     cell_grid: list[list[TableCell]] = []
@@ -2046,7 +2087,36 @@ def _parse_sheet(
 
     # Apply native <mergeCells> so span survives without _AST sidecar (v8 P1).
     _apply_merge_cells(root, result, cell_grid)
-    return result, cell_grid, has_formula
+
+    col_widths = _parse_col_widths(root, max_col + 1)
+    row_heights = [
+        row_heights_map.get(r, 0.0) for r in sorted(rows_map)
+    ]
+    return result, cell_grid, has_formula, col_widths, row_heights
+
+
+def _parse_col_widths(root: ET.Element, ncols: int) -> list[float]:
+    """Read ``<cols><col width=…/>`` into a per-column list (1-based OOXML)."""
+    widths = [0.0] * max(1, ncols)
+    for col in root.findall(".//m:col", _NS) or root.findall(
+        ".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}col"
+    ):
+        try:
+            mn = int(col.get("min") or "1")
+            mx = int(col.get("max") or mn)
+            w = float(col.get("width") or "0")
+        except ValueError:
+            continue
+        if w <= 0:
+            continue
+        for i in range(mn - 1, mx):
+            if 0 <= i < len(widths):
+                widths[i] = w
+            elif i >= len(widths):
+                while len(widths) <= i:
+                    widths.append(0.0)
+                widths[i] = w
+    return widths
 
 
 def _col_letters_to_index(letters: str) -> int:
@@ -2277,12 +2347,33 @@ def _parse_charts(
                     except ValueError:
                         values.append(0.0)
             series.append({"name": name, "values": values})
+        x_axis, y_axis = "", ""
+        cat_ax = re.search(r"<c:catAx\b[^>]*>(.*?)</c:catAx>", raw, flags=re.DOTALL)
+        if cat_ax:
+            xm = re.search(
+                r"<c:title\b[^>]*>.*?<a:t>([^<]*)</a:t>",
+                cat_ax.group(1),
+                flags=re.DOTALL,
+            )
+            if xm:
+                x_axis = xm.group(1).strip()
+        val_ax = re.search(r"<c:valAx\b[^>]*>(.*?)</c:valAx>", raw, flags=re.DOTALL)
+        if val_ax:
+            ym = re.search(
+                r"<c:title\b[^>]*>.*?<a:t>([^<]*)</a:t>",
+                val_ax.group(1),
+                flags=re.DOTALL,
+            )
+            if ym:
+                y_axis = ym.group(1).strip()
         out.append(
             Chart(
                 title=title or Path(path).stem,
                 chart_type=ctype,
                 categories=categories,
                 series=series,
+                x_axis_title=x_axis,
+                y_axis_title=y_axis,
             )
         )
     return out

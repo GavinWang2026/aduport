@@ -65,6 +65,7 @@ def _table_from_item(item: Any) -> Table | None:
         return None
 
     rows: list[list[str]] = []
+    cell_grid: list[list[TableCell]] = []
     try:
         if hasattr(data, "export_to_dataframe"):
             df = data.export_to_dataframe()
@@ -73,22 +74,48 @@ def _table_from_item(item: Any) -> Table | None:
                 header = [str(c) for c in df.columns.tolist()]
                 if header:
                     rows.insert(0, header)
+            cell_grid = [
+                [TableCell(text=c) for c in row] for row in rows
+            ]
         elif isinstance(grid, list):
-            for row in grid:
+            for r_idx, row in enumerate(grid):
                 if isinstance(row, list):
-                    rows.append([_cell_text(c) for c in row])
+                    texts = [_cell_text(c) for c in row]
+                    cells_row = [_cell_to_table_cell(c) for c in row]
                 else:
-                    rows.append([_cell_text(row)])
+                    texts = [_cell_text(row)]
+                    cells_row = [_cell_to_table_cell(row)]
+                rows.append(texts)
+                cell_grid.append(cells_row)
     except Exception:
         return None
 
     if not rows:
         return None
-    cells = [
-        [TableCell(text=c, origin_row=r, origin_col=j) for j, c in enumerate(row)]
-        for r, row in enumerate(rows)
-    ]
-    return Table(rows=rows, cells=cells)
+    # Only keep cells when real spans exist (avoid origin_* header-switch illusion).
+    has_span = any(
+        c.covered or c.row_span > 1 or c.col_span > 1
+        for row in cell_grid
+        for c in row
+    )
+    return Table(
+        rows=rows,
+        cells=cell_grid if has_span else [],
+        header_rows=1 if len(rows) > 1 else 0,
+    )
+
+
+def _cell_to_table_cell(cell: Any) -> TableCell:
+    text = _cell_text(cell)
+    row_span = int(getattr(cell, "row_span", None) or getattr(cell, "rowspan", None) or 1)
+    col_span = int(getattr(cell, "col_span", None) or getattr(cell, "colspan", None) or 1)
+    covered = bool(getattr(cell, "covered", False) or getattr(cell, "is_covered", False))
+    return TableCell(
+        text=text,
+        row_span=max(1, row_span),
+        col_span=max(1, col_span),
+        covered=covered,
+    )
 
 
 def _cell_text(cell: Any) -> str:
@@ -142,6 +169,10 @@ def docling_document_to_model(doc: Any, title: str = "") -> DocumentModel:
         md = doc.export_to_markdown()
         model = _markdown_fallback(md, title)
 
+    if model.metadata is None:
+        model.metadata = {}
+    model.metadata.setdefault("importer", "docling")
+    model.metadata.setdefault("pdf_pipeline", "docling")
     return model
 
 
