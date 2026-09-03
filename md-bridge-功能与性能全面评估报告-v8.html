@@ -316,24 +316,24 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <div class="callout c-blue" data-page-node-id="hMNmORyS2PgpZ8B4AN4fkz"><b data-page-node-id="EcCuBy9iCgoJZKaZaAL2Aw">六维解读（小菜观点）：</b><br data-page-node-id="OvqBo5PVARb4hMD8aVmiRV">
 · <b data-page-node-id="Pp9Z2VqcK7fMXwdM3gDlTZ">完整性/功能广度 → md-bridge 单项封顶</b>：全平台只有它把「服务化（Job+Webhook+限流+审计+多租户）+ 双向转换 + 统一 AST」做成了一体产品；anydoc/mammoth/markitdown 是库，docling/unstructured 面向 RAG 管线而非文档交换，pandoc 是单机 CLI，LibreOffice 是套件不是服务。<br data-page-node-id="HIpjVn9mH5AMl0yoOETzNW">
 · <b data-page-node-id="iKpDNZ6kJouxMShgQ7OQPb">结构 → pandoc 教科书级</b>（reader/writer/AST/Lua filter），anydoc 的 Rust 模块化也很好；md-bridge 的注册表 + anydoc 桥设计合理但 import/export 深度不均拖累。<br data-page-node-id="9272QBlFlgKNIossuhiNNu">
-· <b data-page-node-id="z2QHtnlqaObNVsX8PDOvIr">深度 → LibreOffice 与 docling 领先</b>：LibreOffice 有真实排版引擎（像素级保真但拿不到语义 AST）；docling 有 AI 版面/表格模型。md-bridge 的深度短板正在于此（xlsx span 往返断裂、docx 深布局绑 anydoc）。<br data-page-node-id="21zrdVMjE7j1w7QgrGKKmJ">
-· <b data-page-node-id="TsWLVCGbTKZl1oyIY3cENG">整洁度 → pandoc/anydoc 领先</b>：md-bridge 安全面优秀；v8 工程红灯（golden xlsx / header / xlsb）已进 fidelity-gates，工作树拆提交仍待人工。</div>
+· <b data-page-node-id="z2QHtnlqaObNVsX8PDOvIr">深度 → LibreOffice 与 docling 领先</b>：LibreOffice 有真实排版引擎（像素级保真但拿不到语义 AST）；docling 有 AI 版面/表格模型。md-bridge 深度短板现主要为 <b>PDF 版面</b>与 <b>docx 深布局仍优先 anydoc</b>（xlsx <code>mergeCells</code> 往返已在 v8 闭环；自研 <code>docx_text</code> 已有 mammoth-lite style-map 兜底）。<br data-page-node-id="21zrdVMjE7j1w7QgrGKKmJ">
+· <b data-page-node-id="TsWLVCGbTKZl1oyIY3cENG">整洁度 → pandoc/anydoc 领先</b>：md-bridge 安全面优秀；v8 工程红灯（golden xlsx / header / xlsb）与 B/C 门禁已进 fidelity-gates，工作树已按主题拆分提交。</div>
 
 <h3 data-page-node-id="1l0SaqIexO3HDWipcuQtPT">4.3 逐工具深度剖面</h3>
 
 <div class="card" data-page-node-id="4JMjM4hGwP39U5e4kyC1Jg">
 <h4 data-page-node-id="9zgkZMsSnFsXRVzZmmLOTF">🔵 md-bridge（评估主角）</h4>
 <table data-page-node-id="zD5Rt7umfZfRklVTsvPtIo"><tr data-page-node-id="xNY0ABOwS2G8oJ9xprvaos"><th data-page-node-id="YQJgNgoSzPMueRe8X4fQQG">项</th><th data-page-node-id="C8jgX0JtgB4eGK1Ng1eNr8">结论</th></tr>
-<tr data-page-node-id="lTAdXX549XVJNQKlgRCvao"><td data-page-node-id="QsWtY0wslwwT2jtVzaRmMf">独有能力</td><td data-page-node-id="jItbeT3BFHbCOzocxDARHS">29×18 双向矩阵 + <b data-page-node-id="RHDqM5cEhWFwzr1AAxtdLY">统一 DocumentModel AST（32 语义节点）</b>，批注/修订/透视/文本框/内容控件可穿透到 html/epub/docx/pdf/pptx/xlsx/json；表格 span 共享逻辑覆盖 11 路目标；内置 OCR 双引擎（MinerU/Paddle，可选）、Job+Webhook、多租户 quota、Prometheus 就绪</td></tr>
+<tr data-page-node-id="lTAdXX549XVJNQKlgRCvao"><td data-page-node-id="QsWtY0wslwwT2jtVzaRmMf">独有能力</td><td data-page-node-id="jItbeT3BFHbCOzocxDARHS">29×18 双向矩阵 + <b data-page-node-id="RHDqM5cEhWFwzr1AAxtdLY">统一 DocumentModel AST（32 语义节点）</b>，批注/修订/透视/文本框/内容控件可穿透到 html/epub/docx/pdf/pptx/xlsx/json；表格 span 共享逻辑覆盖 11 路目标（xlsx 原生 <code>mergeCells</code> 往返已闭环）；PDF 三态（text/docling/ocr）；trusted 客户端可跳过隔离池；内置 OCR 双引擎（MinerU/Paddle，可选）、Job+Webhook、多租户 quota、Prometheus 就绪</td></tr>
 <tr data-page-node-id="XTHChw1uXHSkT9o9HA9UmW"><td data-page-node-id="SfAmjvQhTDqvAbfiZOTGff">相对竞品的胜负手</td><td data-page-node-id="Uvk59cIqHbpFGakrQ0KVpX"><b data-page-node-id="EduOi22nV4RzPdbPhVXrJs">可私有化 + 双向 + 服务化一体</b>：docker compose 起一套即得文档交换中台，天然适配企业知识库/合同归档/合规数字化场景</td></tr>
-<tr data-page-node-id="WB8uN7IpEldD9VadIULwjB"><td data-page-node-id="7E3UCwYgJ7xhhv276zLHMs">明显短板</td><td data-page-node-id="no1bHgMKIf8yCiUmfDuZGz">PDF 语义还原非排版级；docx 深布局强依赖 anydoc（自研 docx_text 覆盖弱）；性能受隔离 fork 开销影响；生态与社区远小于头部竞品（xlsx span 往返已在 v8 闭环）</td></tr></table>
+<tr data-page-node-id="WB8uN7IpEldD9VadIULwjB"><td data-page-node-id="7E3UCwYgJ7xhhv276zLHMs">明显短板</td><td data-page-node-id="no1bHgMKIf8yCiUmfDuZGz"><b>PDF 语义还原非排版级</b>（三态 text/docling/ocr 已固化，版面深度仍外包）；<b>docx 深布局仍优先 anydoc</b>（自研 <code>docx_text</code> mammoth-lite 可保 Heading/Quote/List/行内，深度仍弱于 anydoc）；<b>默认隔离池</b>对冷请求有调度开销（trusted clients 可进程内跳过）；<b>生态/社区</b>相对 markitdown·docling 差 2–3 个数量级（战略项，见 <code>ECOSYSTEM_STRATEGY.md</code>）。xlsx <code>mergeCells</code> 往返与表头开关、损坏 xlsb 静默成功已在 v8 <span class="badge b-closed">CLOSED</span>。</td></tr></table>
 </div>
 
 <div class="card" data-page-node-id="RmMQEk0wCWYmVLcTsOYiAM">
 <h4 data-page-node-id="w5CAqU47dFYQGN6jcIhDd8">🔴 anydoc（Firecrawl · Rust）— md-bridge 的「被内化对手」</h4>
 <p data-page-node-id="vZ36CDGajc6v6kWAnh365j">定位是 <b data-page-node-id="SGs5fDBrVannRWIVxNwGYl">「office → LLM-ready Markdown」的单向快通道</b>，不是转换平台。毫秒级、无网络、Rust 内存安全；格式覆盖 doc/ppt/xls(xlsb)/odt/ods/odp/rtf/epub/csv/pdf，含 legacy OLE——这正是 md-bridge 导入矩阵的支柱。多语言绑定（Node/Py/WASM）+ 浏览器 demo。</p>
 <table data-page-node-id="AYCjU8jy3DlyW3aX6C4vsO"><tr data-page-node-id="ApnzaSGuezDL6WPksD7Xe4"><th data-page-node-id="XRELCEx9utZtzyBvnpxCpS">对比项</th><th data-page-node-id="q4eX9Azi2SONPZnk27Y9Bb">结论</th></tr>
-<tr data-page-node-id="2zB1rcTYnAB2jOGlR54I7N"><td data-page-node-id="P2VjMILgP1jQSF5xtIKgZH">与 md-bridge 关系</td><td data-page-node-id="TBuhrFa41XnOPp0BeLHHEj">md-bridge 已 vendored anydoc 为 <code data-page-node-id="6qb8Twf3xM6c2eW6xvnKuO">mdbridge_native._doc</code>（同 SHA pin）——<b data-page-node-id="fjGaIG5h2Ymtn1zQyd1aJv">对手已被收编为引擎层</b>；但单点风险并存：anydoc 上游演进/授权变化直接影响 md-bridge 导入深度</td></tr>
+<tr data-page-node-id="2zB1rcTYnAB2jOGlR54I7N"><td data-page-node-id="P2VjMILgP1jQSF5xtIKgZH">与 md-bridge 关系</td><td data-page-node-id="TBuhrFa41XnOPp0BeLHHEj">md-bridge 已 vendored anydoc 为 <code data-page-node-id="6qb8Twf3xM6c2eW6xvnKuO">mdbridge_native._doc</code>（同 SHA pin）——<b data-page-node-id="fjGaIG5h2Ymtn1zQyd1aJv">对手已被收编为引擎层</b>；单点风险见 <code>enterprise/ANYDOC_RISK.md</code>（上游演进/授权变化直接影响导入深度）。关 anydoc 时 docx 走自研 <code>docx_text</code> 降级，xlsb 等真二进制格式则硬失败而非静默空文档。</td></tr>
 <tr data-page-node-id="0kdytvI1oZqfRpEP2wOm6X"><td data-page-node-id="jV1Hq2zAoX79BL010iDCYl">无法替代 md-bridge 的部分</td><td data-page-node-id="AyrKIEJXo2BnFQAtWuSoGp">anydoc 不做双向（无 md→docx/pdf 等导出）、无 AST 语义（批注/修订/透视）、无服务化/Job/多租户、无 OCR 编排</td></tr>
 <tr data-page-node-id="sqMw5GxPIrPSTwt7aUK84R"><td data-page-node-id="SC5KnMlaRlrjkW71iR3UFG">六维均分</td><td data-page-node-id="TGZUBTq9Fndpkc1GcJPfiV">结构 8.5 / 整洁 8.5 / 深度 7 —— 库级标杆，但完整性仅 5.5</td></tr></table>
 </div>
@@ -343,7 +343,7 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <p data-page-node-id="H1FkHeegNLYSgNcJAbyYJ5">把 <code data-page-node-id="o1yMu2egN9HYg1E5N2RWyP">.docx</code> 的语义（Heading 样式/列表/表格/脚注）映射为<b data-page-node-id="ZCRi4H11crVmzoFyqWXpbg">干净 HTML</b>，风格映射（style map）是核心可扩展点；设计克制：<b data-page-node-id="Dsb8JONs0RepFhHugj6GT8">不追求视觉复刻、不做输入消毒、忽略评论/表格格式</b>，README 明确声明 XSS/DoS 风险需隔离运行。有 JS/Python/.NET 多平台实现，6.3K★ 三十年如一日稳定。</p>
 <table data-page-node-id="vxQ67Z80iqL36yp9AuD1iw"><tr data-page-node-id="t6EbdOty9GZMJsUuWSoqMS"><th data-page-node-id="KlCmDFealTZM6PclNG9VTS">对比项</th><th data-page-node-id="EnVDNKUf04R0VLVI3yFPPF">结论</th></tr>
 <tr data-page-node-id="5PmDlO2S7PPUmqDwg26Ds7"><td data-page-node-id="iAKhgORGHZvyQR6i8tGqKf">长处</td><td data-page-node-id="y83FCO5dtfJhgVdw01S2Mk">docx→HTML 语义提取质量高且零依赖重；风格映射 API 优雅</td></tr>
-<tr data-page-node-id="HF3ht0lkLsyVWCZD0dSy52"><td data-page-node-id="WlarilG19J2bcm9SjzSTqj">与 md-bridge 关系</td><td data-page-node-id="wpLQLeQ6Okjqo28ebncOJk">格式覆盖 1 vs 29，不在同一赛道；md-bridge 的 docx 行内保真仍绑 anydoc，可借鉴 mammoth 的 style-map 思路做自研兜底</td></tr></table>
+<tr data-page-node-id="HF3ht0lkLsyVWCZD0dSy52"><td data-page-node-id="WlarilG19J2bcm9SjzSTqj">与 md-bridge 关系</td><td data-page-node-id="wpLQLeQ6Okjqo28ebncOJk">格式覆盖 1 vs 29，不在同一赛道。v8 已借鉴 mammoth style-map：<code>docx_text</code> mammoth-lite（Heading/Quote/List + 行内 marks）作关 anydoc 时的结构兜底；脚注/评论/复杂表格格式仍远弱于 mammoth 专项深度，深路径继续绑 anydoc。</td></tr></table>
 </div>
 
 <div class="card" data-page-node-id="4kIqe9MhYNi3OWyndPliZ8">
@@ -352,7 +352,7 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <table data-page-node-id="Usw9mEnAXQsJOvXUOHjeqL"><tr data-page-node-id="uCR3hNqhnIZwM7XBKJshGI"><th data-page-node-id="83eGXuTZnO2Hu7FrsPrt5Q">对比项</th><th data-page-node-id="5zPlRLCorzAUA7bjtruhQ5">结论</th></tr>
 <tr data-page-node-id="homL9auxckUnYxggCEcqR7"><td data-page-node-id="USNGuvXwAV1JN1mjI5LkiY">长处</td><td data-page-node-id="JSWEOMx8Y2lmQB2d1Kndbj">生态与热度、插件化、云增强路径、格式覆盖面（尤其媒体类）</td></tr>
 <tr data-page-node-id="SOXeDVX9tu5bBNChhRn4BM"><td data-page-node-id="YzJ1VGFqQ2O9EQKo0sgPi9">短板</td><td data-page-node-id="lAKmgMFXQrBLL3SS4GfffG">单向、无统一语义 AST（表格合并/批注/修订不进 md）、无服务化/Job、深度有限</td></tr>
-<tr data-page-node-id="MDR5tNplYZ4limTRLldFAP"><td data-page-node-id="ldzjoIZl2zB8TFbZcRICwX">对 md-bridge 启示</td><td data-page-node-id="px4NPyo1KDn2uneXF5i4dU"><b data-page-node-id="jLiDLUmzz6xRpEtGi6Sbte">LLM 语料方向</b>是 max(热度) 赛道；md-bridge 可用「AST→GFM 快通道」对标其 md 质量，同时守住其不具备的双向+服务化护城河</td></tr></table>
+<tr data-page-node-id="MDR5tNplYZ4limTRLldFAP"><td data-page-node-id="ldzjoIZl2zB8TFbZcRICwX">对 md-bridge 启示</td><td data-page-node-id="px4NPyo1KDn2uneXF5i4dU"><b data-page-node-id="jLiDLUmzz6xRpEtGi6Sbte">LLM 语料方向</b>是 max(热度) 赛道；md-bridge 用「AST→GFM 快通道」对标其 md 质量，同时守住双向+服务化护城河。社区数量级差距属 <b>P2·战略</b>（<code>ECOSYSTEM_STRATEGY.md</code>），不得写入对外 66.2 抬分理由。</td></tr></table>
 </div>
 
 <div class="card" data-page-node-id="mLCxj3Xcs2qAewHNrf2DAJ">
@@ -367,7 +367,7 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <p data-page-node-id="szKk3A6Y49yGUYMetmJtI8">把 PDF/Office/网页/图片经<b data-page-node-id="EAjgm9CzUlM8hPEkr8pAWY"> AI 版面分析 + 表格结构识别</b>读入统一 <code data-page-node-id="w8HQVazJc96LE72FV86Eit">DoclingDocument</code>（与 md-bridge 的 DocumentModel 理念同构），导出 md/html/JSON；支持 EPUB/ODF/Apple Pages/邮件/音视频等 15+ 输入；离线模型 + VLM 可选。被 IBM 捐赠 LF AI & Data，版本迭代极快（2.124）。</p>
 <table data-page-node-id="jh3jB1Q7kZLMcSgT65mzbt"><tr data-page-node-id="ijEg2Bu9UtBWpkrK9lwv5f"><th data-page-node-id="EPMMdapvWzVnrTK4Oz4oUK">对比项</th><th data-page-node-id="3BFz5tyFrhrSm2c1cnrQji">结论</th></tr>
 <tr data-page-node-id="UqoHchXtabZpNEpRmebo6T"><td data-page-node-id="pHzvQGntrWd3Buw7T6wvns">理念对标</td><td data-page-node-id="pZl8McNL1udxzK3GNKMaWh"><b data-page-node-id="vYgMBfr2bWqaUMv0tDRzxv">DoclingDocument ≈ DocumentModel</b>——但 docling 的 AI 版面/表格模型让 PDF 深度更强；md-bridge 的 AST 节点面（批注/修订/透视/内容控件）更贴 office 语义</td></tr>
-<tr data-page-node-id="93aqWeKN5EkayzgAhDdXJX"><td data-page-node-id="hb6YrzzhYUjFgikyYTDHf7">对 md-bridge 启示</td><td data-page-node-id="u9zmHBPDGOT3yZb1eAATrh">md-bridge 已将其列为可选 importer（<code data-page-node-id="8wMBDyPzbjSSqmP9F9s7u6">[office]</code> extra + PDF 引擎之一）——<b data-page-node-id="Nc0VsDaH9PwgHXbJ1i5FTf">正确策略</b>：深度引擎外包，AST 归一自持；应把 docling 输出充分映射进 32 节点，补 PDF 版面短板</td></tr></table>
+<tr data-page-node-id="93aqWeKN5EkayzgAhDdXJX"><td data-page-node-id="hb6YrzzhYUjFgikyYTDHf7">对 md-bridge 启示</td><td data-page-node-id="u9zmHBPDGOT3yZb1eAATrh">已列为可选 importer（<code data-page-node-id="8wMBDyPzbjSSqmP9F9s7u6">[office]</code> extra）且纳入 PDF 三态之 <b>docling</b> 态（见 <code>PDF_TRISTATE.md</code>）——<b data-page-node-id="Nc0VsDaH9PwgHXbJ1i5FTf">正确策略</b>：深度引擎外包，AST 归一自持；下一刀是把 DoclingDocument <b>充分映射</b>进 32 节点，专补「弱文本层 → 2 个 Paragraph」类版面塌缩。</td></tr></table>
 </div>
 
 <div class="card" data-page-node-id="crK6FZpHaozErZGnZEXFD0">
@@ -441,7 +441,7 @@ pandoc / LibreOffice —— <b data-page-node-id="k3PSbcN93Z6iaR2p8f5ETF">官方
 <div class="callout c-green" style="font-size:14.5px" data-page-node-id="cMrsrj28HEUMwQeGmHJqFo"><b data-page-node-id="jOKxtVtrdi3wi7df0L2Jk7">结论先行：</b>md-bridge 不该去和 markitdown/docling 抢「单文件 → LLM 文本」的库赛道，而应坐实<b data-page-node-id="M64OrTCJEK9zh0UhW7KlnR">「可私有化部署的双向文档交换中台」</b>——这是七工具中唯一无人占据的位置：<b data-page-node-id="ov4UKuCqvUr0sS6UvHFonb">anydoc/mammoth/markitdown/docling 是单向引擎，pandoc 是单机 CLI，LibreOffice 是排版套件，只有 md-bridge 提供 AST 归一 + 双向转换 + 服务化的一体化产品。</b></div>
 <table data-page-node-id="0TifxpyayqLKKezYDRzwpO">
 <tr data-page-node-id="or8iViHiVZgDRMvcvGNyeY"><th data-page-node-id="jnoxwE3DehdY3eZYsjO4yX">护城河（保持）</th><th data-page-node-id="SZ3q9DfbdMWNQHH78oEIJP">补短板（对齐竞品）</th><th data-page-node-id="bcfvfkNmkjPsVBYcWumEAd">差异化卖点（对外）</th></tr>
-<tr data-page-node-id="vr52B7FhD9mATiY5jAcsKJ"><td data-page-node-id="zV8QOx5BLsyjmBK3WkCl6D">29×18 双向矩阵 · 32 节点 AST · 安全硬门禁 · Job/多租户服务化 · OCR 可选</td><td data-page-node-id="SsEXGEiuxUkWkaD3m5Eqpg">xlsx span 往返 · docx 自研深度 · PDF AI 版面 · 性能曲线公开 · 社区样板案例</td><td data-page-node-id="HZKIMBFuqm4Qer4B6aEURs">「一个私有化网关，Office/PDF/电子书/表格双向互转，语义不丢，数据不出内网」</td></tr>
+<tr data-page-node-id="vr52B7FhD9mATiY5jAcsKJ"><td data-page-node-id="zV8QOx5BLsyjmBK3WkCl6D">29×18 双向矩阵 · 32 节点 AST · 安全硬门禁 · Job/多租户服务化 · OCR 可选</td><td data-page-node-id="SsEXGEiuxUkWkaD3m5Eqpg">docx 自研深度继续逼近 mammoth；PDF AI 版面（docling 全量映射）；trusted/untrusted 隔离压测曲线实跑；社区样板（见 ECOSYSTEM_STRATEGY）——xlsx span 往返已闭环</td><td data-page-node-id="HZKIMBFuqm4Qer4B6aEURs">「一个私有化网关，Office/PDF/电子书/表格双向互转，语义不丢，数据不出内网」</td></tr>
 </table>
 
 <!-- ================= 7 CONCLUSION ================= -->
