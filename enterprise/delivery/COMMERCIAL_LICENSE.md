@@ -1,6 +1,7 @@
 # AduPort Enterprise — Commercial License Boundary
 
 **Product:** AduPort  
+**Licensor:** Heying Huitong Intelligent Technology (Suzhou) Co., Ltd.  
 **Edition:** Enterprise private deployment  
 **License model:** One-machine-one-key (HMAC-signed token bound to host fingerprint)  
 **Status:** Binding for private installs that set `ADUPORT_LICENSE_REQUIRED=true`

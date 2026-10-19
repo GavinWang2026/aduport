@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-authors = [{ name = "Gavin Wang & HYHT Company" }]
+authors = [{ name = "Gavin Wang & Heying Huitong Intelligent Technology (Suzhou) Co., Ltd." }]
 keywords = ["markdown", "docx", "pdf", "converter", "document", "odt", "epub"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -104,9 +104,10 @@ packages = ["aduport"]
 [tool.hatch.build.targets.wheel.force-include]
 "main.py" = "main.py"
 # Apache-2.0 §4(d) 与 anydoc 的 MIT 署名要求：NOTICE 必须随发行物一起走。
-# 只放一份在仓库根，靠 force-include 引用，避免两份文件内容漂移。
-"../NOTICE" = "NOTICE"
-"../THIRD_PARTY_NOTICES.md" = "THIRD_PARTY_NOTICES.md"
+# 文件须位于构建根目录（backend/）内：`python -m build` 会用解包后的 sdist 再建 wheel，
+# 那时 `../NOTICE` 不存在，构建直接失败（曾实测踩到）。
+"NOTICE" = "NOTICE"
+"THIRD_PARTY_NOTICES.md" = "THIRD_PARTY_NOTICES.md"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -114,14 +115,10 @@ include = [
     "main.py",
     "README.md",
     "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_NOTICES.md",
     "pyproject.toml",
 ]
-
-# sdist 同样要带 NOTICE（Apache-2.0 §4(d) + anydoc MIT 署名），
-# 只存在于仓库根，故用 force-include 引入，避免两份副本漂移。
-[tool.hatch.build.targets.sdist.force-include]
-"../NOTICE" = "NOTICE"
-"../THIRD_PARTY_NOTICES.md" = "THIRD_PARTY_NOTICES.md"
 
 [tool.ruff]
 line-length = 100
