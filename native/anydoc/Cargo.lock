@@ -779,7 +779,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdbridge-native"
+name = "aduport-native"
 version = "0.2.4"
 dependencies = [
  "anydoc",

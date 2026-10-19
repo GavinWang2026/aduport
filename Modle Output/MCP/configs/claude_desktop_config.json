@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "AduPort": {
+      "command": "aduport-mcp",
+      "args": [],
+      "env": {
+        "ADUPORT_MCP_ALLOWED_ROOTS": "/Users/YOURNAME/Documents,/Users/YOURNAME/Desktop",
+        "ADUPORT_MCP_ALLOWED_EXTENSIONS": ".md,.docx,.pdf,.pptx,.xlsx,.html,.htm,.txt,.epub,.odt,.ods,.csv,.json,.rtf,.latex"
+      }
+    }
+  }
+}

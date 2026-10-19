@@ -10,14 +10,14 @@ import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 
-from app.core.converter import convert, convert_directory
-from app.core.css_sanitize import sanitize_custom_css
-from app.core.document_model import ListItem
-from app.exporters.docx_exporter import export_docx
-from app.exporters.md_exporter import export_md
-from app.exporters.pdf_exporter import _render_html
-from app.importers.md_importer import import_md
-from main import app
+from aduport.core.converter import convert, convert_directory
+from aduport.core.css_sanitize import sanitize_custom_css
+from aduport.core.document_model import ListItem
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.md_exporter import export_md
+from aduport.exporters.pdf_exporter import _render_html
+from aduport.importers.md_importer import import_md
+from main import aduport
 
 
 def test_md_to_docx_preserves_table_and_bold():
@@ -67,7 +67,7 @@ def test_css_blocks_font_face_and_url():
 
 
 def test_batch_file_limit(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "max_batch_files", 2)
     monkeypatch.setattr(settings, "api_key", "")

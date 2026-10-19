@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Blockquote,
     Footnote,
     HorizontalRule,
     ListItem,
     MathBlock,
 )
-from app.core.format_detect import detect_source_format
-from app.exporters.md_exporter import export_md
-from app.importers.md_importer import import_md
+from aduport.core.format_detect import detect_source_format
+from aduport.exporters.md_exporter import export_md
+from aduport.importers.md_importer import import_md
 
 
 def test_blockquote_roundtrip():
@@ -62,7 +62,7 @@ def test_math_display():
 
 def test_html_heading_to_ast():
     model = import_md(b"<h2>Title</h2>\n<p>Body</p>\n")
-    from app.core.document_model import Heading, Paragraph
+    from aduport.core.document_model import Heading, Paragraph
 
     assert any(isinstance(n, Heading) and n.plain_text() == "Title" for n in model.nodes)
     assert any(isinstance(n, Paragraph) and "Body" in n.plain_text() for n in model.nodes)

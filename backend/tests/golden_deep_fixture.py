@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Comment,
     ContentControl,
     DocumentModel,

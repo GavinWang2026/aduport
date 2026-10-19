@@ -1,4 +1,4 @@
-# Minimal Alertmanager routing for md-bridge Prometheus rules
+# Minimal Alertmanager routing for AduPort Prometheus rules
 route:
   receiver: default
   group_by: ["alertname"]

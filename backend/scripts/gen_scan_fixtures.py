@@ -19,7 +19,7 @@ PAGES = [
     {
         "name": "scan_en_cjk_mixed",
         "lines": [
-            "md-bridge Scan Regression Fixture",
+            "AduPort Scan Regression Fixture",
             "English line: Hello OCR Sample 2026",
             "中文行：扫描件识别验收样张",
             "混排：合同编号 CONTRACT-OCR-001",

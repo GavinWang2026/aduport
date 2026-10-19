@@ -5,10 +5,10 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import DocumentModel, MathBlock, OleObject, Paragraph, SmartArt
-from app.exporters import docx_exporter
-from app.exporters.omml import build_omath, omml_element_to_tex
-from app.importers.docx_ooxml import enrich_docx_model
+from aduport.core.document_model import DocumentModel, MathBlock, OleObject, Paragraph, SmartArt
+from aduport.exporters import docx_exporter
+from aduport.exporters.omml import build_omath, omml_element_to_tex
+from aduport.importers.docx_ooxml import enrich_docx_model
 
 
 def test_omml_nested_and_nary():

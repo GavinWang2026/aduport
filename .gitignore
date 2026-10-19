@@ -11,6 +11,7 @@ build/
 venv/
 .env
 .pytest_cache/
+.pytest-tmp/
 .mypy_cache/
 .ruff_cache/
 htmlcov/
@@ -49,9 +50,16 @@ backend/data/
 
 # Vendored anydoc Rust build artifacts (source of truth: native/anydoc/{src,python})
 native/anydoc/target/
+native/anydoc/fuzz/target/
+native/anydoc/fuzz/corpus/
+native/anydoc/fuzz/artifacts/
+native/anydoc/fuzz/coverage/
 native/**/target/
 **/target/wheels/
-# Leftover upstream snapshot (if recreated locally)
+enterprise/dist/
+# Leftover upstream snapshot (local reference only; fused bits live under native/anydoc)
 anydoc-main/
+# Local MarkItDown reference tree (useful importers fused into backend/aduport/importers/)
+markitdown-main/
 **/Cargo.lock.bak
 

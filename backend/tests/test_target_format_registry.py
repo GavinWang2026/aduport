@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from app.core.converter import SUPPORTED_TARGET_FORMATS
-from app.core.registry import ensure_builtin_plugins, registered_export_formats
+from aduport.core.converter import EXPORT_MODES, SUPPORTED_TARGET_FORMATS
+from aduport.core.registry import ensure_builtin_plugins, registered_export_formats
 
 
 def test_all_supported_targets_have_exporters():
@@ -11,5 +11,8 @@ def test_all_supported_targets_have_exporters():
     registered = set(registered_export_formats())
     missing = sorted(SUPPORTED_TARGET_FORMATS - registered)
     assert not missing, f"targets without exporter: {missing}"
-    assert len(SUPPORTED_TARGET_FORMATS) == 19
-    assert {"ods", "odp", "rag"} <= SUPPORTED_TARGET_FORMATS
+    assert len(SUPPORTED_TARGET_FORMATS) == 18
+    assert {"ods", "odp"} <= SUPPORTED_TARGET_FORMATS
+    assert "rag" not in SUPPORTED_TARGET_FORMATS
+    assert EXPORT_MODES == frozenset({"rag"})
+    assert "rag" in registered

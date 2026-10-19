@@ -8,47 +8,68 @@ from pathlib import Path
 
 import pytest
 
-from app.core.converter import convert
-from app.core.exceptions import ExportError, MdBridgeError
-from app.core.tenants import clear_tenant_cache, load_tenant_keys
-from app.exporters.pdf_simple import export_pdf_simple
-from app.core.document_model import DocumentModel, Heading, Paragraph
-from app.importers.docling_ready import clear_docling_ready_cache, docling_models_ready
-from app.importers.pdf_importer import import_pdf
+from aduport.core.converter import convert
+from aduport.core.exceptions import ExportError, AduPortError
+from aduport.core.tenants import clear_tenant_cache, load_tenant_keys
+from aduport.exporters.pdf_simple import export_pdf_simple
+from aduport.core.document_model import DocumentModel, Heading, Paragraph
+from aduport.importers.docling_ready import clear_docling_ready_cache, docling_models_ready
+from aduport.importers.pdf_importer import import_pdf
+
+
+def _pdf_font_uses_unicode(reader) -> bool:
+    """Identity-H / ToUnicode live in compressed font objects, not the raw file bytes."""
+    for page in reader.pages:
+        resources = page.get("/Resources")
+        if resources is None:
+            continue
+        fonts = resources.get("/Font")
+        if fonts is None:
+            continue
+        font_map = fonts.get_object() if hasattr(fonts, "get_object") else fonts
+        for font_ref in font_map.values():
+            font = font_ref.get_object() if hasattr(font_ref, "get_object") else font_ref
+            encoding = str(font.get("/Encoding") or "")
+            subtype = str(font.get("/Subtype") or "")
+            if "Identity" in encoding or font.get("/ToUnicode") is not None:
+                return True
+            if subtype == "/Type0" or font.get("/DescendantFonts") is not None:
+                return True
+    return False
 
 
 def test_p0_1_cjk_pdf_embeds_identity_h():
-    """P0-1 方案 A: Chinese PDF must embed Identity-H subset, not Helvetica ???."""
+    """P0-1 方案 A: Chinese PDF must embed a Unicode cmap, not Helvetica ???."""
     md = "# 中文标题测试\n\n这是中文段落内容。\n"
     out = convert(md.encode("utf-8"), "md", "pdf", filename="d.md")
     assert len(out) > 2000
-    assert b"Identity-H" in out or b"/ToUnicode" in out
-    assert b"Helvetica" not in out or b"MDBridgeCJK" in out
-    assert out.count(b"?????") == 0
 
     try:
         from pypdf import PdfReader
     except ImportError:
         pytest.skip("pypdf not installed")
-    text = (PdfReader(io.BytesIO(out)).pages[0].extract_text() or "")
+    reader = PdfReader(io.BytesIO(out))
+    text = "\n".join((page.extract_text() or "") for page in reader.pages)
     assert "中文" in text or "标题" in text
+    assert "?????" not in text
+    assert _pdf_font_uses_unicode(reader)
 
 
 def test_p0_1_raises_when_forced_ascii_fallback(monkeypatch):
-    from app.config import settings
-    from app.exporters import pdf_simple as ps
+    from aduport.config import settings
+    from aduport.exporters import pdf_simple as ps
 
     monkeypatch.setattr(settings, "pdf_cjk_fallback", "error")
     monkeypatch.setattr(ps, "_find_cjk_font", lambda: None)
     model = DocumentModel(title="t", nodes=[Heading(level=1, text="中文"), Paragraph(text="测试")])
-    with pytest.raises((ExportError, MdBridgeError)):
+    with pytest.raises((ExportError, AduPortError)):
         export_pdf_simple(model)
 
 
 def test_p0_2_missing_models_fast_fail(monkeypatch, tmp_path):
     """Without local models, import must not hang on Hub — text path or quick error."""
-    from app.config import settings
-    import app.importers.docling_ready as dr
+    from aduport.config import settings
+    import aduport.importers.docling_ready as dr
 
     monkeypatch.setattr(settings, "pdf_engine", "auto")
     monkeypatch.setattr(settings, "docling_offline", True)
@@ -94,7 +115,7 @@ def test_p0_3_multi_tenant_keys(monkeypatch, tmp_path):
         ),
         encoding="utf-8",
     )
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_keys", str(keys_file))
     monkeypatch.setattr(settings, "api_key", "")

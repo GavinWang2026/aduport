@@ -1,4 +1,4 @@
-/* md-bridge · Obsidian shell */
+/* AduPort · Obsidian shell */
 
 .md-stage {
   position: fixed;
@@ -347,6 +347,12 @@
   font-weight: 500;
 }
 
+.md-ops-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .md-main {
   position: relative;
   z-index: 5;
@@ -436,6 +442,23 @@
   min-height: 0;
 }
 
+.md-cap-tips {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--amber-50, #faeeda);
+  border: 1px solid #e8d4b0;
+  font-size: 13px;
+  color: #5c4813;
+  line-height: 1.45;
+}
+.md-cap-tips p {
+  margin: 0 0 6px;
+}
+.md-cap-tips p:last-child {
+  margin-bottom: 0;
+}
+
 .md-uploader {
   flex: 1;
   display: flex;
@@ -472,6 +495,13 @@
   grid-template-columns: 1fr 1fr;
   gap: 10px 12px;
   margin-top: 12px;
+}
+.md-adv__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.68;
+  line-height: 1.45;
 }
 .md-field {
   display: flex;
@@ -1101,6 +1131,63 @@
   overflow: auto;
   font-size: 14px;
   color: var(--t-hi);
+}
+
+iframe.md-pv-frame {
+  width: 100%;
+  min-height: 280px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.md-pv-diff {
+  flex: 1;
+  padding: 20px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--t-hi);
+}
+.md-pv-diff__stats {
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+.md-pv-diff__list {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.md-pv-diff__list li {
+  margin: 0.35em 0;
+}
+.md-pv-diff__empty {
+  opacity: 0.65;
+  margin: 0;
+}
+.md-pv-diff__text {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line, rgba(127, 140, 160, 0.28));
+  border-radius: 8px;
+  background: var(--bg-hover, rgba(127, 140, 160, 0.08));
+}
+.md-pv-diff__retention {
+  font-size: 14px;
+}
+.md-pv-diff__chars {
+  opacity: 0.72;
+  font-size: 12.5px;
+  margin-left: 4px;
+}
+.md-pv-diff__hint {
+  margin: 6px 0 8px;
+  opacity: 0.65;
+  font-size: 12px;
+}
+.md-pv-diff__miss {
+  color: var(--warn, #c47a1a);
+  font-weight: 600;
+  margin-right: 4px;
 }
 
 .md-pv-render h1,

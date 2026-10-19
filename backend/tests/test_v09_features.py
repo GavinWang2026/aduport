@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import gzip
 
-from app.config import settings
-from app.core.cache import ResultCache
-from app.core.converter import SUPPORTED_TARGET_FORMATS, convert
-from app.core.document_model import Blockquote, Heading, HorizontalRule, ListItem
-from app.core.warmup import warmup_sync
-from app.exporters.mobi_exporter import export_mobi
-from app.importers.html_importer import import_html
-from app.core.document_model import DocumentModel, Paragraph
+from aduport.config import settings
+from aduport.core.cache import ResultCache
+from aduport.core.converter import SUPPORTED_TARGET_FORMATS, convert
+from aduport.core.document_model import Blockquote, Heading, HorizontalRule, ListItem
+from aduport.core.warmup import warmup_sync
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.importers.html_importer import import_html
+from aduport.core.document_model import DocumentModel, Paragraph
 
 
 def test_mobi_in_targets():

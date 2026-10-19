@@ -6,8 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app import __version__
-from main import app
+from aduport import __version__
+from main import aduport
 
 
 def test_version_matches_pyproject():

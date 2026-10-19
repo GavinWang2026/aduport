@@ -1,8 +1,8 @@
 """Optional live OCR integration — skipped when engines are not installed.
 
 Run manually on GPU hosts after:
-  pip install 'md-bridge[ocr-mineru]' and/or 'md-bridge[ocr-paddle]'
-  MDBRIDGE_OCR_ENABLED=true
+  pip install 'aduport[ocr-mineru]' and/or 'aduport[ocr-paddle]'
+  ADUPORT_OCR_ENABLED=true
 """
 
 from __future__ import annotations
@@ -11,9 +11,9 @@ import importlib.util
 
 import pytest
 
-from app.config import settings
-from app.core.document_model import DocumentModel
-from app.importers import ocr_engine as oe
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel
+from aduport.importers import ocr_engine as oe
 
 
 def _minimal_pdf_bytes() -> bytes:
@@ -91,7 +91,7 @@ def test_ocr_no_engine_raises_clear_error(monkeypatch):
     monkeypatch.setitem(oe._ENGINES, "mineru", Dead())
     monkeypatch.setitem(oe._ENGINES, "paddleocr_vl", Dead())
     monkeypatch.setitem(oe._ENGINES, "docling", Dead())
-    from app.core.exceptions import OcrUnavailableError
+    from aduport.core.exceptions import OcrUnavailableError
 
     with pytest.raises(OcrUnavailableError, match="无可用引擎"):
         oe.import_pdf_with_ocr(b"%PDF", "x.pdf", force_engine="mineru")

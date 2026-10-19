@@ -6,7 +6,7 @@ import io
 import re
 import zipfile
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Bookmark,
     DocumentModel,
     FieldCode,
@@ -17,7 +17,7 @@ from app.core.document_model import (
     RunStyle,
     Section,
 )
-from app.exporters.docx_exporter import export_docx
+from aduport.exporters.docx_exporter import export_docx
 
 
 def _parts(blob: bytes) -> dict[str, str]:

@@ -5,10 +5,42 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import DocumentModel, MathBlock, OleObject, Paragraph, SmartArt
-from app.exporters import docx_exporter
-from app.exporters.omml import build_omath, omml_element_to_tex
-from app.importers.docx_ooxml import enrich_docx_model
+from aduport.core.document_model import DocumentModel, MathBlock, OleObject, Paragraph, SmartArt
+from aduport.exporters import docx_exporter
+from aduport.exporters.omml import build_omath, omml_element_to_tex
+from aduport.importers.docx_ooxml import enrich_docx_model
+
+
+def test_omml_recursion_depth_cap():
+    from xml.etree import ElementTree as ET
+
+    from aduport.exporters.omml import _M, omml_element_to_tex
+
+    root = ET.Element(f"{{{_M}}}r")
+    cur = root
+    for _ in range(80):
+        child = ET.SubElement(cur, f"{{{_M}}}r")
+        cur = child
+    ET.SubElement(cur, f"{{{_M}}}t").text = "x"
+    assert omml_element_to_tex(root) == ""
+
+
+def test_xlsx_covered_cell_matrix_uses_anchor():
+    from aduport.core.document_model import Table, TableCell
+    from aduport.exporters.xlsx_exporter import _table_value_matrix
+
+    cells = [
+        [
+            TableCell(text="anchor", row_span=2, col_span=1),
+            TableCell(text="b"),
+        ],
+        [
+            TableCell(text="", covered=True, origin_row=0, origin_col=0),
+            TableCell(text="d"),
+        ],
+    ]
+    matrix = _table_value_matrix(Table(rows=[], cells=cells))
+    assert matrix[1][0] == "anchor"
 
 
 def test_omml_matrix_and_cases():

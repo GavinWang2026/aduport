@@ -7,11 +7,11 @@ from zipfile import ZipFile
 
 from docx import Document
 
-from app.core.converter import convert
-from app.core.registry import ensure_builtin_plugins, registered_import_formats
-from app.importers.docx_text import try_extract_docx_model
-from app.importers.ods_importer import import_ods
-from app.importers.odp_importer import import_odp
+from aduport.core.converter import convert
+from aduport.core.registry import ensure_builtin_plugins, registered_import_formats
+from aduport.importers.docx_text import try_extract_docx_model
+from aduport.importers.ods_importer import import_ods
+from aduport.importers.odp_importer import import_odp
 
 
 def _minimal_docx(text: str = "Hello builtin DOCX") -> bytes:

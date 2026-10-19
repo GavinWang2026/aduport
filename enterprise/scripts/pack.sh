@@ -10,7 +10,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ENT="$ROOT/enterprise"
 OUT="${1:-$ENT/dist}"
-TAG="${MDBRIDGE_IMAGE_TAG:-0.16.0}"
+TAG="${ADUPORT_IMAGE_TAG:-0.16.0}"
 DOCS_ONLY="${PACK_DOCS_ONLY:-0}"
 
 if [[ "${1:-}" == "--docs-only" ]]; then
@@ -27,41 +27,58 @@ have_docker() {
   command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1
 }
 
-BUNDLE="$OUT/md-bridge-enterprise-${TAG}-bundle"
+BUNDLE="$OUT/aduport-enterprise-${TAG}-bundle"
 rm -rf "$BUNDLE"
 mkdir -p "$BUNDLE/scripts" "$BUNDLE/docs" "$BUNDLE/acceptance"
 
 echo "== docs + scripts =="
 cp "$ENT/docker-compose.yml" "$BUNDLE/"
 cp "$ENT/.env.example" "$BUNDLE/"
-for f in ACCEPTANCE.md OCR.md README.md LICENSE.md SCORE_93.md DELIVERY.md; do
+for f in OCR.md README.md LICENSE.md RAG.md PDF_TRISTATE.md ANYDOC_RISK.md; do
   [[ -f "$ENT/$f" ]] && cp "$ENT/$f" "$BUNDLE/docs/"
 done
-if [[ -d "$ENT/delivery" ]]; then
-  mkdir -p "$BUNDLE/docs/delivery"
-  cp "$ENT/delivery/"*.md "$BUNDLE/docs/delivery/" 2>/dev/null || true
-fi
 cp "$ENT/scripts/install.sh" "$ENT/scripts/smoke_test.sh" "$ENT/scripts/pack.sh" "$BUNDLE/scripts/"
 chmod +x "$BUNDLE/scripts/"*.sh
+
+# Optional: prebuilt aduport-native wheels (no Docker / no Rust on customer host)
+WHEEL_TAR=""
+NATIVE_WHEELS_LINE="native_wheels=absent (run scripts/pack_native_wheels.sh or CI native-wheels)"
+for cand in \
+  "$OUT/aduport-native-wheels-"*.tar.gz \
+  "$ROOT/enterprise/dist/aduport-native-wheels-"*.tar.gz
+do
+  [[ -f "$cand" ]] || continue
+  WHEEL_TAR="$cand"
+done
+if [[ -n "$WHEEL_TAR" && -f "$WHEEL_TAR" ]]; then
+  mkdir -p "$BUNDLE/wheels"
+  cp "$WHEEL_TAR" "$BUNDLE/wheels/"
+  cp "$ROOT/scripts/install_native_wheel.sh" "$BUNDLE/scripts/" 2>/dev/null || true
+  chmod +x "$BUNDLE/scripts/install_native_wheel.sh" 2>/dev/null || true
+  NATIVE_WHEELS_LINE="native_wheels=$(basename "$WHEEL_TAR")"
+  echo "OK bundled native wheels: $(basename "$WHEEL_TAR")"
+fi
 
 # Acceptance helpers for customer sign-off
 cat > "$BUNDLE/acceptance/CHECKLIST.md" <<EOF
 # 离线包验收速查（${TAG}）
 
-1. \`gunzip -c md-bridge-enterprise-${TAG}.tar.gz | docker load\`（若本包含镜像）
-2. \`cp .env.example .env\` 并填写 \`MDBRIDGE_API_KEY\` / License
+1. \`gunzip -c aduport-enterprise-${TAG}.tar.gz | docker load\`（若本包含镜像）
+2. \`cp .env.example .env\` 并填写 \`ADUPORT_API_KEY\` / License
 3. \`./scripts/install.sh\`
 4. \`./scripts/smoke_test.sh http://127.0.0.1:8000\`
-5. 对照 \`docs/ACCEPTANCE.md\` 勾选 B1–B8
-6. 扫描 OCR（可选）：见 \`docs/OCR.md\`，样张回归 \`pytest -m integration tests/test_scan_ocr_regression.py\`
+5. 对照 \`docs/README.md\` / \`docs/OCR.md\` 完成冒烟与 OCR（可选）
+6. 无 Docker 仅 Python 时：\`bash scripts/install_native_wheel.sh --tarball wheels/aduport-native-wheels-*.tar.gz\`（若包内含 wheels/）
+7. 扫描 OCR（可选）：样张回归 \`pytest -m integration tests/test_scan_ocr_regression.py\`
 EOF
 
 cat > "$BUNDLE/MANIFEST.txt" <<EOF
-product=md-bridge-enterprise
+product=aduport-enterprise
 version=${TAG}
 built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 docs_only=${DOCS_ONLY}
 host=$(hostname 2>/dev/null || echo unknown)
+${NATIVE_WHEELS_LINE}
 EOF
 
 IMAGES_OK=0
@@ -80,34 +97,34 @@ docker compose build
 
     echo "== save =="
     docker save \
-      "md-bridge-backend:enterprise" \
-      "md-bridge-frontend:enterprise" \
-      | gzip > "$OUT/md-bridge-enterprise-${TAG}.tar.gz"
-    cp "$OUT/md-bridge-enterprise-${TAG}.tar.gz" "$BUNDLE/"
-    SIZE=$(du -h "$OUT/md-bridge-enterprise-${TAG}.tar.gz" | awk '{print $1}')
+      "aduport-backend:enterprise" \
+      "aduport-frontend:enterprise" \
+      | gzip > "$OUT/aduport-enterprise-${TAG}.tar.gz"
+    cp "$OUT/aduport-enterprise-${TAG}.tar.gz" "$BUNDLE/"
+    SIZE=$(du -h "$OUT/aduport-enterprise-${TAG}.tar.gz" | awk '{print $1}')
     echo "images=included size=${SIZE}" >> "$BUNDLE/MANIFEST.txt"
     IMAGES_OK=1
-    echo "OK images: $OUT/md-bridge-enterprise-${TAG}.tar.gz ($SIZE)"
+    echo "OK images: $OUT/aduport-enterprise-${TAG}.tar.gz ($SIZE)"
   fi
 fi
 
 (
   cd "$OUT"
-  tar -czf "md-bridge-enterprise-${TAG}-bundle.tar.gz" "md-bridge-enterprise-${TAG}-bundle"
+  tar -czf "aduport-enterprise-${TAG}-bundle.tar.gz" "aduport-enterprise-${TAG}-bundle"
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "md-bridge-enterprise-${TAG}-bundle.tar.gz" > "SHA256SUMS.txt"
-    if [[ -f "md-bridge-enterprise-${TAG}.tar.gz" ]]; then
-      shasum -a 256 "md-bridge-enterprise-${TAG}.tar.gz" >> "SHA256SUMS.txt"
+    shasum -a 256 "aduport-enterprise-${TAG}-bundle.tar.gz" > "SHA256SUMS.txt"
+    if [[ -f "aduport-enterprise-${TAG}.tar.gz" ]]; then
+      shasum -a 256 "aduport-enterprise-${TAG}.tar.gz" >> "SHA256SUMS.txt"
     fi
   elif command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "md-bridge-enterprise-${TAG}-bundle.tar.gz" > "SHA256SUMS.txt"
-    if [[ -f "md-bridge-enterprise-${TAG}.tar.gz" ]]; then
-      sha256sum "md-bridge-enterprise-${TAG}.tar.gz" >> "SHA256SUMS.txt"
+    sha256sum "aduport-enterprise-${TAG}-bundle.tar.gz" > "SHA256SUMS.txt"
+    if [[ -f "aduport-enterprise-${TAG}.tar.gz" ]]; then
+      sha256sum "aduport-enterprise-${TAG}.tar.gz" >> "SHA256SUMS.txt"
     fi
   fi
 )
 
-echo "OK bundle: $OUT/md-bridge-enterprise-${TAG}-bundle.tar.gz"
+echo "OK bundle: $OUT/aduport-enterprise-${TAG}-bundle.tar.gz"
 [[ -f "$OUT/SHA256SUMS.txt" ]] && echo "OK checksums: $OUT/SHA256SUMS.txt"
 
 if [[ "$IMAGES_OK" -eq 1 ]]; then

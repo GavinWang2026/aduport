@@ -5,11 +5,11 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import Chart, DocumentModel, Heading, Paragraph, Table
-from app.core.registry import ensure_builtin_plugins, get_exporter
-from app.exporters.odp_exporter import export_odp
-from app.exporters.ods_exporter import export_ods
-from app.exporters.xlsx_exporter import export_xlsx
+from aduport.core.document_model import Chart, DocumentModel, Heading, Paragraph, Table
+from aduport.core.registry import ensure_builtin_plugins, get_exporter
+from aduport.exporters.odp_exporter import export_odp
+from aduport.exporters.ods_exporter import export_ods
+from aduport.exporters.xlsx_exporter import export_xlsx
 
 
 def test_ods_export_tables_round_mimetype():
@@ -45,6 +45,34 @@ def test_odp_export_pages_and_heading_buckets():
     assert "office:presentation" in xml
     assert "SENT_ODP_BODY" in xml
     assert "draw:page" in xml
+    visible = __import__("re").sub(r"<[^>]+>", " ", xml)
+    assert "Intro" in visible
+    assert "Next" in visible
+
+
+def test_odp_table_is_native_and_round_trips():
+    from aduport.importers.odp_importer import import_odp
+
+    model = DocumentModel(
+        nodes=[
+            Heading(level=1, text="GRID"),
+            Table(rows=[["区域", "Q1"], ["DELTA", "31415"]], header_rows=1),
+        ]
+    )
+    blob = export_odp(model)
+    xml = zipfile.ZipFile(BytesIO(blob)).read("content.xml").decode("utf-8")
+    assert "<table:table>" in xml
+    assert "<table:table-cell" in xml
+    assert "| DELTA |" not in xml
+    assert "DELTA" in xml
+    assert "区域" in xml
+    back = import_odp(blob, "grid.odp")
+    tables = [node for node in back.nodes if getattr(node, "type", "") == "table"]
+    assert tables
+    flat = " ".join(cell for row in tables[0].rows for cell in row)
+    assert "DELTA" in flat
+    assert "31415" in flat
+    assert "区域" in flat
 
 
 def test_ods_odp_registered_exporters():

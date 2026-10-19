@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-from app.config import settings
-from app.core.document_model import InlineMarkType
-from app.importers.md_importer import import_md
-
-
-def test_ab_contract_doc_exists():
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    assert (root / "enterprise" / "AB_TEST_CONTRACT.md").is_file()
+from aduport.config import settings
+from aduport.core.document_model import InlineMarkType
+from aduport.importers.md_importer import import_md
 
 
 def test_ab_fixture_disables_cache(ab_benchmark):
@@ -20,7 +13,7 @@ def test_ab_fixture_disables_cache(ab_benchmark):
 
 def test_v_a_nested_span_chinese_md_roundtrip(ab_benchmark):
     """D-01: nested CJK marks survive md → AST → md → AST (exporter emitter)."""
-    from app.exporters.md_exporter import export_md
+    from aduport.exporters.md_exporter import export_md
 
     cases = [
         "**粗体里套*斜体*结束**",

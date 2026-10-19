@@ -1,6 +1,6 @@
 {
   "version": "1.2",
-  "description": "Acceptance sample library (proxy for customer抽检 ≥90%). CI: test_sample_pack_t39 + test_phase_c_gates. Private volume: MDBRIDGE_PRIVATE_SAMPLES_DIR",
+  "description": "Acceptance sample library (proxy for customer抽检 ≥90%). CI: test_sample_pack_t39 + test_phase_c_gates. Private volume: ADUPORT_PRIVATE_SAMPLES_DIR",
   "audit_proxy_min_pass_rate": 0.9,
   "samples": [
     {

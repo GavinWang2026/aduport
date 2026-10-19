@@ -1,11 +1,30 @@
 #!/usr/bin/env python3
-"""md-bridge Python SDK usage example."""
+"""AduPort Python SDK usage example — 使用公共 API 面（``from aduport import ...``）。
+
+安装后（``pip install aduport``）同样的代码即可直接运行。
+"""
 
 from pathlib import Path
 
-from app.core.converter import convert, convert_directory
+from aduport import (
+    SUPPORTED_SOURCE_FORMATS,
+    SUPPORTED_TARGET_FORMATS,
+    capabilities,
+    convert,
+    convert_directory,
+)
 
 EXAMPLES_DIR = Path(__file__).parent
+
+
+def demo_capabilities():
+    """能力检测：分层授权（free / native / enterprise）的地基。"""
+    caps = capabilities()
+    print("capabilities():")
+    for key in ("version", "native", "native_version", "ocr_mineru", "embed", "office_docling"):
+        print(f"  {key:16} = {caps.get(key)!r}")
+    print(f"  {'formats':16} = {len(SUPPORTED_SOURCE_FORMATS)} sources / "
+          f"{len(SUPPORTED_TARGET_FORMATS)} targets")
 
 
 def demo_docx_to_md():
@@ -50,7 +69,7 @@ def demo_batch():
 
 
 def demo_in_memory():
-    md_content = b"# Hello md-bridge\n\nThis is a **demo** paragraph.\n\n- item one\n- item two\n"
+    md_content = b"# Hello AduPort\n\nThis is a **demo** paragraph.\n\n- item one\n- item two\n"
     docx_bytes = convert(md_content, "md", "docx")
     print(f"MD -> DOCX: {len(docx_bytes)} bytes")
     roundtrip_md = convert(docx_bytes, "docx", "md")
@@ -59,10 +78,14 @@ def demo_in_memory():
 
 
 def demo_document_model():
-    """First-class DocumentModel: build AST → export without going through convert()."""
-    from app.core.document_model import DocumentModel, Heading, Paragraph, Table
-    from app.exporters.docx_exporter import export_docx
-    from app.exporters.md_exporter import export_md
+    """First-class DocumentModel: build AST → export without going through convert().
+
+    DocumentModel 是稳定公共导出（节点集合只增不破）；AST 节点类暂走内部模块路径。
+    """
+    from aduport import DocumentModel
+    from aduport.core.document_model import Heading, Paragraph, Table
+    from aduport.exporters.docx_exporter import export_docx
+    from aduport.exporters.md_exporter import export_md
 
     model = DocumentModel(
         title="SDK AST demo",
@@ -80,7 +103,9 @@ def demo_document_model():
 
 
 if __name__ == "__main__":
-    print("=== md-bridge SDK Demo ===\n")
+    print("=== AduPort SDK Demo ===\n")
+    demo_capabilities()
+    print()
     demo_document_model()
     print()
     demo_in_memory()

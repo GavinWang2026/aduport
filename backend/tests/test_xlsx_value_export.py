@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from app.core.document_model import DocumentModel, Table, TableCell
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.core.document_model import DocumentModel, Table, TableCell
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
 
 
 def test_export_xlsx_from_cells_when_rows_empty():

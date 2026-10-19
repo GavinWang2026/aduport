@@ -8,14 +8,14 @@ from io import BytesIO
 
 import pytest
 
-from app.config import settings
-from app.core.document_model import DocumentModel, Image, Paragraph, PivotTable, Revision, Table, TableCell
-from app.exporters.md_exporter import export_md
-from app.exporters.html_render import render_body_html
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
-from app.importers.docx_ooxml import enrich_docx_model
-from app.importers.epub_text import _epub_drm_meta
-from app.importers.pdf_text_fallback import extract_pdf_text_model
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel, Image, Paragraph, PivotTable, Revision, Table, TableCell
+from aduport.exporters.md_exporter import export_md
+from aduport.exporters.html_render import render_body_html
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.importers.docx_ooxml import enrich_docx_model
+from aduport.importers.epub_text import _epub_drm_meta
+from aduport.importers.pdf_text_fallback import extract_pdf_text_model
 
 
 _W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -122,7 +122,7 @@ def test_epub_drm_metadata():
 
 
 def test_pdf_layout_metadata_keys():
-    from app.exporters.pdf_simple import export_pdf_simple
+    from aduport.exporters.pdf_simple import export_pdf_simple
 
     pdf = export_pdf_simple(
         DocumentModel(title="t", nodes=[Paragraph(text="Hello PDF layout meta")])
@@ -224,7 +224,7 @@ def test_xlsx_pivot_export_roundtrip():
 
 
 def test_pdf_layout_html_preview():
-    from app.exporters.pdf_simple import export_pdf_simple
+    from aduport.exporters.pdf_simple import export_pdf_simple
 
     pdf = export_pdf_simple(DocumentModel(nodes=[Paragraph(text="Layout preview text")]))
     model = extract_pdf_text_model(pdf, "t.pdf")
@@ -234,7 +234,7 @@ def test_pdf_layout_html_preview():
 
 
 def test_pptx_animation_metadata():
-    from app.importers.pptx_text import try_extract_pptx_model
+    from aduport.importers.pptx_text import try_extract_pptx_model
 
     slide = """<?xml version="1.0" encoding="UTF-8"?>
 <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -273,7 +273,7 @@ def test_textbox_ast_docx():
 
 
 def test_docx_export_revision_ins():
-    from app.exporters.docx_exporter import export_docx
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(nodes=[Revision(change="insert", author="a", text="added")])
     raw = export_docx(model)
@@ -283,8 +283,8 @@ def test_docx_export_revision_ins():
 
 
 def test_docx_export_content_control_sdt():
-    from app.core.document_model import ContentControl
-    from app.exporters.docx_exporter import export_docx
+    from aduport.core.document_model import ContentControl
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(
         nodes=[ContentControl(tag="t1", alias="Title", text="hello control")]
@@ -296,8 +296,8 @@ def test_docx_export_content_control_sdt():
 
 
 def test_docx_export_content_control_dropdown():
-    from app.core.document_model import ContentControl
-    from app.exporters.docx_exporter import export_docx
+    from aduport.core.document_model import ContentControl
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(
         nodes=[
@@ -316,8 +316,8 @@ def test_docx_export_content_control_dropdown():
 
 
 def test_docx_export_textbox_txbx():
-    from app.core.document_model import TextBox
-    from app.exporters.docx_exporter import export_docx
+    from aduport.core.document_model import TextBox
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(nodes=[TextBox(text="box text", source="docx:txbx")])
     raw = export_docx(model)
@@ -367,7 +367,7 @@ def test_xlsx_pivot_cache_records_with_data():
 
 
 def test_html_footnotes_end_section():
-    from app.core.document_model import Footnote
+    from aduport.core.document_model import Footnote
 
     model = DocumentModel(
         nodes=[
@@ -382,9 +382,9 @@ def test_html_footnotes_end_section():
 
 
 def test_txt_latex_comment_export():
-    from app.core.document_model import Comment
-    from app.exporters.latex_exporter import export_latex
-    from app.exporters.txt_exporter import export_txt
+    from aduport.core.document_model import Comment
+    from aduport.exporters.latex_exporter import export_latex
+    from aduport.exporters.txt_exporter import export_txt
 
     model = DocumentModel(
         nodes=[Comment(author="alice", text="fix typo", anchor="p1")]
@@ -396,8 +396,8 @@ def test_txt_latex_comment_export():
 
 
 def test_pptx_footnotes_and_animations_slides():
-    from app.core.document_model import Footnote
-    from app.exporters.pptx_exporter import export_pptx
+    from aduport.core.document_model import Footnote
+    from aduport.exporters.pptx_exporter import export_pptx
 
     model = DocumentModel(
         nodes=[Footnote(id="a", text="see appendix")],
@@ -417,8 +417,8 @@ def test_pptx_footnotes_and_animations_slides():
 
 
 def test_docx_pivot_table_and_footnotes_export():
-    from app.core.document_model import Footnote
-    from app.exporters.docx_exporter import export_docx
+    from aduport.core.document_model import Footnote
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(
         nodes=[
@@ -443,8 +443,8 @@ def test_docx_pivot_table_and_footnotes_export():
 
 
 def test_mobi_footnotes_css_embedded():
-    from app.core.document_model import Footnote
-    from app.exporters.mobi_exporter import export_mobi
+    from aduport.core.document_model import Footnote
+    from aduport.exporters.mobi_exporter import export_mobi
 
     model = DocumentModel(
         nodes=[
@@ -457,7 +457,7 @@ def test_mobi_footnotes_css_embedded():
 
 
 def test_pdf_simple_pivot_line():
-    from app.exporters.pdf_simple import _model_lines
+    from aduport.exporters.pdf_simple import _model_lines
 
     model = DocumentModel(
         nodes=[
@@ -469,7 +469,7 @@ def test_pdf_simple_pivot_line():
 
 
 def test_xlsx_revision_content_control_roundtrip():
-    from app.core.document_model import ContentControl
+    from aduport.core.document_model import ContentControl
 
     model = DocumentModel(
         nodes=[
@@ -493,7 +493,7 @@ def test_xlsx_revision_content_control_roundtrip():
 
 
 def test_xlsx_unified_ast_all_node_types():
-    from app.core.document_model import ContentControl, TextBox
+    from aduport.core.document_model import ContentControl, TextBox
 
     model = DocumentModel(
         nodes=[
@@ -544,7 +544,7 @@ def test_xlsx_ast_pivot_table_row():
 
 
 def test_xlsx_ast_comment_roundtrip():
-    from app.core.document_model import Comment
+    from aduport.core.document_model import Comment
 
     model = DocumentModel(
         nodes=[
@@ -565,7 +565,7 @@ def test_xlsx_ast_comment_roundtrip():
 
 
 def test_xlsx_ast_footnote_roundtrip():
-    from app.core.document_model import Footnote
+    from aduport.core.document_model import Footnote
 
     model = DocumentModel(
         nodes=[
@@ -585,7 +585,7 @@ def test_xlsx_ast_footnote_roundtrip():
 
 
 def test_xlsx_ast_math_roundtrip():
-    from app.core.document_model import MathBlock
+    from aduport.core.document_model import MathBlock
 
     model = DocumentModel(
         nodes=[
@@ -606,7 +606,7 @@ def test_xlsx_ast_math_roundtrip():
 
 
 def test_xlsx_ast_image_html_roundtrip():
-    from app.core.document_model import HtmlBlock, Image
+    from aduport.core.document_model import HtmlBlock, Image
 
     png = b"\x89PNG\r\n\x1a\n"
     model = DocumentModel(
@@ -629,7 +629,7 @@ def test_xlsx_ast_image_html_roundtrip():
 
 
 def test_xlsx_ast_code_blockquote_roundtrip():
-    from app.core.document_model import Blockquote, CodeBlock
+    from aduport.core.document_model import Blockquote, CodeBlock
 
     model = DocumentModel(
         nodes=[
@@ -653,7 +653,7 @@ def test_xlsx_ast_code_blockquote_roundtrip():
 
 
 def test_xlsx_ast_structure_nodes_roundtrip():
-    from app.core.document_model import Heading, HorizontalRule, ListItem, Paragraph
+    from aduport.core.document_model import Heading, HorizontalRule, ListItem, Paragraph
 
     model = DocumentModel(
         nodes=[
@@ -683,7 +683,7 @@ def test_xlsx_ast_structure_nodes_roundtrip():
 
 
 def test_xlsx_legacy_structure_sheets_import():
-    from app.core.document_model import Heading, HorizontalRule, ListItem, Paragraph
+    from aduport.core.document_model import Heading, HorizontalRule, ListItem, Paragraph
 
     raw = export_xlsx(
         DocumentModel(
@@ -709,7 +709,7 @@ def test_xlsx_legacy_structure_sheets_import():
 
 
 def test_xlsx_legacy_code_blockquote_sheets_import():
-    from app.core.document_model import Blockquote, CodeBlock
+    from aduport.core.document_model import Blockquote, CodeBlock
 
     raw = export_xlsx(
         DocumentModel(
@@ -733,7 +733,7 @@ def test_xlsx_legacy_code_blockquote_sheets_import():
 
 def test_xlsx_legacy_meta_sheets_import():
     """Backward compat: pre-v1.18 split meta sheets still import."""
-    from app.core.document_model import ContentControl
+    from aduport.core.document_model import ContentControl
 
     raw = export_xlsx(
         DocumentModel(
@@ -821,7 +821,7 @@ def test_xlsx_legacy_cell_spans_sheet_import():
 
 
 def test_xlsx_textbox_roundtrip():
-    from app.core.document_model import TextBox
+    from aduport.core.document_model import TextBox
 
     model = DocumentModel(
         nodes=[

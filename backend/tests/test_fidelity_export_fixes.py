@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import zipfile
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     CodeBlock,
     DocumentModel,
     Heading,
@@ -19,8 +19,8 @@ from app.core.document_model import (
     RichText,
     Table,
 )
-from app.exporters import docx_exporter, rtf_exporter
-from app.exporters.pdf_simple import _wrap_text, export_pdf_simple
+from aduport.exporters import docx_exporter, rtf_exporter
+from aduport.exporters.pdf_simple import _wrap_text, export_pdf_simple
 
 
 def test_rtf_codeblock_uses_line_breaks():
@@ -56,9 +56,10 @@ def test_rtf_rich_link_bold_and_image_math():
     assert r"\b" in out and "Title H1" in out
     assert "HYPERLINK" in out and "example.com" in out
     assert "x^2" in out
-    assert "[Image: chart]" in out
+    assert r"\pngblip" in out and r"\mdalt chart" in out
     assert "raw html body" in out
-    assert "1. " in out and "2. " in out
+    assert r"\listtable" in out and r"\ls1" in out
+    assert out.count(r"\mdn") == 2
     assert "A" in out and "B" in out
 
 
@@ -85,8 +86,8 @@ def test_pdf_simple_soft_wrap_keeps_long_text():
     model = DocumentModel(nodes=[Paragraph(text=long.strip())])
     blob = export_pdf_simple(model)
     assert blob.startswith(b"%PDF")
-    assert b"mdbridge-pdf-degraded: true" in blob
-    assert b"mdbridge-pdf-engine: pdf_simple" in blob
+    assert b"aduport-pdf-degraded: true" in blob
+    assert b"aduport-pdf-engine: pdf_simple" in blob
     # Soft-wrap keeps content; hard truncate would leave ~110 chars only.
     text = blob.decode("latin-1", errors="ignore")
     assert text.count("word") >= 40

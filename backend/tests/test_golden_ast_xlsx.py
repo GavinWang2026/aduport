@@ -7,8 +7,8 @@ from io import BytesIO
 
 import pytest
 
-from app.config import settings
-from app.core.document_model import (
+from aduport.config import settings
+from aduport.core.document_model import (
     Blockquote,
     CodeBlock,
     Comment,
@@ -28,7 +28,7 @@ from app.core.document_model import (
     TableCell,
     TextBox,
 )
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
 
 _TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"

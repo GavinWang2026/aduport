@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core.document_model import DocumentModel, Paragraph, RichText
-from app.core.jobs import Job, JobStatus, job_store
-from main import app
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel, Paragraph, RichText
+from aduport.core.jobs import Job, JobStatus, job_store
+from main import aduport
 
 _ROOT = Path(__file__).resolve().parents[2]
 
@@ -25,8 +25,8 @@ def client(monkeypatch):
 
 
 def test_t10_hard_exception_falls_back_to_native(monkeypatch):
-    from app.core.registry import _anydoc_first
-    from app.importers import anydoc_bridge as bridge
+    from aduport.core.registry import _anydoc_first
+    from aduport.importers import anydoc_bridge as bridge
 
     monkeypatch.setattr(settings, "anydoc_fallback", True)
     monkeypatch.setattr(bridge, "should_handle", lambda fmt: True)
@@ -74,7 +74,7 @@ def test_t11_done_status_not_rolled_back_by_side_effect(monkeypatch):
 
 
 def test_t13_copy_context_propagates_tenant():
-    from app.core.request_context import current_tenant_id, tenant_id_var
+    from aduport.core.request_context import current_tenant_id, tenant_id_var
 
     seen: dict[str, str | None] = {"tid": None}
 

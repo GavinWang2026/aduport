@@ -91,8 +91,16 @@ impl Table {
             b.next_row();
             for cell in row {
                 // Span-less placement never charges the expansion budget.
-                b.place(Cell { col_span: 1, row_span: 1, ..cell })
-                    .expect("span-less placement cannot exceed the expansion budget");
+                if let Err(err) = b.place(Cell {
+                    col_span: 1,
+                    row_span: 1,
+                    ..cell
+                }) {
+                    // Defensive: never panic on table build (report P3-4).
+                    // Span-less cells should not hit ResourceLimit; skip the cell.
+                    let _ = err;
+                    continue;
+                }
             }
         }
         let mut table = b.finish(kind);

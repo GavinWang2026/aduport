@@ -5,14 +5,14 @@ from __future__ import annotations
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import Comment, DocumentModel, Paragraph
-from app.exporters.azw3_exporter import export_azw3
-from app.exporters.html_render import render_body_html
-from app.importers.docx_ooxml import enrich_docx_model
-from app.importers.md_importer import import_md
-from app.importers.mobi_text import try_extract_mobi_model
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import Comment, DocumentModel, Paragraph
+from aduport.exporters.azw3_exporter import export_azw3
+from aduport.exporters.html_render import render_body_html
+from aduport.importers.docx_ooxml import enrich_docx_model
+from aduport.importers.md_importer import import_md
+from aduport.importers.mobi_text import try_extract_mobi_model
 
 
 def _minimal_docx_with_comments_header() -> bytes:

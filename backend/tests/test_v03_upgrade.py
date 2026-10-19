@@ -5,21 +5,21 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.cache import ResultCache
-from app.core.converter import convert
-from app.core.exceptions import InvalidDocumentError, UnsupportedFormatError
-from app.core.registry import (
+from aduport.core.cache import ResultCache
+from aduport.core.converter import convert
+from aduport.core.exceptions import InvalidDocumentError, UnsupportedFormatError
+from aduport.core.registry import (
     ensure_builtin_plugins,
     registered_export_formats,
     registered_import_formats,
 )
-from app.core.security import validate_upload
-from main import app
+from aduport.core.security import validate_upload
+from main import aduport
 
 
 @pytest.fixture()
 def client(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "rate_limit_per_minute", 0)
@@ -81,8 +81,8 @@ def test_magic_bytes_reject_ext_mismatch():
 
 
 def test_result_cache_hit(monkeypatch):
-    from app.config import settings
-    from app.core import converter as conv_mod
+    from aduport.config import settings
+    from aduport.core import converter as conv_mod
 
     monkeypatch.setattr(settings, "cache_enabled", True)
     monkeypatch.setattr(settings, "audit_enabled", False)
@@ -130,12 +130,12 @@ def test_health_and_metrics(client):
 
     m = client.get("/api/metrics")
     assert m.status_code == 200
-    assert "mdbridge_conversions_total" in m.text or "conversions" in m.text.lower() or m.text.strip() != ""
+    assert "aduport_conversions_total" in m.text or "conversions" in m.text.lower() or m.text.strip() != ""
 
 
 def test_rate_limit(monkeypatch):
-    from app.api.rate_limit import reset_rate_limits
-    from app.config import settings
+    from aduport.api.rate_limit import reset_rate_limits
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "rate_limit_per_minute", 2)

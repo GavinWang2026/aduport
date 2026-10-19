@@ -5,12 +5,12 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import Comment, DocumentModel, Heading, Image, Paragraph
-from app.core.stream_convert import can_stream_convert, convert_streaming
-from app.exporters.azw3_exporter import export_azw3
-from app.exporters.docx_exporter import export_docx
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import Comment, DocumentModel, Heading, Image, Paragraph
+from aduport.core.stream_convert import can_stream_convert, convert_streaming
+from aduport.exporters.azw3_exporter import export_azw3
+from aduport.exporters.docx_exporter import export_docx
 
 
 def test_azw3_export_with_image():

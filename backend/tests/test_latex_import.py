@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.core.converter import convert
-from app.core.document_model import Heading
-from app.importers.latex_importer import import_latex
+from aduport.core.converter import convert
+from aduport.core.document_model import Heading
+from aduport.importers.latex_importer import import_latex
 
 
 def test_import_latex_sections():

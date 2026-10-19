@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.converter import convert
-from app.core.document_model import InlineMarkType, Paragraph
-from app.exporters.html_render import render_body_html
-from app.importers.html_importer import import_html
-from app.importers.md_importer import import_md
+from aduport.core.converter import convert
+from aduport.core.document_model import InlineMarkType, Paragraph
+from aduport.exporters.html_render import render_body_html
+from aduport.importers.html_importer import import_html
+from aduport.importers.md_importer import import_md
 
 
 def test_md_embedded_html_inline_marks():

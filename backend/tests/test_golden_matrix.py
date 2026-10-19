@@ -1,7 +1,7 @@
 """P2-5: golden fixture matrix — sources × md/docx/pdf/html targets.
 
 Uses anydoc upstream fixtures (real Office/PDF samples). DOCX row requires
-anydoc native wheel or docling (`md-bridge[office]`); mobi/azw3 rows use
+anydoc native wheel or docling (`aduport[office]`); mobi/azw3 rows use
 programmatic golden samples (CI-safe, no docling).
 """
 
@@ -13,14 +13,14 @@ from io import BytesIO
 
 import pytest
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, Footnote, Heading, Paragraph
-from app.core.exceptions import InvalidDocumentError
-from app.exporters.azw3_exporter import export_azw3, export_kf8
-from app.exporters.epub_exporter import export_epub
-from app.exporters.mobi_exporter import export_mobi
-from app.importers import anydoc_bridge as bridge
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, Footnote, Heading, Paragraph
+from aduport.core.exceptions import InvalidDocumentError
+from aduport.exporters.azw3_exporter import export_azw3, export_kf8
+from aduport.exporters.epub_exporter import export_epub
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.importers import anydoc_bridge as bridge
 
 FIX = os.path.normpath(
     os.path.join(
@@ -143,7 +143,7 @@ def test_golden_matrix_row(
     golden_light_pdf,
 ):
     if src_fmt == "docx" and not _docx_import_available():
-        pytest.skip("docx import needs anydoc wheel or md-bridge[office]")
+        pytest.skip("docx import needs anydoc wheel or aduport[office]")
     if src_fmt == "pdf" and not _pdf_text_import_available():
         pytest.skip("pdf text import needs pypdfium2")
 
@@ -157,7 +157,7 @@ def test_golden_matrix_row(
 @pytest.mark.skipif(not bridge.anydoc_available(), reason="anydoc wheel not installed")
 def test_golden_docx_anydoc_channel(monkeypatch):
     """Force anydoc fast Markdown (pipe tables) for handmade-tables."""
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "anydoc_enabled", True)
     monkeypatch.setattr(

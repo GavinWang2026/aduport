@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Blockquote,
     Chart,
     CodeBlock,
@@ -30,7 +30,7 @@ from app.core.document_model import (
     Table,
     TextBox,
 )
-from app.exporters import (
+from aduport.exporters import (
     docx_exporter,
     epub_exporter,
     html_exporter,
@@ -45,7 +45,7 @@ from app.exporters import (
     txt_exporter,
     xlsx_exporter,
 )
-from app.exporters.pdf_simple import export_pdf_simple
+from aduport.exporters.pdf_simple import export_pdf_simple
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"

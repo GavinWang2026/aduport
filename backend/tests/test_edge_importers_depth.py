@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     DocumentModel,
     Footnote,
     Heading,
@@ -18,14 +18,14 @@ from app.core.document_model import (
     Table,
     TableCell,
 )
-from app.core.exceptions import InvalidDocumentError
-from app.exporters.mobi_exporter import export_mobi
-from app.exporters.odt_exporter import export_odt
-from app.importers.csv_importer import import_csv
-from app.importers.doc_importer import import_doc
-from app.importers.mobi_importer import import_mobi
-from app.importers.odt_importer import import_odt
-from app.importers.ole_office import import_ppt
+from aduport.core.exceptions import InvalidDocumentError
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.exporters.odt_exporter import export_odt
+from aduport.importers.csv_importer import import_csv
+from aduport.importers.doc_importer import import_doc
+from aduport.importers.mobi_importer import import_mobi
+from aduport.importers.odt_importer import import_odt
+from aduport.importers.ole_office import import_ppt
 from tests._ole_fixtures import build_cfb_with_stream, build_minimal_ppt
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -144,15 +144,15 @@ def test_mobi_export_import_roundtrip():
 
 
 def test_odt_rejects_bad_zip():
-    from app.core.exceptions import CorruptedFileError
+    from aduport.core.exceptions import CorruptedFileError
 
     with pytest.raises((InvalidDocumentError, CorruptedFileError)):
         import_odt(b"PK\x03\x04not-odt", "x.odt")
 
 
 def test_mobi_looks_like_and_tiny_payload():
-    from app.importers.mobi_importer import _looks_like_mobi
-    from app.importers.mobi_text import try_extract_mobi_model
+    from aduport.importers.mobi_importer import _looks_like_mobi
+    from aduport.importers.mobi_text import try_extract_mobi_model
 
     assert _looks_like_mobi(b"BOOKMOBI" + b"\x00" * 80)
     assert not _looks_like_mobi(b"xxxx")
@@ -167,9 +167,9 @@ def test_mobi_looks_like_and_tiny_payload():
 
 def test_docx_importer_native_path_and_reject():
     """docx_importer.py was 23% covered — exercise reject + native fallback."""
-    from app.core.exceptions import CorruptedFileError
-    from app.exporters.docx_exporter import export_docx
-    from app.importers.docx_importer import import_docx
+    from aduport.core.exceptions import CorruptedFileError
+    from aduport.exporters.docx_exporter import export_docx
+    from aduport.importers.docx_importer import import_docx
 
     with pytest.raises((InvalidDocumentError, CorruptedFileError)):
         import_docx(b"not-a-zip", "x.docx")
@@ -191,9 +191,9 @@ def test_docx_importer_native_path_and_reject():
 
 
 def test_pptx_importer_light_path_and_reject():
-    from app.core.exceptions import CorruptedFileError
-    from app.exporters.pptx_exporter import export_pptx
-    from app.importers.pptx_importer import import_pptx
+    from aduport.core.exceptions import CorruptedFileError
+    from aduport.exporters.pptx_exporter import export_pptx
+    from aduport.importers.pptx_importer import import_pptx
 
     with pytest.raises((InvalidDocumentError, CorruptedFileError)):
         import_pptx(b"not-pptx", "x.pptx")
@@ -208,9 +208,9 @@ def test_pptx_importer_light_path_and_reject():
 
 def test_docx_text_run_level_marks_without_anydoc():
     """§3.4: native docx_text must recover bold/italic (not anydoc-only)."""
-    from app.core.document_model import InlineMark, InlineMarkType, RichText
-    from app.exporters.docx_exporter import export_docx
-    from app.importers.docx_text import try_extract_docx_model
+    from aduport.core.document_model import InlineMark, InlineMarkType, RichText
+    from aduport.exporters.docx_exporter import export_docx
+    from aduport.importers.docx_text import try_extract_docx_model
 
     model = DocumentModel(
         nodes=[
@@ -234,11 +234,11 @@ def test_docx_text_run_level_marks_without_anydoc():
 
 def test_list_fence_is_codeblock_child_not_paragraph():
     """V-E: fenced code inside list items must be CodeBlock in AST/json."""
-    from app.core.document_model import CodeBlock
-    from app.exporters.html_render import render_body_html
-    from app.exporters.json_exporter import export_json
-    from app.exporters.txt_exporter import export_txt
-    from app.importers.md_importer import import_md
+    from aduport.core.document_model import CodeBlock
+    from aduport.exporters.html_render import render_body_html
+    from aduport.exporters.json_exporter import export_json
+    from aduport.exporters.txt_exporter import export_txt
+    from aduport.importers.md_importer import import_md
 
     src = b"- item one\n\n  ```python\n  hello_code_block\n  ```\n\n- item two\n"
     model = import_md(src)

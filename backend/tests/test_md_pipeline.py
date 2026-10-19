@@ -6,12 +6,12 @@ import base64
 
 import pytest
 
-from app.api.routes import _safe_output_filename
-from app.core.css_sanitize import sanitize_custom_css, sanitize_font_family
-from app.core.document_model import Image, InlineMarkType, Table
-from app.core.converter import convert
-from app.exporters.md_exporter import export_md
-from app.importers.md_importer import import_md
+from aduport.api.routes import _safe_output_filename
+from aduport.core.css_sanitize import sanitize_custom_css, sanitize_font_family
+from aduport.core.document_model import Image, InlineMarkType, Table
+from aduport.core.converter import convert
+from aduport.exporters.md_exporter import export_md
+from aduport.importers.md_importer import import_md
 
 
 def test_import_table_preserved():
@@ -32,7 +32,7 @@ def test_bold_italic_link_no_duplication():
     assert text.count("Markdown") == 1
     assert "斜体" in text
     assert "链接" in text
-    from app.core.document_model import Paragraph, ensure_rich_text
+    from aduport.core.document_model import Paragraph, ensure_rich_text
 
     rich = ensure_rich_text(paras[0].text)  # type: ignore[attr-defined]
     types = {m.type for m in rich.marks}
@@ -46,7 +46,7 @@ def test_bold_italic_link_no_duplication():
 def test_inline_code_and_strikethrough():
     md = b"use `code` and ~~gone~~\n"
     model = import_md(md)
-    from app.core.document_model import Paragraph, ensure_rich_text
+    from aduport.core.document_model import Paragraph, ensure_rich_text
 
     para = next(n for n in model.nodes if isinstance(n, Paragraph))
     rich = ensure_rich_text(para.text)
@@ -73,7 +73,7 @@ def test_image_data_uri_and_remote_placeholder():
 def test_nested_list_levels():
     md = b"- item1\n  - nested1\n- item2\n"
     model = import_md(md)
-    from app.core.document_model import ListItem
+    from aduport.core.document_model import ListItem
 
     items = [n for n in model.nodes if isinstance(n, ListItem)]
     assert len(items) >= 2
@@ -92,7 +92,8 @@ def test_md_roundtrip_table_and_bold():
     text = out.decode("utf-8")
     assert "| Name" in text or "| Name " in text
     assert "Alice" in text
-    assert "**world**" in text or "world" in text
+    # v15 P1: bold must survive as markdown marks — bare "world" is not enough
+    assert "**world**" in text
     assert "https://a.example" in text
     assert "https://b.example" in text
 
@@ -115,8 +116,8 @@ def test_css_ssrf_stripped():
 
 def test_circular_import_safe():
     # Must not raise ImportError
-    from app.importers.md_importer import import_md as im
-    from app.core.converter import convert as cv
-    from app.exporters.md_exporter import export_md as em
+    from aduport.importers.md_importer import import_md as im
+    from aduport.core.converter import convert as cv
+    from aduport.exporters.md_exporter import export_md as em
 
     assert callable(im) and callable(cv) and callable(em)

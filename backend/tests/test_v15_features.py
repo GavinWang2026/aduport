@@ -7,22 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from app.config import settings
-from app.core.converter import (
+from aduport.config import settings
+from aduport.core.converter import (
     SUPPORTED_SOURCE_FORMATS,
     SUPPORTED_TARGET_FORMATS,
     convert,
     convert_directory,
     convert_directory_async,
 )
-from app.core.document_model import DocumentModel, Heading, Image, Paragraph, Table
-from app.core.image_ops import maybe_compress_images
-from app.exporters.azw3_exporter import export_azw3, export_kf8
-from app.exporters.mobi_exporter import export_mobi
-from app.exporters.odt_exporter import export_odt
-from app.exporters.xlsx_exporter import import_xlsx
-from app.importers.mobi_text import try_extract_mobi_model
-from app.importers.odt_text import try_extract_odt_model
+from aduport.core.document_model import DocumentModel, Heading, Image, Paragraph, Table
+from aduport.core.image_ops import maybe_compress_images
+from aduport.exporters.azw3_exporter import export_azw3, export_kf8
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.exporters.odt_exporter import export_odt
+from aduport.exporters.xlsx_exporter import import_xlsx
+from aduport.importers.mobi_text import try_extract_mobi_model
+from aduport.importers.odt_text import try_extract_odt_model
 
 
 def test_formats_v15_registered():

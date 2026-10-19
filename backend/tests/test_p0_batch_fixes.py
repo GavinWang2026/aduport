@@ -9,7 +9,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     CodeBlock,
     Comment,
     DocumentModel,
@@ -20,13 +20,13 @@ from app.core.document_model import (
     Table,
     ensure_rich_text,
 )
-from app.core.safe_fetch import is_safe_url
-from app.core.stream_convert import _iter_text_chunks
-from app.exporters.csv_exporter import export_csv
-from app.exporters.docx_comments import inject_word_comments
-from app.exporters.html_render import render_body_html
-from app.importers.epub_text import _try_deobfuscate
-from app.importers.md_importer import import_md
+from aduport.core.safe_fetch import is_safe_url
+from aduport.core.stream_convert import _iter_text_chunks
+from aduport.exporters.csv_exporter import export_csv
+from aduport.exporters.docx_comments import inject_word_comments
+from aduport.exporters.html_render import render_body_html
+from aduport.importers.epub_text import _try_deobfuscate
+from aduport.importers.md_importer import import_md
 
 
 def test_csv_formula_injection_neutralized():
@@ -48,8 +48,8 @@ def test_csv_formula_injection_neutralized():
     assert "'=cmd|" in out
     assert "'+1" in out
     assert "'@SUM" in out
-    assert "'-1" in out
-    assert "'\t=1" in out
+    assert "-1" in out and "'-1" not in out
+    assert "\t=1" in out and "'\t=1" not in out
 
 
 def test_html_block_xss_sanitized():
@@ -81,14 +81,14 @@ def test_md_preprocessor_preserves_fenced_code():
     codes2 = [n for n in model2.nodes if isinstance(n, CodeBlock)]
     assert len(codes2) == 1
     assert "[^1]: NOT a footnote" in codes2[0].content
-    from app.core.document_model import Footnote
+    from aduport.core.document_model import Footnote
 
     assert not any(isinstance(n, Footnote) for n in model2.nodes)
 
 
 def test_md_preprocessor_preserves_indented_and_inline_dollars():
     """History P0 #10: 4-space indented + inline code must keep $$."""
-    from app.core.document_model import MathBlock
+    from aduport.core.document_model import MathBlock
 
     indented = "    cost = $$price$$\n"
     model = import_md(indented.encode())
@@ -129,8 +129,8 @@ def test_zip_inflate_session_is_cumulative(monkeypatch):
     import io
     import zipfile as zfmod
 
-    from app.core.exceptions import FileTooLargeError
-    from app.core.safe_zip import read_zip_member, zip_inflate_session
+    from aduport.core.exceptions import FileTooLargeError
+    from aduport.core.safe_zip import read_zip_member, zip_inflate_session
 
     buf = io.BytesIO()
     with zfmod.ZipFile(buf, "w") as zf:
@@ -175,7 +175,7 @@ def test_ssrf_blocks_ipv4_mapped_and_cgn():
 
 
 def test_docx_comment_author_quote_safe():
-    from app.exporters.docx_exporter import export_docx
+    from aduport.exporters.docx_exporter import export_docx
 
     model = DocumentModel(nodes=[Heading(level=1, text="T"), Paragraph(text="body")])
     base = export_docx(model)
@@ -196,7 +196,7 @@ def test_docx_comment_author_quote_safe():
 def test_registry_concurrent_init_single_wire():
     import threading
 
-    from app.core import registry as reg
+    from aduport.core import registry as reg
 
     # Reset for test (best-effort)
     with reg._REGISTRY_LOCK:

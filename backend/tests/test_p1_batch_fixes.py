@@ -8,15 +8,15 @@ from zipfile import ZipFile
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core.document_model import DocumentModel, Image, ListItem, Paragraph
-from app.core.stream_convert import _SpillWriter
-from app.core.tenants import clear_tenant_cache, find_tenant_by_key
-from app.importers.docx_ooxml import enrich_docx_model
-from app.importers.html_importer import import_html
-from app.importers.md_importer import import_md
-from app.importers.pdf_font_fix import normalize_pdf_text
-from main import app
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel, Image, ListItem, Paragraph
+from aduport.core.stream_convert import _SpillWriter
+from aduport.core.tenants import clear_tenant_cache, find_tenant_by_key
+from aduport.importers.docx_ooxml import enrich_docx_model
+from aduport.importers.html_importer import import_html
+from aduport.importers.md_importer import import_md
+from aduport.importers.pdf_font_fix import normalize_pdf_text
+from main import aduport
 
 
 @pytest.fixture()
@@ -123,7 +123,7 @@ def test_tenant_compare_digest(monkeypatch):
 def test_job_persist_wal_singleton(tmp_path, monkeypatch):
     db = tmp_path / "jobs.sqlite3"
     monkeypatch.setattr(settings, "job_db_path", str(db))
-    from app.core import job_persist as jp
+    from aduport.core import job_persist as jp
 
     jp._conn = None
     jp._conn_path = None

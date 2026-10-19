@@ -164,7 +164,7 @@ fn format_from_path(path: PathBuf) -> Option<&'static str> {
 /// and unrecognizable containers.
 #[pyfunction]
 fn to_markdown(py: Python<'_>, path: PathBuf) -> PyResult<String> {
-    py.detach(|| anydoc::to_markdown(&path)).map_err(|e| convert_error(py, e))
+    catch_convert(py, || anydoc::to_markdown(&path))
 }
 
 /// Convert an in-memory document to Markdown. Without a format, it is
@@ -174,7 +174,7 @@ fn to_markdown(py: Python<'_>, path: PathBuf) -> PyResult<String> {
 #[pyo3(signature = (data, format=None))]
 fn to_markdown_bytes(py: Python<'_>, data: Vec<u8>, format: Option<&str>) -> PyResult<String> {
     let format = format.map(parse_format).transpose()?;
-    py.detach(|| anydoc::to_markdown_bytes(&data, format)).map_err(|e| convert_error(py, e))
+    catch_convert(py, || anydoc::to_markdown_bytes(&data, format))
 }
 
 /// Parse an in-memory document into the document model, which also carries
@@ -190,9 +190,22 @@ fn to_document(
     format: Option<&str>,
 ) -> PyResult<document::Document> {
     let format = format.map(parse_format).transpose()?;
-    let parsed =
-        py.detach(|| anydoc::to_document(&data, format)).map_err(|e| convert_error(py, e))?;
+    let parsed = catch_convert(py, || anydoc::to_document(&data, format))?;
     document::document(py, parsed)
+}
+
+fn catch_convert<T, F>(py: Python<'_>, f: F) -> PyResult<T>
+where
+    T: Send,
+    F: FnOnce() -> Result<T, anydoc::ConvertError> + Send + std::panic::UnwindSafe,
+{
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| py.detach(f))) {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(convert_error(py, e)),
+        Err(_) => Err(ConvertError::new_err(
+            "native parser panicked; isolated failure (catch_unwind)",
+        )),
+    }
 }
 
 /// Convert documents to GitHub-Flavored Markdown.

@@ -8,15 +8,15 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
+from main import aduport
 
 
 @pytest.fixture()
 def client(monkeypatch):
-    monkeypatch.setenv("MDBRIDGE_API_KEY", "")
-    monkeypatch.setenv("MDBRIDGE_CORS_ORIGINS", "local")
+    monkeypatch.setenv("ADUPORT_API_KEY", "")
+    monkeypatch.setenv("ADUPORT_CORS_ORIGINS", "local")
     # Reload settings is hard; middleware reads settings at request time for API key
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "cors_origins", "local")
@@ -74,8 +74,8 @@ def test_cors_whitelist(client):
 
 
 def test_api_key_required(monkeypatch):
-    from app.config import settings
-    from app.core.tenants import clear_tenant_cache
+    from aduport.config import settings
+    from aduport.core.tenants import clear_tenant_cache
 
     monkeypatch.setattr(settings, "api_key", "secret-key")
     monkeypatch.setattr(settings, "api_keys", "")

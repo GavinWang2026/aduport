@@ -2,10 +2,10 @@
 requires = ["maturin>=1.9,<2"]
 build-backend = "maturin"
 
-# md-bridge's fused native parser. Ships as the `mdbridge-native` distribution
-# and imports as `mdbridge_native._doc` (a single abi3 extension module).
+# AduPort's fused native parser. Ships as the `aduport-native` distribution
+# and imports as `aduport_native._doc` (a single abi3 extension module).
 [project]
-name = "mdbridge-native"
+name = "aduport-native"
 description = "Convert documents (doc, docx, odt, rtf, epub, pdf, presentations, spreadsheets, csv) to GitHub-Flavored Markdown"
 readme = "README.md"
 license = "MIT"
@@ -22,9 +22,12 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://github.com/firecrawl/anydoc#readme"
-Repository = "https://github.com/firecrawl/anydoc"
-Issues = "https://github.com/firecrawl/anydoc/issues"
+Homepage = "https://github.com/GavinWang2026/aduport"
+Repository = "https://github.com/GavinWang2026/aduport"
+Issues = "https://github.com/GavinWang2026/aduport/issues"
+Documentation = "https://github.com/GavinWang2026/aduport/blob/main/native/anydoc/README.md"
+# Prebuilt wheels: GitHub Releases asset aduport-native-wheels-*.tar.gz
+# (not on the main AduPort PyPI artifact — product boundary).
 
 [tool.maturin]
-module-name = "mdbridge_native._doc"
+module-name = "aduport_native._doc"

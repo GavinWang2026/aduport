@@ -12,8 +12,8 @@ import os
 
 import pytest
 
-from app.importers import anydoc_bridge as bridge
-from app.importers.anydoc_bridge import (
+from aduport.importers import anydoc_bridge as bridge
+from aduport.importers.anydoc_bridge import (
     ANYDOC_ONLY_SIBLINGS,
     ANYDOC_ONLY_SIBLINGS as _ONLY,
     _FORMAT_MAP,
@@ -43,9 +43,22 @@ skip_if_no_anydoc = pytest.mark.skipif(
 
 
 def test_supports_known_formats():
-    for fmt in ("doc", "docx", "odt", "rtf", "ppt", "pptx", "epub", "xls", "xlsx", "ods", "odp", "csv"):
+    for fmt in (
+        "doc",
+        "docx",
+        "odt",
+        "rtf",
+        "ppt",
+        "pptx",
+        "epub",
+        "xls",
+        "xlsx",
+        "ods",
+        "odp",
+        "csv",
+        "pdf",
+    ):
         assert supports(fmt) is True
-    assert supports("pdf") is False
     assert supports("txt") is False
     assert supports(".DOCX") is True
 
@@ -62,8 +75,6 @@ def test_format_map_inverse_for_sniff():
     # Every anydoc format name used by _FORMAT_MAP values must be sniffable back.
     targets = set(_FORMAT_MAP.values())
     for t in targets:
-        if t == "pdf":
-            continue  # PDF is sniffable but intentionally not imported via anydoc
         assert t in _SNIFF_MAP, f"anydoc target {t} missing from _SNIFF_MAP"
 
 
@@ -82,10 +93,31 @@ def test_should_handle_respects_anydoc_only():
     assert should_handle("rtf") is True
     assert should_handle("epub") is True
     assert should_handle("csv") is True
+    # PDF never owns the model path (no AST); fast-md is separate.
+    assert should_handle("pdf") is False
+
+
+def test_should_handle_fast_md_pdf(monkeypatch):
+    from aduport.config import settings
+    from aduport.importers.anydoc_bridge import should_handle_fast_md
+
+    monkeypatch.setattr(settings, "anydoc_enabled", True)
+    monkeypatch.setattr(settings, "anydoc_fast_markdown", True)
+    monkeypatch.setattr(settings, "anydoc_pdf_markdown", True)
+    assert should_handle_fast_md("pdf") is True
+    monkeypatch.setattr(settings, "anydoc_pdf_markdown", False)
+    assert should_handle_fast_md("pdf") is False
+    monkeypatch.setattr(settings, "anydoc_pdf_markdown", True)
+    monkeypatch.setattr(settings, "anydoc_fast_markdown", False)
+    assert should_handle_fast_md("pdf") is False
+    # Office shared formats still follow should_handle.
+    monkeypatch.setattr(settings, "anydoc_fast_markdown", True)
+    assert should_handle_fast_md("doc") is True
+    assert should_handle_fast_md("xlsx") is False
 
 
 def test_should_handle_disabled_when_master_switch_off(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "anydoc_enabled", False)
     assert should_handle("xlsb") is False
@@ -93,7 +125,7 @@ def test_should_handle_disabled_when_master_switch_off(monkeypatch):
 
 
 def test_should_handle_allowlist_opt_out(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "anydoc_formats", "docx")  # narrower list
     # docx still anydoc-led (in list); doc falls back to native.
@@ -119,7 +151,7 @@ def test_error_translation_mapping():
 
 
 def test_marker_map_covers_enum():
-    from app.core.document_model import ListMarker
+    from aduport.core.document_model import ListMarker
 
     assert set(_MARKER_MAP.values()) == set(ListMarker)
 
@@ -175,7 +207,7 @@ def test_model_channel_odf_table_spans():
     model = bridge.import_via_anydoc(data, "sheet.ods", "ods")
     tables = [n for n in model.nodes if getattr(n, "__class__", None) and n.__class__.__name__ == "Table"]
     assert tables, "expected at least one table"
-    # anydoc reports header_rows / cell spans; md-bridge model must carry them.
+    # anydoc reports header_rows / cell spans; AduPort model must carry them.
     assert hasattr(tables[0], "cells")
     assert hasattr(tables[0], "header_rows")
 
@@ -212,9 +244,38 @@ def test_model_channel_epub_csv(fmt, rel):
 
 
 @skip_if_no_anydoc
+def test_fast_markdown_pdf_text():
+    data = open(os.path.join(FIX, "pdf", "text.pdf"), "rb").read()
+    out = bridge.markdown_via_anydoc(data, "pdf", "text.pdf")
+    assert isinstance(out, str) and out.strip()
+
+
+@skip_if_no_anydoc
+def test_model_channel_rejects_pdf():
+    data = open(os.path.join(FIX, "pdf", "text.pdf"), "rb").read()
+    with pytest.raises(bridge.AnydocFallback):
+        bridge.import_via_anydoc(data, "text.pdf", "pdf")
+
+
+@skip_if_no_anydoc
+def test_pdf_fast_md_via_converter(monkeypatch):
+    from aduport.config import settings
+    from aduport.core import converter
+
+    monkeypatch.setattr(settings, "anydoc_enabled", True)
+    monkeypatch.setattr(settings, "anydoc_fast_markdown", True)
+    monkeypatch.setattr(settings, "anydoc_pdf_markdown", True)
+    monkeypatch.setattr(settings, "heading_numbering", False)
+    monkeypatch.setattr(settings, "image_compress", False)
+    data = open(os.path.join(FIX, "pdf", "text.pdf"), "rb").read()
+    out = converter.convert(data, "pdf", "md", filename="text.pdf")
+    assert out and len(out) > 0
+
+
+@skip_if_no_anydoc
 def test_xlsb_roundtrip_via_converter(monkeypatch):
     # End-to-end through converter.convert (registry wiring).
-    from app.core import converter
+    from aduport.core import converter
 
     data = open(os.path.join(FIX, "xlsb", "handmade-sheet.xlsb"), "rb").read()
     out = converter.convert(data, "xlsb", "md", filename="handmade-sheet.xlsb")
@@ -230,7 +291,7 @@ def test_sniff_returns_anydoc_format():
 
 @skip_if_no_anydoc
 def test_hard_error_surfaces_not_silent():
-    from app.core.exceptions import InvalidDocumentError
+    from aduport.core.exceptions import InvalidDocumentError
 
     # A zero-byte file is not a valid container; anydoc should error hard.
     with pytest.raises((InvalidDocumentError, bridge.AnydocFallback, Exception)):

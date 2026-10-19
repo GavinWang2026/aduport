@@ -5,14 +5,14 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.config import settings
-from app.core.converter import SUPPORTED_TARGET_FORMATS, convert
-from app.core.document_model import DocumentModel, Heading, Paragraph, Table
-from app.core.heading_numbers import apply_heading_numbers
-from app.exporters.csv_exporter import export_csv
-from app.exporters.docx_exporter import export_docx
-from app.exporters.latex_exporter import export_latex
-from app.exporters.pdf_exporter import _expand_placeholders, _header_footer_css
+from aduport.config import settings
+from aduport.core.converter import SUPPORTED_TARGET_FORMATS, convert
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, Table
+from aduport.core.heading_numbers import apply_heading_numbers
+from aduport.exporters.csv_exporter import export_csv
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.latex_exporter import export_latex
+from aduport.exporters.pdf_exporter import _expand_placeholders, _header_footer_css
 
 
 def test_docx_table_header_style():
@@ -59,7 +59,7 @@ def test_heading_numbering():
 
 def test_heading_numbering_via_convert(monkeypatch):
     monkeypatch.setattr(settings, "heading_numbering", True)
-    from app.core.cache import result_cache
+    from aduport.core.cache import result_cache
 
     result_cache.clear()
     # md→md is identity passthrough; use html to exercise _export numbering

@@ -41,8 +41,8 @@ def test_playwright_e2e_scaffold_present():
 def test_private_samples_hard_gate_documented():
     root = Path(__file__).resolve().parents[2]
     readme = (root / "enterprise" / "samples" / "README.md").read_text(encoding="utf-8")
-    assert "MDBRIDGE_PRIVATE_SAMPLES_DIR" in readme
-    assert "MDBRIDGE_PRIVATE_SAMPLES_REQUIRED" in readme
+    assert "ADUPORT_PRIVATE_SAMPLES_DIR" in readme
+    assert "ADUPORT_PRIVATE_SAMPLES_REQUIRED" in readme
     assert (root / "backend" / "tests" / "test_private_samples_optional.py").is_file()
     src = (
         root / "backend" / "tests" / "test_private_samples_optional.py"

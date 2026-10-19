@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     DocumentModel,
     FieldCode,
     HeaderFooter,
@@ -16,11 +16,11 @@ from app.core.document_model import (
     Section,
     TextBox,
 )
-from app.exporters.export_warnings import get_last_export_warnings
-from app.exporters.json_exporter import SCHEMA_VERSION, export_json, import_json
-from app.exporters.latex_exporter import export_latex
-from app.exporters.odt_exporter import export_odt
-from app.importers.anydoc_bridge import AnydocFallback, _translate_error
+from aduport.exporters.export_warnings import get_last_export_warnings
+from aduport.exporters.json_exporter import SCHEMA_VERSION, export_json, import_json
+from aduport.exporters.latex_exporter import export_latex
+from aduport.exporters.odt_exporter import export_odt
+from aduport.importers.anydoc_bridge import AnydocFallback, _translate_error
 
 
 def test_priority_ast_nodes_json_roundtrip():
@@ -96,8 +96,8 @@ def test_ffi_panic_exception_mapped():
 
 
 def test_export_warnings_collected_via_converter(monkeypatch):
-    from app.config import settings
-    from app.core.converter import convert
+    from aduport.config import settings
+    from aduport.core.converter import convert
 
     monkeypatch.setattr(settings, "convert_isolate", False)
     monkeypatch.setattr(settings, "cache_enabled", False)

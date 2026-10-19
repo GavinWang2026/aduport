@@ -1,15 +1,15 @@
 # DocumentModel — 一等公民中间 AST
 
-md-bridge 所有导入器最终产出 **`DocumentModel`**，所有导出器从同一 AST 消费。  
+AduPort 所有导入器最终产出 **`DocumentModel`**，所有导出器从同一 AST 消费。  
 `convert(bytes, src, tgt)` 是薄封装：import →（可选 enrich）→ export。
 
 ## 快速上手
 
 ```python
-from app.core.document_model import DocumentModel, Heading, Paragraph, Table
-from app.core.registry import get_exporter  # or convert()
-from app.exporters.md_exporter import export_md
-from app.exporters.docx_exporter import export_docx
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, Table
+from aduport.core.registry import get_exporter  # or convert()
+from aduport.exporters.md_exporter import export_md
+from aduport.exporters.docx_exporter import export_docx
 
 model = DocumentModel(
     title="Demo",
@@ -28,7 +28,7 @@ docx = export_docx(model, theme="academic")
 从文件走完整管线：
 
 ```python
-from app.core.converter import convert
+from aduport.core.converter import convert
 
 out = convert(open("in.docx", "rb").read(), "docx", "md", filename="in.docx")
 ```
@@ -39,7 +39,8 @@ out = convert(open("in.docx", "rb").read(), "docx", "md", filename="in.docx")
 |------|------|
 | `Heading` | 标题 level 1–6 |
 | `Paragraph` | 段落；`text` 可为 `str` 或 `RichText`+`InlineMark` |
-| `ListItem` | 有序/无序/任务列表；可嵌套 `children` |
+| `ListItem` | 有序/无序/任务列表；`number` / `start` 保留起始序号；可嵌套 `children` |
+| `PageBreak` | 显式分页（`type=page_break`）；Markdown 为 `<!-- pagebreak -->` |
 | `Table` | `rows: list[list[str]]`；anydoc 还可填 `cells`（含 rowspan/colspan） |
 | `Image` | `data` / `mime_type` / `alt_text` |
 | `CodeBlock` / `Blockquote` / `HorizontalRule` | 代码、引用、分隔线 |
@@ -53,7 +54,7 @@ out = convert(open("in.docx", "rb").read(), "docx", "md", filename="in.docx")
 | `TableCell.formula` / `cell_kind` | 公式文本与透视/图表元数据（xlsx） |
 | `metadata.pdf_layout.blocks` | PDF charbox 像素级行块；HTML 导出含定位预览 |
 
-完整定义见 `backend/app/core/document_model.py`。
+完整定义见 `backend/aduport/core/document_model.py`。
 
 ## 插件边界
 

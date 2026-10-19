@@ -5,17 +5,20 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   native-regression:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87  # stable
+      - uses: Swatinem/rust-cache@5cb072d7354962be830356aa6b146f7612846014  # v2.7.5
         with:
           workspaces: native/anydoc -> native/anydoc/target
       - name: Create venv + install backend
@@ -23,13 +26,13 @@ jobs:
           python -m venv backend/.venv
           backend/.venv/bin/pip install -U pip
           backend/.venv/bin/pip install -e "backend/[dev]"
-      - name: Build mdbridge_native
+      - name: Build aduport_native
         run: bash scripts/build_native.sh
       - name: Full golden + EPUB roundtrip (native)
         working-directory: backend
         env:
-          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
-          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          ADUPORT_PRIVATE_SAMPLES_REQUIRED: "1"
         run: |
           .venv/bin/pytest -q tests/test_anydoc_bridge.py tests/test_golden_matrix.py \
             tests/test_golden_mobi_footnote.py tests/test_golden_ast_xlsx.py \
@@ -38,12 +41,25 @@ jobs:
             tests/test_sample_pack_t39.py tests/test_api_e2e_t40.py \
             tests/test_private_samples_optional.py \
             tests/test_sprint_illusion_ab_weasy.py \
-            tests/test_xml_safe_no_et_fromstring.py --tb=short
+            tests/test_xml_safe_no_et_fromstring.py \
+            tests/test_fidelity_golden_v15.py --tb=short
+      - name: Order-isolation shuffle (pytest-randomly)
+        working-directory: backend
+        env:
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+        run: |
+          # v15 §4.2: shuffle to surface cross-test pollution (not a hard gate on full suite)
+          .venv/bin/pytest -q --randomly-seed=v15 \
+            tests/test_fidelity_golden_v15.py \
+            tests/test_v15_features.py \
+            tests/test_breadth_fidelity_tiers.py \
+            tests/test_convert_isolate.py \
+            tests/test_p0_batch_fixes.py --tb=line
       - name: Private / acceptance sample gate
         working-directory: backend
         env:
-          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
-          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          ADUPORT_PRIVATE_SAMPLES_REQUIRED: "1"
         run: |
           .venv/bin/pytest -q tests/test_private_samples_optional.py \
             tests/test_sample_pack_t39.py tests/test_v_g_corpus_inventory.py --tb=short

@@ -5,11 +5,11 @@ from __future__ import annotations
 from io import BytesIO
 import zipfile
 
-from app.core.document_model import Comment, DocumentModel, Heading, Paragraph
-from app.exporters.azw3_exporter import export_azw3
-from app.exporters.epub_exporter import export_epub
-from app.exporters.html_render import render_body_html
-from app.exporters.mobi_exporter import export_mobi
+from aduport.core.document_model import Comment, DocumentModel, Heading, Paragraph
+from aduport.exporters.azw3_exporter import export_azw3
+from aduport.exporters.epub_exporter import export_epub
+from aduport.exporters.html_render import render_body_html
+from aduport.exporters.mobi_exporter import export_mobi
 
 
 def test_html_render_includes_comment():

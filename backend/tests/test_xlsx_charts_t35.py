@@ -5,9 +5,9 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import Chart, DocumentModel, Paragraph, Table
-from app.exporters import docx_exporter
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.core.document_model import Chart, DocumentModel, Paragraph, Table
+from aduport.exporters import docx_exporter
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
 
 
 def test_xlsx_embeds_drawingml_chart():
@@ -63,5 +63,5 @@ def test_docx_theme_rewrites_latin_font():
     with zipfile.ZipFile(BytesIO(blob)) as zf:
         theme_path = next(n for n in zf.namelist() if n.endswith("theme1.xml"))
         theme = zf.read(theme_path).decode("utf-8", "ignore")
-    assert "md-bridge-academic" in theme or "Times New Roman" in theme
+    assert "AduPort-academic" in theme or "Times New Roman" in theme
     assert "Times New Roman" in theme

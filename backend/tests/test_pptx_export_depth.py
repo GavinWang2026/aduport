@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.document_model import (
+import re
+import zipfile
+from io import BytesIO
+
+from aduport.core.document_model import (
     DocumentModel,
     Heading,
     Image,
@@ -10,7 +14,7 @@ from app.core.document_model import (
     RichText,
     Table,
 )
-from app.exporters.pptx_exporter import export_pptx
+from aduport.exporters.pptx_exporter import export_pptx
 
 
 def test_pptx_export_embeds_table_and_image():
@@ -33,8 +37,39 @@ def test_pptx_export_embeds_table_and_image():
     assert len(data) > 2000
 
 
+def _slide_texts(blob: bytes) -> list[list[str]]:
+    slides: list[tuple[int, list[str]]] = []
+    with zipfile.ZipFile(BytesIO(blob)) as zf:
+        for name in zf.namelist():
+            match = re.fullmatch(r"ppt/slides/slide(\d+)\.xml", name)
+            if not match:
+                continue
+            xml = zf.read(name).decode("utf-8")
+            slides.append((int(match.group(1)), re.findall(r"<a:t[^>]*>([^<]*)</a:t>", xml)))
+    return [texts for _, texts in sorted(slides)]
+
+
+def test_title_slide_is_not_repeated_on_the_next_slide():
+    from aduport.importers.md_importer import import_md
+
+    seed = """# ALPHA 2026 报告
+
+BRAVO 这是一个用于校验的段落，包含 31415 这个数字。
+
+## CHARLIE 数据
+
+正文还在。
+"""
+    slides = _slide_texts(export_pptx(import_md(seed.encode(), "seed.md")))
+    assert slides[0] == ["ALPHA 2026 报告"] or slides[0][:1] == ["ALPHA 2026 报告"]
+    second = "".join(slides[1])
+    assert "ALPHA 2026 报告" not in second
+    assert "BRAVO" in second
+    assert any("CHARLIE" in "".join(texts) for texts in slides[2:])
+
+
 def test_strip_running_headers():
-    from app.importers.pdf_text_fallback import _strip_running_headers_footers
+    from aduport.importers.pdf_text_fallback import _strip_running_headers_footers
 
     pages = [
         "公司页眉\n正文甲第一段\n1",

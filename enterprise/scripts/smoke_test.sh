@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# HTTP smoke tests against a running md-bridge API (acceptance B1–B6 subset).
+# HTTP smoke tests against a running AduPort API (acceptance B1–B6 subset).
 # Usage: ./smoke_test.sh [base_url] [api_key]
 set -euo pipefail
 
 BASE="${1:-http://127.0.0.1:8000}"
-KEY="${2:-${MDBRIDGE_API_KEY:-}}"
+KEY="${2:-${ADUPORT_API_KEY:-}}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

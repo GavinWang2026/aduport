@@ -2,7 +2,7 @@
 # =====================================================================
 # sync_anydoc.sh — pull upstream Firecrawl/anydoc into the vendored tree
 # ---------------------------------------------------------------------
-# md-bridge vendors anydoc's Rust source at native/anydoc/ (NOT an external
+# AduPort vendors anydoc's Rust source at native/anydoc/ (NOT an external
 # PyPI dependency). Default ref is PINNED (not floating main) so abi3 /
 # pymodule contracts cannot drift silently.
 #
@@ -14,11 +14,13 @@
 # What gets synced:
 #   - upstream src/              -> native/anydoc/src/            (full overwrite)
 #   - upstream python/src/*.rs   -> native/anydoc/python/src/     (except lib.rs)
+#   - upstream fuzz/             -> native/anydoc/fuzz/           (full overwrite)
+#   - upstream tests/snapshots*  -> native/anydoc/tests/          (harness + snaps)
 # What is KEPT as our fork (do NOT overwrite):
-#   - python/Cargo.toml         (mdbridge-native, path dep)
-#   - python/pyproject.toml     (module-name = mdbridge_native._doc)
+#   - python/Cargo.toml         (aduport-native, path dep)
+#   - python/pyproject.toml     (module-name = aduport_native._doc)
 #   - python/src/lib.rs         (pymodule fn _doc + hosted-OCR stripped)
-#   - python/mdbridge_native/   (package anchor)
+#   - python/aduport_native/   (package anchor)
 #   - LICENSE                   (MIT, preserved)
 #   - UPSTREAM_PIN / UPSTREAM_REV (provenance)
 # After sync, rebuild: ./scripts/build_native.sh
@@ -44,7 +46,7 @@ _default_ref() {
     fi
   fi
   local ver
-  ver="$(grep -E '^version\s*=' "$VENDOR/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  ver="$(grep -E '^version[[:space:]]*=' "$VENDOR/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
   if [ -n "${ver:-}" ]; then
     echo "v${ver}"
     return
@@ -81,13 +83,13 @@ else
 fi
 
 RESOLVED_SHA="$(git -C "$TMP/up" rev-parse HEAD)"
-UPSTREAM_VER="$(grep -E '^version\s*=' "$TMP/up/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
-LOCAL_VER="$(grep -E '^version\s*=' "$VENDOR/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
-PY_VER="$(grep -E '^version\s*=' "$VENDOR/python/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+UPSTREAM_VER="$(grep -E '^version[[:space:]]*=' "$TMP/up/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+LOCAL_VER="$(grep -E '^version[[:space:]]*=' "$VENDOR/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
+PY_VER="$(grep -E '^version[[:space:]]*=' "$VENDOR/python/Cargo.toml" | head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
 
 echo "  resolved SHA: $RESOLVED_SHA"
 echo "  upstream crate version: ${UPSTREAM_VER:-?}"
-echo "  local crate / mdbridge-native: ${LOCAL_VER:-?} / ${PY_VER:-?}"
+echo "  local crate / aduport-native: ${LOCAL_VER:-?} / ${PY_VER:-?}"
 
 if [ -n "${UPSTREAM_VER:-}" ] && [ -n "${LOCAL_VER:-}" ] && [ "$UPSTREAM_VER" != "$LOCAL_VER" ]; then
   echo "!! Version drift: upstream $UPSTREAM_VER != local Cargo.toml $LOCAL_VER" >&2
@@ -109,6 +111,39 @@ for f in "$TMP/up/python/src"/*.rs; do
 done
 
 cp "$TMP/up/LICENSE" "$VENDOR/LICENSE"
+
+# Optional harness assets (fuzz + Markdown snapshot corpus). Keep local patches
+# under native/anydoc/src; these dirs are additive and safe to refresh.
+if [ -d "$TMP/up/fuzz" ]; then
+  echo "  syncing fuzz/"
+  rm -rf "$VENDOR/fuzz"
+  cp -R "$TMP/up/fuzz" "$VENDOR/fuzz"
+fi
+if [ -d "$TMP/up/tests/snapshots" ]; then
+  echo "  syncing tests/snapshots + harness"
+  mkdir -p "$VENDOR/tests"
+  rm -rf "$VENDOR/tests/snapshots"
+  cp -R "$TMP/up/tests/snapshots" "$VENDOR/tests/snapshots"
+  for f in snapshots.rs robustness.rs; do
+    [ -f "$TMP/up/tests/$f" ] && cp "$TMP/up/tests/$f" "$VENDOR/tests/$f"
+  done
+  if [ -d "$TMP/up/tests/common" ]; then
+    rm -rf "$VENDOR/tests/common"
+    cp -R "$TMP/up/tests/common" "$VENDOR/tests/common"
+  fi
+fi
+# Merge any new abuse fixtures without deleting local additions
+if [ -d "$TMP/up/tests/fixtures/abuse" ]; then
+  mkdir -p "$VENDOR/tests/fixtures/abuse"
+  for f in "$TMP/up/tests/fixtures/abuse"/*; do
+    [ -e "$f" ] || continue
+    base="$(basename "$f")"
+    if [ ! -e "$VENDOR/tests/fixtures/abuse/$base" ]; then
+      cp "$f" "$VENDOR/tests/fixtures/abuse/$base"
+      echo "  + abuse fixture $base"
+    fi
+  done
+fi
 
 # sanity: our fork entry point must still exist
 if ! grep -q "fn _doc(" "$VENDOR/python/src/lib.rs"; then

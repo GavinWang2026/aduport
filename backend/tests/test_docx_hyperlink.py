@@ -15,9 +15,9 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
-from app.core.document_model import InlineMarkType, Paragraph, RichText
-from app.exporters.md_exporter import export_md
-from app.importers.docx_importer import import_docx
+from aduport.core.document_model import InlineMarkType, Paragraph, RichText
+from aduport.exporters.md_exporter import export_md
+from aduport.importers.docx_importer import import_docx
 
 
 def _add_hyperlink(paragraph, url: str, text: str, *, bold: bool = False) -> None:

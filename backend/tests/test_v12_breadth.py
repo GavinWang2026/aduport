@@ -9,15 +9,15 @@ import pytest
 from pptx import Presentation
 from pptx.util import Inches
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, Paragraph
-from app.exporters.azw3_exporter import export_azw3
-from app.exporters.pdf_simple import export_pdf_simple
-from app.importers.epub_text import try_extract_epub_model
-from app.importers.mobi_text import try_extract_mobi_model
-from app.importers.pdf_text_fallback import extract_pdf_text_model
-from app.importers.pptx_text import try_extract_pptx_model
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, Paragraph
+from aduport.exporters.azw3_exporter import export_azw3
+from aduport.exporters.pdf_simple import export_pdf_simple
+from aduport.importers.epub_text import try_extract_epub_model
+from aduport.importers.mobi_text import try_extract_mobi_model
+from aduport.importers.pdf_text_fallback import extract_pdf_text_model
+from aduport.importers.pptx_text import try_extract_pptx_model
 
 TARGETS = ("md", "docx", "pdf", "html", "txt", "epub", "pptx", "mobi", "azw3", "kf8")
 
@@ -88,14 +88,14 @@ def _build_mobi() -> bytes:
 @pytest.fixture
 def force_light_importers(monkeypatch):
     """Skip docling so CI uses PalmDB / XHTML / slide-XML fallbacks."""
-    from app.core.exceptions import InvalidDocumentError
+    from aduport.core.exceptions import InvalidDocumentError
 
     def _boom():
         raise InvalidDocumentError("force light path")
 
-    monkeypatch.setattr("app.importers.epub_importer._require_docling", _boom)
-    monkeypatch.setattr("app.importers.pptx_importer._require_docling", _boom)
-    monkeypatch.setattr("app.importers.mobi_importer._require_docling", _boom)
+    monkeypatch.setattr("aduport.importers.epub_importer._require_docling", _boom)
+    monkeypatch.setattr("aduport.importers.pptx_importer._require_docling", _boom)
+    monkeypatch.setattr("aduport.importers.mobi_importer._require_docling", _boom)
     monkeypatch.setattr(settings, "pdf_engine", "text")
     monkeypatch.setattr(settings, "pdf_text_min_chars", 8)
 

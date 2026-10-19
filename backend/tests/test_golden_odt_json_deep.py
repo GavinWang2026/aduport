@@ -6,7 +6,7 @@ import json
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Comment,
     ContentControl,
     Footnote,
@@ -16,13 +16,13 @@ from app.core.document_model import (
     Table,
     TextBox,
 )
-from app.exporters.epub_exporter import export_epub
-from app.exporters.json_exporter import export_json, import_json
-from app.exporters.odt_exporter import export_odt
-from app.exporters.rtf_exporter import export_rtf
-from app.importers.html_importer import import_html
-from app.importers.odt_text import try_extract_odt_model
-from app.importers.rtf_importer import import_rtf
+from aduport.exporters.epub_exporter import export_epub
+from aduport.exporters.json_exporter import export_json, import_json
+from aduport.exporters.odt_exporter import export_odt
+from aduport.exporters.rtf_exporter import export_rtf
+from aduport.importers.html_importer import import_html
+from aduport.importers.odt_text import try_extract_odt_model
+from aduport.importers.rtf_importer import import_rtf
 from tests.golden_deep_fixture import golden_deep_model
 
 
@@ -211,7 +211,7 @@ def test_html_importer_content_control_deep():
 
 
 def test_epub_deep_import_roundtrip_meta_and_span():
-    from app.importers.epub_text import try_extract_epub_model
+    from aduport.importers.epub_text import try_extract_epub_model
 
     model = golden_deep_model()
     raw = export_epub(model)
@@ -240,8 +240,8 @@ def test_epub_deep_import_roundtrip_meta_and_span():
 
 def test_epub_convert_json_roundtrip_native_light(monkeypatch):
     """convert() EPUB→JSON when native/light importer owns epub (no anydoc)."""
-    from app.core.converter import convert
-    from app.importers import anydoc_bridge
+    from aduport.core.converter import convert
+    from aduport.importers import anydoc_bridge
 
     monkeypatch.setattr(anydoc_bridge, "should_handle", lambda _fmt: False)
 
@@ -272,8 +272,8 @@ def test_epub_convert_json_roundtrip_native_light(monkeypatch):
 
 def test_epub_convert_md_native_light(monkeypatch):
     """convert() EPUB→MD when native/light importer owns epub (no anydoc fast path)."""
-    from app.core.converter import convert
-    from app.importers import anydoc_bridge
+    from aduport.core.converter import convert
+    from aduport.importers import anydoc_bridge
 
     monkeypatch.setattr(anydoc_bridge, "should_handle", lambda _fmt: False)
 
@@ -288,7 +288,7 @@ def test_epub_convert_md_native_light(monkeypatch):
 
 def test_epub_import_epub_light_roundtrip_json():
     """import_epub light extract → JSON export (CI backend path without docling)."""
-    from app.importers.epub_importer import import_epub
+    from aduport.importers.epub_importer import import_epub
 
     raw = export_epub(golden_deep_model())
     model = import_epub(raw, "deep.epub")

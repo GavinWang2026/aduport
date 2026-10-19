@@ -1,10 +1,10 @@
 # Slim image: Markdown + DOCX/PDF *export* + vendored anydoc import (no docling/torch).
-# High-fidelity Office→MD via mdbridge_native; no ML stack.
+# High-fidelity Office→MD via aduport_native; no ML stack.
 #
 # Non-ASCII checkout paths: prefer `bash scripts/docker_build_safe.sh`
 #
 # Build from repo root:
-#   docker build -f backend/Dockerfile.slim -t md-bridge-backend:slim .
+#   docker build -f backend/Dockerfile.slim -t aduport-backend:slim .
 # Or:
 #   docker compose -f docker-compose.yml -f docker-compose.slim.yml up --build
 #
@@ -15,13 +15,27 @@ ARG INSTALL_NATIVE=1
 FROM python:3.11-slim-bookworm AS native-builder
 
 ARG INSTALL_NATIVE=1
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates build-essential pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --default-toolchain stable --profile minimal
+ARG RUSTUP_VERSION=1.27.1
+ARG RUST_TOOLCHAIN=1.88.0
+ARG RUSTUP_INIT_SHA256=6aeece6993e902708983b209d04c0d1dbb14ebb405ddb87def578d41f920f56d
+COPY scripts/install_rustup_pinned.sh /tmp/install_rustup_pinned.sh
+RUN chmod +x /tmp/install_rustup_pinned.sh \
+ && RUSTUP_VERSION="$RUSTUP_VERSION" \
+    RUST_TOOLCHAIN="$RUST_TOOLCHAIN" \
+    RUSTUP_INIT_SHA256="$RUSTUP_INIT_SHA256" \
+    /tmp/install_rustup_pinned.sh \
+ && rm -f /tmp/install_rustup_pinned.sh
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /build
@@ -29,7 +43,10 @@ COPY native/anydoc ./native/anydoc
 
 RUN mkdir -p /wheels \
  && if [ "$INSTALL_NATIVE" = "1" ]; then \
-      pip install --no-cache-dir "maturin>=1.9,<2" \
+      pip install --upgrade pip \
+      && ( pip install --no-cache-dir "maturin>=1.9,<2" \
+           || pip install --no-cache-dir -i https://pypi.org/simple "maturin>=1.9,<2" \
+           || cargo install --locked maturin --version 1.9.6 ) \
       && cd native/anydoc/python \
       && maturin build --release \
       && cp ../target/wheels/*.whl /wheels/; \
@@ -38,12 +55,17 @@ RUN mkdir -p /wheels \
 FROM python:3.11-slim-bookworm
 
 ARG INSTALL_NATIVE=1
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    MDBRIDGE_ANYDOC_ENABLED=true \
-    MDBRIDGE_NATIVE_REQUIRED=${INSTALL_NATIVE}
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
+    ADUPORT_ANYDOC_ENABLED=true \
+    ADUPORT_NATIVE_REQUIRED=${INSTALL_NATIVE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
@@ -59,28 +81,31 @@ WORKDIR /app
 
 COPY backend/pyproject.toml ./
 COPY backend/README.md ./
-COPY backend/app ./app
+COPY backend/LICENSE ./
+COPY NOTICE ./
+COPY THIRD_PARTY_NOTICES.md ./
+COPY backend/aduport ./aduport
 COPY backend/main.py ./
 
 RUN pip install --upgrade pip && pip install .
 
 COPY --from=native-builder /wheels /wheels
-RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/mdbridge_native*.whl >/dev/null 2>&1; then \
-      pip install --no-index --no-deps /wheels/mdbridge_native*.whl \
-      && python -c "import mdbridge_native._doc as d; print('mdbridge_native._doc OK')"; \
+RUN if [ "$INSTALL_NATIVE" = "1" ] && ls /wheels/aduport_native*.whl >/dev/null 2>&1; then \
+      pip install --no-index --no-deps /wheels/aduport_native*.whl \
+      && python -c "import aduport_native._doc as d; print('aduport_native._doc OK')"; \
     else \
-      echo "WARN: mdbridge_native wheel not found in /wheels:"; ls -la /wheels || true; \
+      echo "WARN: aduport_native wheel not found in /wheels:"; ls -la /wheels || true; \
     fi \
  && rm -rf /wheels
 
 EXPOSE 8000
 
-RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin mdbridge \
- && chown -R mdbridge:mdbridge /app
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin aduport \
+ && chown -R aduport:aduport /app
 
-USER mdbridge
+USER aduport
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=3)"
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=127.0.0.1,::1"]

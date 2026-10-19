@@ -1,13 +1,13 @@
-# md-bridge Prometheus alerting rules (P2-3)
+# AduPort Prometheus alerting rules (P2-3)
 # promtool check rules docs/ops/prometheus/alert_rules.yml
 
 groups:
-  - name: mdbridge_anydoc
+  - name: aduport_anydoc
     rules:
       - alert: MdbridgeAnydocHitRateLow
         expr: |
-          mdbridge_anydoc_hit_rate < 0.5
-          and (mdbridge_anydoc_hits + mdbridge_anydoc_degrades) >= 20
+          aduport_anydoc_hit_rate < 0.5
+          and (aduport_anydoc_hits + aduport_anydoc_degrades) >= 20
         for: 15m
         labels:
           severity: warning
@@ -17,8 +17,8 @@ groups:
 
       - alert: MdbridgeAnydocChannelShareLow
         expr: |
-          mdbridge_anydoc_channel_share < 0.3
-          and sum(mdbridge_conversions_by_importer) >= 50
+          aduport_anydoc_channel_share < 0.3
+          and sum(aduport_conversions_by_importer) >= 50
         for: 30m
         labels:
           severity: warning
@@ -26,19 +26,19 @@ groups:
           summary: "anydoc 通道占比偏低"
           description: "channel_share={{ $value }}，大量转换未走 Rust 解析器。"
 
-  - name: mdbridge_ocr
+  - name: aduport_ocr
     rules:
       - alert: MdbridgeOcrEnabledNotReady
-        expr: mdbridge_ocr_enabled == 1 and mdbridge_ocr_ready == 0
+        expr: aduport_ocr_enabled == 1 and aduport_ocr_ready == 0
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "OCR 已开启但无可用引擎"
-          description: "安装 md-bridge[ocr-mineru] 或 Docker INSTALL_OCR=1；见 /api/health ocr.install_hint。"
+          description: "安装 aduport[ocr-mineru] 或 Docker INSTALL_OCR=1；见 /api/health ocr.install_hint。"
 
       - alert: MdbridgeOcrUnavailableFailures
-        expr: increase(mdbridge_conversions_failed_by_code{code="ocr_unavailable"}[10m]) > 0
+        expr: increase(aduport_conversions_failed_by_code{code="ocr_unavailable"}[10m]) > 0
         for: 0m
         labels:
           severity: critical
@@ -46,15 +46,15 @@ groups:
           summary: "扫描 PDF OCR 不可用失败"
           description: "过去 10 分钟出现 ocr_unavailable 失败，检查 OCR 依赖与镜像。"
 
-  - name: mdbridge_slo
+  - name: aduport_slo
     rules:
       - alert: MdbridgeHighFailureRate
         expr: |
           (
-            sum(rate(mdbridge_conversions_failed[5m]))
+            sum(rate(aduport_conversions_failed[5m]))
             /
             clamp_min(
-              sum(rate(mdbridge_conversions_total[5m])) + sum(rate(mdbridge_conversions_failed[5m])),
+              sum(rate(aduport_conversions_total[5m])) + sum(rate(aduport_conversions_failed[5m])),
               1e-9
             )
           ) > 0.25
@@ -66,7 +66,7 @@ groups:
           description: "5 分钟窗口失败率 > 25%。"
 
       - alert: MdbridgeHighLatencyP95
-        expr: mdbridge_conversion_latency_p95_seconds > 60
+        expr: aduport_conversion_latency_p95_seconds > 60
         for: 15m
         labels:
           severity: warning

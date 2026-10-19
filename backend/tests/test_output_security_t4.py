@@ -5,7 +5,7 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     CodeBlock,
     DocumentModel,
     MathBlock,
@@ -13,8 +13,8 @@ from app.core.document_model import (
     Table,
     TableCell,
 )
-from app.exporters.latex_exporter import export_latex
-from app.exporters.xlsx_exporter import export_xlsx
+from aduport.exporters.latex_exporter import export_latex
+from aduport.exporters.xlsx_exporter import export_xlsx
 
 
 def test_latex_math_blocks_dangerous_commands():
@@ -73,7 +73,7 @@ def test_xlsx_merge_cols_and_number_types():
 
 
 def test_xlsx_sheet_cap_above_eight(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "xlsx_max_sheets", 64)
     tables = [Table(name=f"S{i}", rows=[[str(i)]]) for i in range(12)]

@@ -6,11 +6,11 @@ import time
 import zipfile
 from io import BytesIO
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, ListItem, Paragraph
-from app.core.stream_convert import can_stream_convert, convert_streaming
-from app.exporters.docx_exporter import export_docx
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, ListItem, Paragraph
+from aduport.core.stream_convert import can_stream_convert, convert_streaming
+from aduport.exporters.docx_exporter import export_docx
 
 
 def test_docx_fast_scales_near_linear():

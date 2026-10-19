@@ -5,9 +5,9 @@ from __future__ import annotations
 from io import BytesIO
 import zipfile
 
-from app.core.document_model import Comment, DocumentModel, Heading, Paragraph
-from app.exporters.pdf_simple import export_pdf_simple
-from app.exporters.pptx_exporter import export_pptx
+from aduport.core.document_model import Comment, DocumentModel, Heading, Paragraph
+from aduport.exporters.pdf_simple import export_pdf_simple
+from aduport.exporters.pptx_exporter import export_pptx
 
 
 def test_pdf_simple_includes_comment():

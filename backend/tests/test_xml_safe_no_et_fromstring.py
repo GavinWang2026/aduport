@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_APP = Path(__file__).resolve().parents[1] / "app"
+_APP = Path(__file__).resolve().parents[1] / "aduport"
 _FORBIDDEN = re.compile(
     r"(?:ET|ElementTree)\.fromstring\s*\(",
 )
@@ -24,6 +24,6 @@ def test_no_bare_et_fromstring_in_app():
 
 
 def test_xml_safe_module_exists():
-    from app.core import xml_safe
+    from aduport.core import xml_safe
 
     assert callable(xml_safe.fromstring)

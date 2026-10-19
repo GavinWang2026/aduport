@@ -9,8 +9,8 @@ import pytest
 from docx import Document
 from docx.shared import Inches
 
-from app.config import settings
-from app.core.document_model import (
+from aduport.config import settings
+from aduport.core.document_model import (
     CodeBlock,
     DocumentModel,
     Heading,
@@ -20,11 +20,11 @@ from app.core.document_model import (
     Table,
     TableCell,
 )
-from app.core.registry import ensure_builtin_plugins
-from app.exporters.md_escape import collapse_blank_lines, escape_md_text
-from app.exporters.md_exporter import export_md
-from app.importers.anydoc_bridge import should_handle
-from app.importers.docx_importer import import_docx
+from aduport.core.registry import ensure_builtin_plugins
+from aduport.exporters.md_escape import collapse_blank_lines, escape_md_text
+from aduport.exporters.md_exporter import export_md
+from aduport.importers.anydoc_bridge import should_handle
+from aduport.importers.docx_importer import import_docx
 
 
 _PNG = base64.b64decode(
@@ -138,7 +138,7 @@ def test_p3_llm_mode_strips_base64_and_adds_front_matter(monkeypatch):
 
 def test_p2_fast_md_skipped_for_docx_when_span_html(monkeypatch):
     ensure_builtin_plugins()
-    from app.core import converter as conv
+    from aduport.core import converter as conv
 
     monkeypatch.setattr(settings, "html_table_for_span", True)
     monkeypatch.setattr(settings, "anydoc_fast_markdown", True)
@@ -149,7 +149,7 @@ def test_docx_importer_source_mentions_drawing_pipeline():
     """v9 evidence grep: importer module must reference drawing/blip path."""
     from pathlib import Path
 
-    src = Path(__file__).resolve().parents[1] / "app" / "importers" / "docx_importer.py"
+    src = Path(__file__).resolve().parents[1] / "aduport" / "importers" / "docx_importer.py"
     text = src.read_text(encoding="utf-8")
     assert "drawing" in text and "blip" in text
     assert "Image" in text
@@ -161,7 +161,7 @@ def test_native_md_no_run_style_placeholder_flood():
 
     from docx import Document
 
-    from app.core.converter import convert
+    from aduport.core.converter import convert
 
     doc = Document()
     doc.add_heading("H", level=1)

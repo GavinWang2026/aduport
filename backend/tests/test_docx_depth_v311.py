@@ -6,20 +6,20 @@ import io
 import re
 import zipfile
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     DocumentModel,
     MathBlock,
     PageSetup,
     Paragraph,
     Section,
 )
-from app.exporters.docx_exporter import export_docx
-from app.exporters.omml import (
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.omml import (
     build_omath,
     extract_math_blocks_from_document_xml,
     omml_element_to_tex,
 )
-from app.importers.docx_ooxml import enrich_docx_model
+from aduport.importers.docx_ooxml import enrich_docx_model
 
 
 def _zip_text(blob: bytes, path: str) -> str:
@@ -87,6 +87,6 @@ def test_theme_name_and_body_style_written():
     blob = export_docx(model, theme="academic")
     theme = _zip_text(blob, "word/theme/theme1.xml")
     styles = _zip_text(blob, "word/styles.xml")
-    assert "md-bridge-academic" in theme
+    assert "AduPort-academic" in theme
     assert "2C3E50" in theme.upper()
-    assert "MdBridge Body" in styles
+    assert "AduPort Body" in styles

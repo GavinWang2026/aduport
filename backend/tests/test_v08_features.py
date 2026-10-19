@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from io import BytesIO
 
-from app.config import settings
-from app.core.audit import _sanitize_detail
-from app.core.converter import SUPPORTED_TARGET_FORMATS, convert
-from app.core.document_model import Comment, DocumentModel, Heading, ListItem, Paragraph
-from app.core.spill import SpillBuffer
-from app.exporters.docx_exporter import export_docx
-from app.exporters.pptx_exporter import export_pptx
-from app.importers.md_importer import import_md
+from aduport.config import settings
+from aduport.core.audit import _sanitize_detail
+from aduport.core.converter import SUPPORTED_TARGET_FORMATS, convert
+from aduport.core.document_model import Comment, DocumentModel, Heading, ListItem, Paragraph
+from aduport.core.spill import SpillBuffer
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.pptx_exporter import export_pptx
+from aduport.importers.md_importer import import_md
 
 
 def test_pptx_in_targets():

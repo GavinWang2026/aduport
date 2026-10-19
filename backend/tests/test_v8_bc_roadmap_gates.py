@@ -8,11 +8,11 @@ from unittest import mock
 
 import pytest
 
-from app.config import settings
-from app.core import convert_isolate
-from app.core.document_model import Blockquote, Heading, ListItem, Paragraph
-from app.importers import pdf_importer
-from app.importers.docx_text import try_extract_docx_model
+from aduport.config import settings
+from aduport.core import convert_isolate
+from aduport.core.document_model import Blockquote, Heading, ListItem, Paragraph
+from aduport.importers import pdf_importer
+from aduport.importers.docx_text import try_extract_docx_model
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -53,23 +53,6 @@ def test_untrusted_client_not_auto_trusted(monkeypatch):
     monkeypatch.setattr(settings, "convert_trusted_inprocess", True)
     assert convert_isolate._client_is_trusted("public") is False
     assert convert_isolate._client_is_trusted("warmup") is True
-
-
-def test_weasy_perf_curve_doc_published():
-    path = _ROOT / "enterprise" / "WEASY_PERF_CURVE.md"
-    assert path.is_file()
-    text = path.read_text(encoding="utf-8")
-    assert "ProcessPool" in text
-    assert "Weasy" in text or "weasy" in text.lower()
-    assert "trusted" in text.lower() or "进程内" in text
-
-
-def test_ecosystem_strategy_doc_is_strategic_not_score_bump():
-    path = _ROOT / "enterprise" / "ECOSYSTEM_STRATEGY.md"
-    assert path.is_file()
-    text = path.read_text(encoding="utf-8")
-    assert "66.2" in text
-    assert "战略" in text or "strateg" in text.lower()
 
 
 def test_docx_style_map_heading_and_quote_without_anydoc():

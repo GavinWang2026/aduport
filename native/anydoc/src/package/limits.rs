@@ -23,6 +23,11 @@ pub const MAX_XML_DEPTH: usize = 256;
 /// memory test) so a saturating part stays around the archive budget.
 pub const MAX_XML_NODES: usize = 2_000_000;
 
+/// Soft DOM-byte budget paired with [`MAX_XML_NODES`]. Tracks approximate
+/// retained string/attr payload so a few huge text nodes cannot bypass the
+/// ~800 MiB implied by the node cap alone (report P1-5).
+pub const MAX_XML_DOM_BYTES: usize = 512 * 1024 * 1024;
+
 /// Maximum grid positions one spreadsheet table may materialize: 4 million.
 pub const MAX_GRID_SLOTS: u64 = 4_000_000;
 
@@ -39,6 +44,9 @@ pub const MAX_ASSET_TOTAL_BYTES: usize = 128 * 1024 * 1024;
 
 /// Maximum nesting depth of binary record containers (legacy PPT stream).
 pub const MAX_RECORD_DEPTH: usize = 64;
+
+/// Maximum RTF brace-group nesting depth (CharState stack).
+pub const MAX_RTF_GROUP_DEPTH: usize = 4096;
 
 /// Maximum total binary records visited in one legacy record stream.
 pub const MAX_RECORDS: u64 = 16_000_000;

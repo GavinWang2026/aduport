@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.config import settings
-from app.core.license import (
+from aduport.config import settings
+from aduport.core.license import (
     LicenseError,
     assert_license_ok,
     issue_license,

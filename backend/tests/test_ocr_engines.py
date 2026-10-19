@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.config import settings
-from app.core.document_model import DocumentModel, Paragraph
-from app.importers import ocr_engine as oe
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel, Paragraph
+from aduport.importers import ocr_engine as oe
 
 
 def test_resolve_chain_balanced(monkeypatch):

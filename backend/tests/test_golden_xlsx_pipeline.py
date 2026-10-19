@@ -8,9 +8,9 @@ from io import BytesIO
 
 import pytest
 
-from app.config import settings
-from app.core.converter import convert
-from app.exporters.xlsx_exporter import export_xlsx
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.exporters.xlsx_exporter import export_xlsx
 from tests.golden_xlsx_fixture import golden_xlsx_model
 
 

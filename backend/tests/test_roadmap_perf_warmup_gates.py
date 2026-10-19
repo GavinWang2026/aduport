@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.config import settings
-from app.core import warmup as warmup_mod
+from aduport.config import settings
+from aduport.core import warmup as warmup_mod
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -58,34 +58,17 @@ def test_warmup_primes_isolate_pool_when_enabled(monkeypatch):
         return b"ok"
 
     monkeypatch.setattr(
-        "app.core.convert_isolate.ensure_isolate_pool", _fake_pool
+        "aduport.core.convert_isolate.ensure_isolate_pool", _fake_pool
     )
     monkeypatch.setattr(
-        "app.core.convert_isolate.convert_isolated", _fake_iso
+        "aduport.core.convert_isolate.convert_isolated", _fake_iso
     )
     # Avoid heavy real converts in this unit gate
     monkeypatch.setattr(
-        "app.core.converter.convert",
+        "aduport.core.converter.convert",
         lambda *a, **k: b"<p>x</p>" if k.get("target_format") == "html" or (len(a) > 2 and a[2] == "html") else b"x",
     )
     status = warmup_mod.warmup_sync()
     assert status.get("isolate_pool") == "ok"
     assert status.get("isolate_prime") == "ok"
     assert "pool" in calls and "prime" in calls
-
-
-def test_weasy_perf_curve_doc_published():
-    path = _ROOT / "enterprise" / "WEASY_PERF_CURVE.md"
-    assert path.is_file()
-    text = path.read_text(encoding="utf-8")
-    assert "ProcessPool" in text
-    assert "Weasy" in text or "weasy" in text.lower()
-
-
-def test_weasy_perf_curve_doc_published():
-    """v8 §C / R-05: published ProcessPool+Weasy curve methodology (not SLA)."""
-    path = _ROOT / "enterprise" / "WEASY_PERF_CURVE.md"
-    assert path.is_file()
-    text = path.read_text(encoding="utf-8")
-    assert "ProcessPool" in text
-    assert "Weasy" in text or "weasy" in text.lower()

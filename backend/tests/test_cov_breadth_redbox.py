@@ -10,30 +10,30 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.config import settings
-from app.core.document_model import DocumentModel, Heading, Paragraph, RichText
-from app.core.exceptions import (
+from aduport.config import settings
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, RichText
+from aduport.core.exceptions import (
     CorruptedFileError,
     InvalidDocumentError,
     OcrUnavailableError,
 )
-from app.exporters.docx_exporter import export_docx
-from app.exporters.mobi_exporter import export_mobi
-from app.exporters.odt_exporter import export_odt
-from app.exporters.pdf_simple import export_pdf_simple
-from app.exporters.pptx_exporter import export_pptx
-from app.importers import _docling_utils as du
-from app.importers.csv_importer import import_csv
-from app.importers.docx_importer import import_docx
-from app.importers.docx_text import _zip_xml_fallback, try_extract_docx_model
-from app.importers.epub_text import try_extract_epub_model
-from app.importers.mobi_importer import import_mobi
-from app.importers.mobi_text import _palmdoc_decompress, try_extract_mobi_model
-from app.importers.odt_importer import import_odt
-from app.importers.ole_biff8 import parse_biff8_workbook
-from app.importers.ole_office import import_pps, import_pot, import_ppt, import_xls, import_xlsb
-from app.importers.pdf_importer import import_pdf, _is_hub_network_error
-from app.importers.pptx_importer import import_pptx
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.exporters.odt_exporter import export_odt
+from aduport.exporters.pdf_simple import export_pdf_simple
+from aduport.exporters.pptx_exporter import export_pptx
+from aduport.importers import _docling_utils as du
+from aduport.importers.csv_importer import import_csv
+from aduport.importers.docx_importer import import_docx
+from aduport.importers.docx_text import _zip_xml_fallback, try_extract_docx_model
+from aduport.importers.epub_text import try_extract_epub_model
+from aduport.importers.mobi_importer import import_mobi
+from aduport.importers.mobi_text import _palmdoc_decompress, try_extract_mobi_model
+from aduport.importers.odt_importer import import_odt
+from aduport.importers.ole_biff8 import parse_biff8_workbook
+from aduport.importers.ole_office import import_pps, import_pot, import_ppt, import_xls, import_xlsb
+from aduport.importers.pdf_importer import import_pdf, _is_hub_network_error
+from aduport.importers.pptx_importer import import_pptx
 from tests._ole_fixtures import (
     _rec,
     _u16,
@@ -211,7 +211,7 @@ def test_ole_biff8_number_rk_sst_formula():
     # empty cells → as_rows []
     empty_stream = build_minimal_biff8_workbook(cells=[(0, 0, "")])
     # clear after parse by constructing sheet with no non-empty — use unit BiffSheet
-    from app.importers.ole_biff8 import BiffSheet
+    from aduport.importers.ole_biff8 import BiffSheet
 
     assert BiffSheet(name="E").as_rows() == []
 
@@ -326,13 +326,13 @@ def _install_fake_docling(monkeypatch, *, convert_raises: BaseException | None =
     monkeypatch.setitem(sys.modules, "docling", fake_root)
     monkeypatch.setitem(sys.modules, "docling.document_converter", fake_dc)
     monkeypatch.setattr(
-        "app.importers._docling_converter.get_office_converter",
+        "aduport.importers._docling_converter.get_office_converter",
         lambda: _Conv(),
         raising=False,
     )
     # Also patch module attribute if already imported
     try:
-        import app.importers._docling_converter as dc
+        import aduport.importers._docling_converter as dc
 
         monkeypatch.setattr(dc, "get_office_converter", lambda: _Conv())
     except Exception:
@@ -375,7 +375,7 @@ def test_docx_importer_docling_success(monkeypatch):
     _install_fake_docling(monkeypatch)
     # enrich_docx_model may still run; ignore failures
     monkeypatch.setattr(
-        "app.importers.docx_ooxml.enrich_docx_model",
+        "aduport.importers.docx_ooxml.enrich_docx_model",
         lambda m, *_a, **_k: m,
         raising=False,
     )
@@ -385,10 +385,10 @@ def test_docx_importer_docling_success(monkeypatch):
 
 
 def test_pptx_importer_light_path(monkeypatch):
-    from app.core.exceptions import InvalidDocumentError as IDE
+    from aduport.core.exceptions import InvalidDocumentError as IDE
 
     monkeypatch.setattr(
-        "app.importers.pptx_importer._require_docling",
+        "aduport.importers.pptx_importer._require_docling",
         lambda: (_ for _ in ()).throw(IDE("force light")),
     )
     blob = export_pptx(DocumentModel(nodes=[Paragraph(text="PPTX light path body")]))
@@ -408,7 +408,7 @@ def test_pptx_importer_docling_fail_light(monkeypatch):
 
         return C
 
-    monkeypatch.setattr("app.importers.pptx_importer._require_docling", lambda: _get)
+    monkeypatch.setattr("aduport.importers.pptx_importer._require_docling", lambda: _get)
     assert import_pptx(blob, "p.pptx").nodes
 
 
@@ -427,14 +427,14 @@ def test_pptx_importer_docling_success(monkeypatch):
 
         return C
 
-    monkeypatch.setattr("app.importers.pptx_importer._require_docling", lambda: _get)
+    monkeypatch.setattr("aduport.importers.pptx_importer._require_docling", lambda: _get)
     model = import_pptx(blob, "ok.pptx")
     assert any("pptx-docling" in n.plain_text() for n in model.nodes if hasattr(n, "plain_text"))
 
 
 def test_pptx_require_docling_import_error(monkeypatch):
     import builtins
-    from app.importers import pptx_importer as pi
+    from aduport.importers import pptx_importer as pi
 
     real = builtins.__import__
 
@@ -470,7 +470,7 @@ def test_mobi_importer_docling_when_native_empty(monkeypatch):
     struct.pack_into(">I", data, 86, 110)
 
     monkeypatch.setattr(
-        "app.importers.mobi_text.try_extract_mobi_model",
+        "aduport.importers.mobi_text.try_extract_mobi_model",
         lambda *_a, **_k: None,
     )
 
@@ -484,7 +484,7 @@ def test_mobi_importer_docling_when_native_empty(monkeypatch):
             )
 
     monkeypatch.setattr(
-        "app.importers.mobi_importer._require_docling",
+        "aduport.importers.mobi_importer._require_docling",
         lambda: (lambda: _C()),
     )
     model = import_mobi(bytes(data), "d.mobi")
@@ -624,7 +624,7 @@ def test_mobi_text_palmdoc_and_plain(monkeypatch):
     out3 = _palmdoc_decompress(packed)
     assert b"ABCD" in out3
     # Force binary-heavy → decompress path in _decode_payload
-    from app.importers import mobi_text as mt
+    from aduport.importers import mobi_text as mt
 
     binary = bytes([0x00, 0x01, 0x02, 0xFF] * 200)
     monkeypatch.setattr(mt, "_palmdoc_decompress", lambda d: b"Plain para one\n\nPlain para two more text")
@@ -645,7 +645,7 @@ def _pdf_without_sidecar() -> bytes:
         DocumentModel(nodes=[Paragraph(text="Hello PDF text layer coverage content")])
     )
     # Strip AST sidecar so import_pdf exercises text/docling branches
-    marker = b"\n%%MDBRIDGE-AST-v1\n"
+    marker = b"\n%%ADUPORT-AST-v1\n"
     i = pdf.find(marker)
     return pdf[:i] if i >= 0 else pdf
 
@@ -665,7 +665,7 @@ def test_pdf_importer_auto_rich_text_short_circuit(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "auto")
     monkeypatch.setattr(settings, "ocr_enabled", False)
     monkeypatch.setattr(settings, "pdf_text_min_chars", 8)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
     model = import_pdf(_pdf_without_sidecar(), "rich.pdf")
     assert model.nodes
 
@@ -674,7 +674,7 @@ def test_pdf_importer_auto_weak_ocr_off(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "auto")
     monkeypatch.setattr(settings, "ocr_enabled", False)
     monkeypatch.setattr(settings, "pdf_text_min_chars", 99999)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
     try:
         model = import_pdf(_pdf_without_sidecar(), "w.pdf")
         assert model is not None
@@ -685,7 +685,7 @@ def test_pdf_importer_auto_weak_ocr_off(monkeypatch):
 def test_pdf_importer_models_missing_text_fallback(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
     monkeypatch.setattr(settings, "ocr_enabled", False)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
     model = import_pdf(_pdf_without_sidecar(), "m.pdf")
     assert model.nodes
 
@@ -693,12 +693,12 @@ def test_pdf_importer_models_missing_text_fallback(monkeypatch):
 def test_pdf_importer_hub_error_fallback(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
     monkeypatch.setattr(settings, "ocr_enabled", False)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: True)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: True)
 
     def _boom(*_a, **_k):
         raise RuntimeError("huggingface connecttimeout offline")
 
-    monkeypatch.setattr("app.importers.pdf_importer._import_with_docling", _boom)
+    monkeypatch.setattr("aduport.importers.pdf_importer._import_with_docling", _boom)
     model = import_pdf(_pdf_without_sidecar(), "hub.pdf")
     assert model.nodes
 
@@ -718,7 +718,7 @@ def test_pdf_importer_docling_path_success(monkeypatch):
     monkeypatch.setattr(settings, "ocr_enabled", False)
     monkeypatch.setattr(settings, "docling_offline", True)
     monkeypatch.setattr(settings, "hf_endpoint", "https://hf-mirror.example")
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: True)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: True)
 
     class _Conv:
         def convert(self, *_a, **_k):
@@ -739,14 +739,14 @@ def test_pdf_importer_docling_path_success(monkeypatch):
     monkeypatch.setitem(sys.modules, "docling", fake_root)
     monkeypatch.setitem(sys.modules, "docling.document_converter", fake_dc)
     monkeypatch.setattr(
-        "app.importers._docling_converter.get_pdf_converter",
+        "aduport.importers._docling_converter.get_pdf_converter",
         lambda: _Conv(),
         raising=False,
     )
-    import app.importers._docling_converter as dconv
+    import aduport.importers._docling_converter as dconv
 
     monkeypatch.setattr(dconv, "get_pdf_converter", lambda: _Conv())
-    from app.importers import pdf_importer as pi
+    from aduport.importers import pdf_importer as pi
 
     model = pi.import_pdf_via_docling(_pdf_without_sidecar(), "d.pdf")
     assert any("pdf-docling-ok" in n.plain_text() for n in model.nodes if hasattr(n, "plain_text"))
@@ -756,7 +756,7 @@ def test_pdf_importer_ocr_unavailable_empty(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "auto")
     monkeypatch.setattr(settings, "ocr_enabled", False)
     monkeypatch.setattr(settings, "pdf_text_min_chars", 10)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
 
     def _weak(*_a, **_k):
         return DocumentModel(
@@ -766,7 +766,7 @@ def test_pdf_importer_ocr_unavailable_empty(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "app.importers.pdf_importer.extract_pdf_text_model",
+        "aduport.importers.pdf_importer.extract_pdf_text_model",
         _weak,
     )
     with pytest.raises(OcrUnavailableError):
@@ -776,13 +776,13 @@ def test_pdf_importer_ocr_unavailable_empty(monkeypatch):
 def test_pdf_importer_models_missing_no_text(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
     monkeypatch.setattr(settings, "ocr_enabled", False)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
 
     def _boom(*_a, **_k):
         raise InvalidDocumentError("no text")
 
     monkeypatch.setattr(
-        "app.importers.pdf_importer.extract_pdf_text_model",
+        "aduport.importers.pdf_importer.extract_pdf_text_model",
         _boom,
     )
     with pytest.raises(CorruptedFileError):
@@ -792,13 +792,13 @@ def test_pdf_importer_models_missing_no_text(monkeypatch):
 def test_pdf_importer_models_missing_ocr_on(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
     monkeypatch.setattr(settings, "ocr_enabled", True)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
 
     def _boom(*_a, **_k):
         raise InvalidDocumentError("no text")
 
     monkeypatch.setattr(
-        "app.importers.pdf_importer.extract_pdf_text_model",
+        "aduport.importers.pdf_importer.extract_pdf_text_model",
         _boom,
     )
     with pytest.raises(OcrUnavailableError):
@@ -808,15 +808,15 @@ def test_pdf_importer_models_missing_ocr_on(monkeypatch):
 def test_pdf_importer_hub_error_no_text(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
     monkeypatch.setattr(settings, "ocr_enabled", False)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: True)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: True)
     monkeypatch.setattr(
-        "app.importers.pdf_importer._import_with_docling",
+        "aduport.importers.pdf_importer._import_with_docling",
         lambda *_a, **_k: (_ for _ in ()).throw(
             RuntimeError("huggingface connecttimeout offline")
         ),
     )
     monkeypatch.setattr(
-        "app.importers.pdf_importer.extract_pdf_text_model",
+        "aduport.importers.pdf_importer.extract_pdf_text_model",
         lambda *_a, **_k: (_ for _ in ()).throw(InvalidDocumentError("none")),
     )
     with pytest.raises(CorruptedFileError):
@@ -825,9 +825,9 @@ def test_pdf_importer_hub_error_no_text(monkeypatch):
 
 def test_pdf_importer_generic_docling_error(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "docling")
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: True)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: True)
     monkeypatch.setattr(
-        "app.importers.pdf_importer._import_with_docling",
+        "aduport.importers.pdf_importer._import_with_docling",
         lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("corrupt blob")),
     )
     with pytest.raises(CorruptedFileError):
@@ -838,13 +838,13 @@ def test_pdf_importer_ocr_chain_then_fallback(monkeypatch):
     monkeypatch.setattr(settings, "pdf_engine", "auto")
     monkeypatch.setattr(settings, "ocr_enabled", True)
     monkeypatch.setattr(settings, "pdf_text_min_chars", 99999)
-    monkeypatch.setattr("app.importers.pdf_importer.docling_models_ready", lambda: False)
+    monkeypatch.setattr("aduport.importers.pdf_importer.docling_models_ready", lambda: False)
 
     def _ocr(*_a, **_k):
         raise OcrUnavailableError("no ocr")
 
     monkeypatch.setattr(
-        "app.importers.ocr_engine.import_pdf_with_ocr",
+        "aduport.importers.ocr_engine.import_pdf_with_ocr",
         _ocr,
         raising=False,
     )
@@ -897,7 +897,7 @@ def test_docling_utils_edge_branches():
         ],
     )
     model = du.docling_document_to_model(doc, title="it")
-    from app.core.document_model import Footnote
+    from aduport.core.document_model import Footnote
 
     assert any(isinstance(n, (Paragraph, Footnote)) for n in model.nodes)
 

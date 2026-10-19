@@ -5,9 +5,9 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.config import settings
-from app.core.document_model import Comment, DocumentModel, Heading, Paragraph
-from app.exporters.docx_exporter import export_docx
+from aduport.config import settings
+from aduport.core.document_model import Comment, DocumentModel, Heading, Paragraph
+from aduport.exporters.docx_exporter import export_docx
 
 
 def test_docx_theme_academic_applies():

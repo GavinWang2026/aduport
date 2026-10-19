@@ -7,14 +7,14 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.registry import ensure_builtin_plugins, registered_import_formats
-from app.core.virus_scan import VirusDetectedError, scan_bytes
-from main import app
+from aduport.core.registry import ensure_builtin_plugins, registered_import_formats
+from aduport.core.virus_scan import VirusDetectedError, scan_bytes
+from main import aduport
 
 
 @pytest.fixture()
 def client(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "basic_auth", "")
@@ -40,14 +40,14 @@ def test_mobi_invalid(client):
 
 
 def test_virus_scan_disabled_noop(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "virus_scan", False)
     scan_bytes(b"hello", "a.txt")  # should not raise
 
 
 def test_virus_scan_infected(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "virus_scan", True)
     monkeypatch.setattr(settings, "virus_scan_fail_closed", True)
@@ -57,19 +57,19 @@ def test_virus_scan_infected(monkeypatch):
         stdout = "upload.bin: Eicar-Test-Signature FOUND"
         stderr = ""
 
-    with patch("app.core.virus_scan.shutil.which", return_value="/usr/bin/clamscan"), patch(
-        "app.core.virus_scan.subprocess.run", return_value=FakeProc()
+    with patch("aduport.core.virus_scan.shutil.which", return_value="/usr/bin/clamscan"), patch(
+        "aduport.core.virus_scan.subprocess.run", return_value=FakeProc()
     ):
         with pytest.raises(VirusDetectedError):
             scan_bytes(b"eicar", "upload.bin")
 
 
 def test_virus_scan_missing_binary_open(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "virus_scan", True)
     monkeypatch.setattr(settings, "virus_scan_fail_closed", False)
-    with patch("app.core.virus_scan.shutil.which", return_value=None):
+    with patch("aduport.core.virus_scan.shutil.which", return_value=None):
         scan_bytes(b"x", "a.bin")  # warn only
 
 

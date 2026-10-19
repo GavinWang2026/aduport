@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core.tenants import clear_tenant_cache
-from main import app
+from aduport.config import settings
+from aduport.core.tenants import clear_tenant_cache
+from main import aduport
 
 _PACK = Path(__file__).resolve().parent / "fixtures" / "sample_pack"
 

@@ -1,12 +1,12 @@
 """Phase C · private customer sample volume (hard gate when required).
 
-Set MDBRIDGE_PRIVATE_SAMPLES_DIR to a directory containing:
+Set ADUPORT_PRIVATE_SAMPLES_DIR to a directory containing:
   - manifest.json  (same schema as fixtures/sample_pack/manifest.json)
   - sample files referenced by manifest
 
 When unset:
   - default CI/dev: skip (in-repo sample_pack remains the ≥90% proxy)
-  - if MDBRIDGE_PRIVATE_SAMPLES_REQUIRED=1: fail hard (enterprise / nightly gate)
+  - if ADUPORT_PRIVATE_SAMPLES_REQUIRED=1: fail hard (enterprise / nightly gate)
 
 CI fidelity-gates mounts fixtures/sample_pack as the private dir so the hard
 gate always runs against the in-repo proxy corpus.
@@ -22,10 +22,10 @@ from pathlib import Path
 
 import pytest
 
-from app.core.converter import convert
+from aduport.core.converter import convert
 
-_ENV = "MDBRIDGE_PRIVATE_SAMPLES_DIR"
-_REQ = "MDBRIDGE_PRIVATE_SAMPLES_REQUIRED"
+_ENV = "ADUPORT_PRIVATE_SAMPLES_DIR"
+_REQ = "ADUPORT_PRIVATE_SAMPLES_REQUIRED"
 
 
 def _required() -> bool:
@@ -98,7 +98,7 @@ def test_private_samples_audit_hard_gate(private_root: Path):
 
 def test_private_samples_required_env_contract():
     """Documented env pair must be recognized by this module."""
-    assert _ENV.startswith("MDBRIDGE_")
-    assert _REQ.startswith("MDBRIDGE_")
+    assert _ENV.startswith("ADUPORT_")
+    assert _REQ.startswith("ADUPORT_")
     # Smoke: required() reads current env without raising
     assert isinstance(_required(), bool)

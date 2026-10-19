@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from app.config import settings
-from app.importers import ocr_engine as oe
+from aduport.config import settings
+from aduport.importers import ocr_engine as oe
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "scan"
 

@@ -9,13 +9,13 @@ from xml.etree import ElementTree as ET
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core import xml_safe
-from app.core.exceptions import FileTooLargeError, MemoryBudgetError
-from app.core.jobs import job_store
-from app.core.license import LicenseInfo
-from app.core.safe_zip import ZipInflateBudget, read_zip_member
-from main import app
+from aduport.config import settings
+from aduport.core import xml_safe
+from aduport.core.exceptions import FileTooLargeError, MemoryBudgetError
+from aduport.core.jobs import job_store
+from aduport.core.license import LicenseInfo
+from aduport.core.safe_zip import ZipInflateBudget, read_zip_member
+from main import aduport
 
 
 @pytest.fixture()
@@ -53,7 +53,7 @@ def test_t23_license_public_dict_hides_machine_ids(client):
         expires="2099-01-01",
         seats=1,
         customer="t",
-        product="md-bridge",
+        product="AduPort",
         valid=True,
     )
     pub = info.public_dict()
@@ -102,7 +102,7 @@ def test_t19_reserve_bytes_and_queue_stats(monkeypatch):
 
 
 def test_t20_pdf_auto_single_extract_sets_char_meta(monkeypatch):
-    from app.importers import pdf_importer as pi
+    from aduport.importers import pdf_importer as pi
 
     calls = {"n": 0}
 

@@ -10,6 +10,7 @@
 
 use crate::error::ConvertError;
 use crate::model::{Block, Cell, Document, Inline, Table, TableKind};
+use crate::package::limits;
 use crate::shared::header::resolve_header_rows;
 use crate::shared::text::clean_text;
 use csv::ReaderBuilder;
@@ -26,6 +27,7 @@ pub fn parse(bytes: &[u8]) -> Result<Document, ConvertError> {
         .from_reader(text.as_bytes());
 
     let mut rows: Vec<Vec<Cell>> = Vec::new();
+    let mut slots: u64 = 0;
     for record in reader.records() {
         let record = match record {
             Ok(r) => r,
@@ -36,6 +38,13 @@ pub fn parse(bytes: &[u8]) -> Result<Document, ConvertError> {
         };
         let cells: Vec<Cell> =
             record.iter().map(|f| Cell::from_inlines(vec![Inline::plain(clean_text(f))])).collect();
+        slots = slots.saturating_add(cells.len() as u64);
+        if slots > limits::MAX_GRID_SLOTS {
+            return Err(ConvertError::ResourceLimit {
+                limit: "max_grid_slots",
+                detail: format!("CSV grid exceeds {} cells", limits::MAX_GRID_SLOTS),
+            });
+        }
         rows.push(cells);
     }
 

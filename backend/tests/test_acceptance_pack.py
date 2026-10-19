@@ -1,6 +1,4 @@
-"""Packaging acceptance pack — push correctness / functional clarity toward ~95.
-
-Maps to enterprise/ACCEPTANCE.md items B2–B7 (unit-level, no live HTTP server).
+"""Packaging acceptance pack — unit-level functional clarity (no live HTTP).
 """
 
 from __future__ import annotations
@@ -9,15 +7,15 @@ import io
 
 import pytest
 
-from app.config import settings
-from app.core.converter import (
+from aduport.config import settings
+from aduport.core.converter import (
     SUPPORTED_SOURCE_FORMATS,
     SUPPORTED_TARGET_FORMATS,
     convert,
 )
-from app.core.document_model import DocumentModel, Heading, Paragraph
-from app.core.exceptions import ExportError
-from app.exporters.docx_exporter import export_docx
+from aduport.core.document_model import DocumentModel, Heading, Paragraph
+from aduport.core.exceptions import ExportError
+from aduport.exporters.docx_exporter import export_docx
 
 
 def test_formats_latex_azw3_importable():
@@ -80,13 +78,13 @@ def test_acceptance_docx_max_nodes_default_documented():
 
 def test_acceptance_virus_fail_closed_without_binary(monkeypatch):
     """B10: virus_scan on + fail_closed + no clam → virus_scan_unavailable."""
-    from app.core.exceptions import MdBridgeError
-    from app.core import virus_scan as vs
+    from aduport.core.exceptions import AduPortError
+    from aduport.core import virus_scan as vs
 
     monkeypatch.setattr(settings, "virus_scan", True)
     monkeypatch.setattr(settings, "virus_scan_fail_closed", True)
     monkeypatch.setattr(vs.shutil, "which", lambda _name: None)
-    with pytest.raises(MdBridgeError) as ei:
+    with pytest.raises(AduPortError) as ei:
         vs.scan_bytes(b"hello", "a.bin")
     assert ei.value.code == "virus_scan_unavailable"
 

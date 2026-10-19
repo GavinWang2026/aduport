@@ -1,91 +1,57 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import type { ConvertOptions, ConvertResult, SourceFormatOption, TargetFormat } from './types'
+import type { ConvertOptions, ConvertResult, JobStatusPayload, SourceFormatOption, TargetFormat } from './types'
+import {
+  apiKeyHeaders,
+  clearDurableApiKey,
+  getApiKey,
+  jobAuthHeaders,
+  markCookieSession,
+  rememberJobToken,
+} from './sessionAuth'
 
-const API_KEY_STORAGE = 'mdbridge-api-key'
-const JOB_TOKEN_STORAGE = 'mdbridge-job-tokens'
+export { getApiKey, getJobToken, rememberJobToken, setApiKey } from './sessionAuth'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE || '',
   timeout: 300000,
+  withCredentials: true,
 })
 
-/** FE-01: resolve API key from localStorage, then VITE_API_KEY. */
-export function getApiKey(): string {
-  try {
-    const fromStore = (localStorage.getItem(API_KEY_STORAGE) || '').trim()
-    if (fromStore) return fromStore
-  } catch {
-    /* ignore */
-  }
-  const fromEnv = String(import.meta.env.VITE_API_KEY || '').trim()
-  return fromEnv
+/** Bind API key into HttpOnly cookie; drop durable plaintext key on success. */
+export async function createAuthSession(apiKey?: string): Promise<void> {
+  const key = (apiKey || getApiKey()).trim()
+  if (!key) return
+  await api.post('/api/auth/session', null, {
+    headers: { 'X-API-Key': key },
+  })
+  markCookieSession(true)
+  clearDurableApiKey()
 }
 
-export function setApiKey(key: string): void {
-  const v = (key || '').trim()
-  try {
-    if (v) localStorage.setItem(API_KEY_STORAGE, v)
-    else localStorage.removeItem(API_KEY_STORAGE)
-  } catch {
-    /* ignore */
-  }
-}
-
-function readJobTokenMap(): Record<string, string> {
-  try {
-    const raw = sessionStorage.getItem(JOB_TOKEN_STORAGE)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw) as Record<string, string>
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeJobTokenMap(map: Record<string, string>): void {
-  try {
-    sessionStorage.setItem(JOB_TOKEN_STORAGE, JSON.stringify(map))
-  } catch {
-    /* ignore */
-  }
-}
-
-/** FE-02: persist per-job access_token for later status/result calls. */
-export function rememberJobToken(jobId: string, token: string | undefined | null): void {
-  const id = (jobId || '').trim()
-  const tok = (token || '').trim()
-  if (!id || !tok) return
-  const map = readJobTokenMap()
-  map[id] = tok
-  // Cap map size to avoid unbounded sessionStorage growth
-  const keys = Object.keys(map)
-  if (keys.length > 200) {
-    for (const k of keys.slice(0, keys.length - 200)) delete map[k]
-  }
-  writeJobTokenMap(map)
-}
-
-export function getJobToken(jobId: string): string {
-  return readJobTokenMap()[(jobId || '').trim()] || ''
+function parseExportWarnings(headers: Record<string, unknown>): string[] {
+  const count = Number(headers['x-aduport-export-warnings'] || 0)
+  const sample = String(headers['x-aduport-export-warning-sample'] || '').trim()
+  if (!count) return []
+  if (sample) return [sample]
+  return [`${count} 条导出降级提示`]
 }
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const key = getApiKey()
-  if (key) {
+  // Explicit: never inject X-API-Key once HttpOnly cookie session is bound.
+  const headers = apiKeyHeaders()
+  if (headers['X-API-Key']) {
     config.headers = config.headers || {}
-    config.headers['X-API-Key'] = key
+    config.headers['X-API-Key'] = headers['X-API-Key']
+  } else if (config.headers) {
+    delete config.headers['X-API-Key']
+    delete config.headers['x-api-key']
   }
   return config
 })
 
-function jobAuthHeaders(jobId: string): Record<string, string> {
-  const token = getJobToken(jobId)
-  return token ? { 'X-Job-Token': token } : {}
-}
-
 function appendConvertOptions(form: FormData, opts?: ConvertOptions) {
   if (!opts) return
-  const entries: [keyof ConvertOptions, string | boolean | undefined][] = [
+  const entries: [keyof ConvertOptions, string | boolean | number | undefined][] = [
     ['pdf_font_family', opts.pdf_font_family],
     ['pdf_custom_css', opts.pdf_custom_css],
     ['pdf_page_size', opts.pdf_page_size],
@@ -93,6 +59,11 @@ function appendConvertOptions(form: FormData, opts?: ConvertOptions) {
     ['pdf_header', opts.pdf_header],
     ['pdf_footer', opts.pdf_footer],
     ['docx_theme', opts.docx_theme],
+    ['rag_max_chars', opts.rag_max_chars],
+    ['rag_chunk_overlap', opts.rag_chunk_overlap],
+    ['embed_backend', opts.embed_backend],
+    ['pdf_engine', opts.pdf_engine],
+    ['ocr_engine', opts.ocr_engine],
   ]
   for (const [k, v] of entries) {
     if (v !== undefined && v !== null && String(v).trim() !== '') {
@@ -104,6 +75,21 @@ function appendConvertOptions(form: FormData, opts?: ConvertOptions) {
   }
   if (opts.pdf_toc !== undefined) {
     form.append('pdf_toc', opts.pdf_toc ? 'true' : 'false')
+  }
+  if (opts.embed !== undefined) {
+    form.append('embed', opts.embed ? 'true' : 'false')
+  }
+  if (opts.vector_persist !== undefined) {
+    form.append('vector_persist', opts.vector_persist ? 'true' : 'false')
+  }
+  if (opts.force_ocr !== undefined) {
+    form.append('force_ocr', opts.force_ocr ? 'true' : 'false')
+  }
+  if (opts.cache_bypass !== undefined) {
+    form.append('cache_bypass', opts.cache_bypass ? 'true' : 'false')
+  }
+  if (opts.skip_pdf_sidecar !== undefined) {
+    form.append('skip_pdf_sidecar', opts.skip_pdf_sidecar ? 'true' : 'false')
   }
 }
 
@@ -132,36 +118,36 @@ async function extractErrorMessage(err: unknown): Promise<string> {
     return err instanceof Error ? err.message : '转换失败'
   }
 
+  const pick = (json: unknown): string | null => {
+    if (typeof json !== 'object' || !json) return null
+    const obj = json as Record<string, unknown>
+    const message = typeof obj.message === 'string' ? obj.message : null
+    const code = typeof obj.code === 'string' ? obj.code : null
+    if (!message) return null
+    return code ? `[${code}] ${message}` : message
+  }
+
   const data = err.response.data
   if (data instanceof Blob) {
     try {
       const text = await data.text()
-      const json = JSON.parse(text) as { message?: string; code?: string }
-      if (json.message) {
-        return json.code ? `[${json.code}] ${json.message}` : json.message
-      }
+      const fromJson = pick(JSON.parse(text))
+      if (fromJson) return fromJson
       return text.slice(0, 200) || `请求失败 (${err.response.status})`
     } catch {
       return `请求失败 (${err.response.status})`
     }
   }
 
-  if (typeof data === 'object' && data && 'message' in data) {
-    const obj = data as { message?: string; code?: string }
-    return obj.code ? `[${obj.code}] ${obj.message}` : String(obj.message)
-  }
+  const fromObj = pick(data)
+  if (fromObj) return fromObj
 
   return err.message || `请求失败 (${err.response.status})`
 }
 
-export interface JobStatusPayload {
-  id: string
-  status: 'queued' | 'running' | 'done' | 'error'
-  progress: number
-  error?: string | null
-  result_filename?: string | null
-  access_token?: string
-}
+export type { JobStatusPayload } from './types'
+import { subscribeJobEvents, waitForJobViaSSE } from './jobEvents'
+export { subscribeJobEvents, waitForJobViaSSE }
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms))
@@ -187,34 +173,79 @@ export async function convertDocumentAsync(
     rememberJobToken(jobId, created.access_token)
     onProgress?.(created.progress ?? 0, created.status)
 
-    for (let i = 0; i < 600; i++) {
-      await sleep(i < 10 ? 200 : 500)
-      const { data: st } = await api.get<JobStatusPayload>(`/api/jobs/${jobId}`, {
-        headers: jobAuthHeaders(jobId),
-      })
-      onProgress?.(st.progress ?? 0, st.status)
-      if (st.status === 'error') {
-        throw new Error(st.error || '转换失败')
-      }
-      if (st.status === 'done') {
-        const response = await api.get(`/api/jobs/${jobId}/result`, {
-          responseType: 'blob',
-          headers: jobAuthHeaders(jobId),
-        })
-        const disposition = response.headers['content-disposition'] as string | undefined
-        const filename = parseFilename(
-          disposition,
-          st.result_filename || `converted.${targetFormat}`,
-        )
-        const blob = response.data as Blob
-        let preview: string | undefined
-        if (targetFormat === 'md' || targetFormat === 'html') {
-          preview = await blob.text()
-        }
-        return { filename, blob, preview }
-      }
+    let finalStatus: JobStatusPayload
+    try {
+      finalStatus = await waitForJobViaSSE(jobId, onProgress)
+    } catch {
+      finalStatus = await pollJobUntilDone(jobId, onProgress)
     }
-    throw new Error('转换超时，请稍后在历史中重试或改用同步转换')
+
+    const response = await api.get(`/api/jobs/${jobId}/result`, {
+      responseType: 'blob',
+      headers: jobAuthHeaders(jobId),
+    })
+    const disposition = response.headers['content-disposition'] as string | undefined
+    const filename = parseFilename(
+      disposition,
+      finalStatus.result_filename || `converted.${targetFormat}`,
+    )
+    const blob = response.data as Blob
+    const exportWarnings =
+      (finalStatus.export_warnings && finalStatus.export_warnings.length
+        ? finalStatus.export_warnings
+        : parseExportWarnings(response.headers as Record<string, unknown>))
+    let preview: string | undefined
+    if (targetFormat === 'md' || targetFormat === 'html' || targetFormat === 'rag' || targetFormat === 'json') {
+      preview = await blob.text()
+    }
+    return { filename, blob, preview, exportWarnings: exportWarnings.length ? exportWarnings : undefined }
+  } catch (err) {
+    throw new Error(await extractErrorMessage(err))
+  }
+}
+
+async function pollJobUntilDone(
+  jobId: string,
+  onProgress?: (p: number, status: string) => void,
+): Promise<JobStatusPayload> {
+  for (let i = 0; i < 600; i++) {
+    await sleep(i < 10 ? 200 : 500)
+    const { data: st } = await api.get<JobStatusPayload>(`/api/jobs/${jobId}`, {
+      headers: jobAuthHeaders(jobId),
+    })
+    onProgress?.(st.progress ?? 0, st.status)
+    if (st.status === 'error') {
+      throw new Error(st.error || '转换失败')
+    }
+    if (st.status === 'done') {
+      return st
+    }
+  }
+  throw new Error('转换超时，请稍后在历史中重试或改用同步转换')
+}
+
+export async function convertDocumentSync(
+  file: File,
+  sourceFormat: SourceFormatOption,
+  targetFormat: TargetFormat,
+  options?: ConvertOptions,
+): Promise<ConvertResult> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('source_format', sourceFormat)
+  form.append('target_format', targetFormat)
+  appendConvertOptions(form, options)
+  try {
+    const response = await api.post('/api/convert', form, { responseType: 'blob' })
+    const disposition = response.headers['content-disposition'] as string | undefined
+    const filename = parseFilename(disposition, `converted.${targetFormat}`)
+    const blob = response.data as Blob
+    const exportWarnings = parseExportWarnings(response.headers as Record<string, unknown>)
+    let preview: string | undefined
+    if (targetFormat === 'md' || targetFormat === 'html' || targetFormat === 'rag' || targetFormat === 'json') {
+      preview = await blob.text()
+    }
+    return { filename, blob, preview, exportWarnings: exportWarnings.length ? exportWarnings : undefined }
   } catch (err) {
     throw new Error(await extractErrorMessage(err))
   }
@@ -263,16 +294,57 @@ export async function fetchHealth(): Promise<boolean> {
   }
 }
 
+export interface CapabilityHint {
+  enabled?: boolean
+  ready?: boolean
+  install_hint?: string | null
+}
+
+export interface HealthDetailPayload {
+  ocr_ready?: boolean
+  ocr_enabled?: boolean
+  anydoc_available?: boolean
+  capabilities?: Record<string, CapabilityHint>
+  pdf_export?: {
+    weasyprint_available?: boolean
+    install_hint?: string | null
+  }
+  rate_limit?: {
+    backend?: string
+    install_hint?: string | null
+  }
+}
+
+export async function fetchHealthDetail(): Promise<HealthDetailPayload | null> {
+  try {
+    const { data } = await api.get<HealthDetailPayload>('/api/health/detail')
+    return data
+  } catch {
+    return null
+  }
+}
+
 export interface FormatsPayload {
   formats: string[]
   source: string[]
   target: string[]
   export_only: string[]
+  export_modes?: string[]
+  structure_limits?: Record<string, string[]>
   notes?: Record<string, string>
   fidelity_tiers?: {
     full?: string[]
+    structured_partial?: string[]
+    text_markers?: string[]
     text_level?: string[]
     export_shallow?: string[]
+  }
+  claim_policy?: {
+    layout_targets?: string[]
+    text_markers_only_targets?: string[]
+    image_carry_only_sources?: string[]
+    content_success_excludes_sources?: string[]
+    note?: string
   }
 }
 
@@ -292,11 +364,15 @@ export interface ServerJob {
   target_format: string
   status: string
   progress: number
+  stage?: string
   error?: string | null
+  code?: string | null
   result_filename?: string | null
   created_at: number
   bytes_in?: number
   bytes_out?: number
+  resumable?: boolean
+  reprocessable?: boolean
 }
 
 export async function listServerJobs(): Promise<ServerJob[]> {
@@ -308,6 +384,30 @@ export async function getServerJob(jobId: string): Promise<ServerJob> {
   const { data } = await api.get<ServerJob>(`/api/jobs/${jobId}`, {
     headers: jobAuthHeaders(jobId),
   })
+  return data
+}
+
+export async function resumeServerJob(jobId: string): Promise<ServerJob & { access_token?: string }> {
+  const { data } = await api.post<ServerJob & { access_token?: string }>(
+    `/api/jobs/${jobId}/resume`,
+    null,
+    { headers: jobAuthHeaders(jobId) },
+  )
+  if (data?.access_token) {
+    rememberJobToken(jobId, data.access_token)
+  }
+  return data
+}
+
+export async function reprocessServerJob(jobId: string): Promise<ServerJob & { access_token?: string }> {
+  const { data } = await api.post<ServerJob & { access_token?: string }>(
+    `/api/jobs/${jobId}/reprocess`,
+    null,
+    { headers: jobAuthHeaders(jobId) },
+  )
+  if (data?.access_token) {
+    rememberJobToken(jobId, data.access_token)
+  }
   return data
 }
 
@@ -333,9 +433,41 @@ export interface UsagePayload {
   conversions_failed: number
 }
 
+export interface TenantPublic {
+  tenant_id: string
+  rate_limit: number | null
+  daily_quota: number | null
+}
+
 export interface LicensePayload {
   required: boolean
   license: Record<string, unknown> | null
+}
+
+export interface FidelityProbeRow {
+  target: string
+  ok: boolean
+  equal: boolean
+  changes?: number
+  error?: string
+  footnote_wrapped?: boolean
+  untitled?: boolean
+}
+
+export async function postToolJson(path: string, body: unknown): Promise<unknown> {
+  try {
+    const { data } = await api.post(path, body)
+    return data
+  } catch (err) {
+    throw new Error(await extractErrorMessage(err))
+  }
+}
+
+export async function probeFidelity(text: string): Promise<FidelityProbeRow[]> {
+  const form = new FormData()
+  form.append('text', text)
+  const { data } = await api.post<{ rows: FidelityProbeRow[] }>('/api/fidelity/probe', form)
+  return Array.isArray(data?.rows) ? data.rows : []
 }
 
 export async function fetchUsage(): Promise<UsagePayload | null> {
@@ -347,12 +479,52 @@ export async function fetchUsage(): Promise<UsagePayload | null> {
   }
 }
 
+export async function fetchTenants(): Promise<TenantPublic[]> {
+  try {
+    const { data } = await api.get<{ tenants?: TenantPublic[] }>('/api/tenants')
+    return Array.isArray(data?.tenants) ? data.tenants : []
+  } catch {
+    return []
+  }
+}
+
 export async function fetchLicense(): Promise<LicensePayload | null> {
   try {
     const { data } = await api.get<LicensePayload>('/api/license')
     return data
   } catch {
     return null
+  }
+}
+
+export interface ToolCallResult {
+  kind: 'json' | 'file'
+  json?: unknown
+  blob?: Blob
+  filename?: string
+}
+
+/** Multipart call for the document-ops endpoints (PDF pages, redact, diff, sign, forms). */
+export async function postToolForm(path: string, form: FormData): Promise<ToolCallResult> {
+  try {
+    const response = await api.post(path, form, { responseType: 'blob' })
+    const ctype = String(response.headers['content-type'] || '')
+    const blob = response.data as Blob
+    if (ctype.includes('json') || ctype.startsWith('text/')) {
+      const text = await blob.text()
+      try {
+        return { kind: 'json', json: JSON.parse(text) }
+      } catch {
+        return { kind: 'json', json: { text } }
+      }
+    }
+    return {
+      kind: 'file',
+      blob,
+      filename: parseFilename(response.headers['content-disposition'] as string | undefined, 'download.bin'),
+    }
+  } catch (err) {
+    throw new Error(await extractErrorMessage(err))
   }
 }
 

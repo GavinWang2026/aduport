@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, Footnote, Paragraph
-from app.exporters.mobi_exporter import export_mobi
-from app.importers.mobi_text import try_extract_mobi_model
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, Footnote, Paragraph
+from aduport.exporters.mobi_exporter import export_mobi
+from aduport.importers.mobi_text import try_extract_mobi_model
 
 
 def _footnote_model() -> DocumentModel:

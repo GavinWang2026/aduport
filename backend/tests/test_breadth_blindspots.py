@@ -5,16 +5,16 @@ from __future__ import annotations
 import io
 import zipfile
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Chart,
     DocumentModel,
     Heading,
     Paragraph,
     SpeakerNote,
 )
-from app.exporters import docx_exporter, json_exporter, pptx_exporter
-from app.exporters.pdf_simple import export_pdf_simple
-from app.importers.pptx_text import try_extract_pptx_model
+from aduport.exporters import docx_exporter, json_exporter, pptx_exporter
+from aduport.exporters.pdf_simple import export_pdf_simple
+from aduport.importers.pptx_text import try_extract_pptx_model
 
 
 def test_chart_json_roundtrip_and_visible_export():
@@ -49,7 +49,7 @@ def test_docx_auto_toc_field():
             Heading(level=2, text="Detail"),
         ]
     )
-    blob = docx_exporter.export_docx(model)
+    blob = docx_exporter.export_docx(model, auto_toc=True)
     with zipfile.ZipFile(io.BytesIO(blob)) as zf:
         xml = zf.read("word/document.xml").decode("utf-8")
     assert "w:fldChar" in xml
@@ -89,4 +89,4 @@ def test_pdf_simple_acroform_and_annot():
     assert "/AcroForm" in text
     assert "/Subtype /Widget" in text or "/FT /Tx" in text
     assert "/Subtype /Text" in text
-    assert "mdbridge_field" in text or "mdbridge-pdf-annot" in text
+    assert "aduport_field" in text or "aduport-pdf-annot" in text

@@ -9,25 +9,25 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core.document_model import (
+from aduport.config import settings
+from aduport.core.document_model import (
     DocumentModel,
     FieldCode,
     Footnote,
     HeaderFooter,
     HtmlBlock,
 )
-from app.core.exceptions import FileTooLargeError, UploadTimeoutError
-from app.core.upload_stream import read_upload_streaming
-from app.exporters.docx_exporter import export_docx
-from app.exporters.html_render import render_body_html
-from app.importers.md_importer import (
+from aduport.core.exceptions import FileTooLargeError, UploadTimeoutError
+from aduport.core.upload_stream import read_upload_streaming
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.html_render import render_body_html
+from aduport.importers.md_importer import (
     _MAX_BLOCKQUOTE_DEPTH,
     _nodes_from_html,
     _parse_blockquote,
     import_md,
 )
-from main import app
+from main import aduport
 
 
 class _SlowUpload:
@@ -44,7 +44,7 @@ def test_d24_upload_timeout(monkeypatch):
     monkeypatch.setattr(settings, "upload_timeout_seconds", 0.05)
 
     async def _run() -> None:
-        await read_upload_streaming(_SlowUpload(), prefix="mdbridge-slow-")  # type: ignore[arg-type]
+        await read_upload_streaming(_SlowUpload(), prefix="aduport-slow-")  # type: ignore[arg-type]
 
     with pytest.raises(UploadTimeoutError):
         asyncio.run(_run())
@@ -64,7 +64,7 @@ def test_d26_opaque_html_produces_htmlblock():
 def test_d27_docs_gated_when_disabled(monkeypatch):
     monkeypatch.setattr(settings, "debug", False)
     monkeypatch.setattr(settings, "expose_api_docs", False)
-    from app.api.auth import _public_path
+    from aduport.api.auth import _public_path
 
     assert not _public_path("/docs")
     assert not _public_path("/openapi.json")
@@ -96,7 +96,7 @@ def test_d28_batch_member_budget_stops_early(monkeypatch):
     async def _run() -> None:
         await read_upload_streaming(
             _FatUpload(500),  # type: ignore[arg-type]
-            prefix="mdbridge-cap-",
+            prefix="aduport-cap-",
             max_bytes=100,
         )
 

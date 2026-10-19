@@ -1,6 +1,4 @@
 """Sprint: illusion defaults off + A/B roundtrip matrix + Weasy calibration gate.
-
-Does not raise SCORE_93 (66.2). See enterprise/AB_TEST_CONTRACT.md.
 """
 
 from __future__ import annotations
@@ -10,13 +8,13 @@ from io import BytesIO
 
 import pytest
 
-from app.config import settings
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, Heading, Paragraph, Revision, Table
-from app.core.metrics import metrics
-from app.exporters.pdf_exporter import export_pdf
-from app.exporters.pdf_simple import export_pdf_simple, extract_ast_sidecar
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.config import settings
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, Revision, Table
+from aduport.core.metrics import metrics
+from aduport.exporters.pdf_exporter import export_pdf
+from aduport.exporters.pdf_simple import export_pdf_simple, extract_ast_sidecar
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
 
 
 def test_defaults_illusion_flags_off():
@@ -27,7 +25,7 @@ def test_defaults_illusion_flags_off():
 def test_pdf_sidecar_off_by_default():
     model = DocumentModel(nodes=[Paragraph(text="NO_SIDECAR_BODY")])
     pdf = export_pdf_simple(model)
-    assert b"MDBRIDGE-AST-v1" not in pdf
+    assert b"ADUPORT-AST-v1" not in pdf
     assert extract_ast_sidecar(pdf) is None
 
 
@@ -35,7 +33,7 @@ def test_pdf_sidecar_opt_in(monkeypatch):
     monkeypatch.setattr(settings, "pdf_ast_sidecar", True)
     model = DocumentModel(nodes=[Heading(level=1, text="OPT_IN"), Paragraph(text="body")])
     pdf = export_pdf_simple(model)
-    assert b"MDBRIDGE-AST-v1" in pdf
+    assert b"ADUPORT-AST-v1" in pdf
     back = extract_ast_sidecar(pdf)
     assert back is not None
     text = " ".join(n.plain_text() for n in back.nodes if hasattr(n, "plain_text"))
@@ -83,7 +81,7 @@ def test_identity_excluded_from_conversions_total():
     snap = metrics.snapshot()
     assert "identity_passthrough" in snap
     prom = metrics.prometheus_text()
-    assert "mdbridge_identity_passthrough" in prom
+    assert "aduport_identity_passthrough" in prom
 
 
 @pytest.mark.parametrize(
@@ -122,7 +120,7 @@ def test_weasy_calibration_gate():
     pdf = export_pdf(model)
     assert pdf.startswith(b"%PDF")
     assert (model.metadata or {}).get("pdf_engine") == "weasyprint"
-    assert b"MDBRIDGE-AST-v1" not in pdf
+    assert b"ADUPORT-AST-v1" not in pdf
     assert len(pdf) > 200
 
 
@@ -139,19 +137,10 @@ def test_ab_roundtrip_over_stream_threshold(ab_benchmark):
     assert b"ROUNDTRIP_BIG_SENTINEL" in back
 
 
-def test_known_illusions_doc_exists():
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    text = (root / "enterprise" / "KNOWN_ILLUSIONS.md").read_text(encoding="utf-8")
-    assert "R-01" in text and "R-02" in text and "R-03" in text
-    assert "66.2" in text
-
-
 def test_health_exposes_illusion_and_weasy_flags():
     from fastapi.testclient import TestClient
 
-    from main import app
+    from main import aduport
 
     client = TestClient(app)
     r = client.get("/api/health/detail")

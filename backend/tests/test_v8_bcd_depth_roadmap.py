@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from app.config import settings
-from app.core.document_model import (
+from aduport.config import settings
+from aduport.core.document_model import (
     Chart,
     DocumentModel,
     Heading,
@@ -17,15 +17,15 @@ from app.core.document_model import (
     Table,
     TableCell,
 )
-from app.core.stream_convert import convert_streaming
-from app.exporters.libreoffice_bridge import (
+from aduport.core.stream_convert import convert_streaming
+from aduport.exporters.libreoffice_bridge import (
     LibreOfficeUnavailable,
     convert_via_libreoffice,
     libreoffice_enabled,
 )
-from app.exporters.rag_elements import export_rag_elements
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
-from app.importers import _docling_utils as du
+from aduport.exporters.rag_elements import export_rag_elements
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.importers import _docling_utils as du
 
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -121,22 +121,86 @@ def test_rag_elements_contract():
     assert "NarrativeText" in types
     assert "Table" in types
     assert all("metadata" in e and "source_node" in e["metadata"] for e in els)
+    assert all(e["metadata"].get("element_id") for e in els)
+    assert any(e["metadata"].get("chunk_index", 0) >= 0 for e in els if e["type"] == "NarrativeText")
+
+
+def test_rag_elements_span_and_payload():
+    from aduport.core.node_span import set_node_span
+    from aduport.exporters.rag_elements import RAG_SCHEMA_VERSION, export_rag_payload
+
+    model = DocumentModel(
+        title="span-demo",
+        nodes=[Heading(level=1, text="T"), Paragraph(text="alpha beta gamma")],
+    )
+    set_node_span(model, 1, {"page": 3, "bbox": [1.0, 2.0, 3.0, 4.0], "source": "test"})
+    payload = export_rag_payload(model, max_chars=40, chunk_overlap=5)
+    assert payload["schema"] == "aduport.rag_elements.v1"
+    assert payload["schema_version"] == RAG_SCHEMA_VERSION
+    assert payload["chunking"]["max_chars"] == 40
+    paras = [e for e in payload["elements"] if e["type"] == "NarrativeText"]
+    assert paras
+    assert paras[0]["metadata"].get("page_number") == 3
+    assert paras[0]["metadata"].get("bbox") == [1.0, 2.0, 3.0, 4.0]
+    assert "char_start" in paras[0]["metadata"]
 
 
 def test_rag_registered_export_roundtrip():
-    from app.core.converter import convert
-    from app.core.registry import ensure_builtin_plugins
+    from aduport.core.converter import convert
+    from aduport.core.registry import ensure_builtin_plugins
 
     ensure_builtin_plugins()
     out = convert(b"# Title\n\nHello RAG.\n", "md", "rag", filename="t.md", skip_magic=True)
     import json
 
     payload = json.loads(out.decode())
-    assert payload.get("schema") == "mdbridge.rag_elements.v1"
+    assert payload.get("schema") == "aduport.rag_elements.v1"
+    assert payload.get("schema_version") == "1.1"
     assert isinstance(payload.get("elements"), list) and payload["elements"]
+    assert payload["elements"][0]["metadata"].get("element_id")
     # alias
     out2 = convert(b"# T\n", "md", "elements", filename="t.md", skip_magic=True)
-    assert b"mdbridge.rag_elements" in out2
+    assert b"aduport.rag_elements" in out2
+    # kwargs override
+    out3 = convert(
+        b"# T\n\n" + (b"word " * 200),
+        "md",
+        "rag",
+        filename="t.md",
+        skip_magic=True,
+        rag_max_chars=60,
+    )
+    p3 = json.loads(out3.decode())
+    assert p3["chunking"]["max_chars"] == 60
+
+
+def test_ocr_layout_normalize_and_attach():
+    from aduport.core.document_model import DocumentModel, Paragraph
+    from aduport.importers.ocr_layout import apply_ocr_layout_to_model, extract_paddle_layout_blocks
+
+    blocks = extract_paddle_layout_blocks(
+        [{"text": "Hello layout block", "bbox": [0, 1, 2, 3], "page": 1}]
+    )
+    assert blocks and blocks[0]["text"] == "Hello layout block"
+    model = DocumentModel(
+        title="ocr",
+        nodes=[Paragraph(text="Hello layout block")],
+    )
+    apply_ocr_layout_to_model(model, engine="test", blocks=blocks)
+    assert model.metadata.get("ocr_layout", {}).get("engine") == "test"
+    assert model.metadata.get("node_spans")
+
+
+def test_paddle_allow_flag(monkeypatch):
+    from aduport.importers import ocr_engine as oe
+    import sys as _sys
+
+    monkeypatch.setattr(oe.settings, "ocr_allow_paddle", "false")
+    assert oe._paddle_allowed() is False
+    monkeypatch.setattr(oe.settings, "ocr_allow_paddle", "true")
+    assert oe._paddle_allowed() is True
+    monkeypatch.setattr(oe.settings, "ocr_allow_paddle", "auto")
+    assert oe._paddle_allowed() is (_sys.platform != "darwin")
 
 
 def test_libreoffice_bridge_disabled_by_default(monkeypatch):
@@ -147,14 +211,14 @@ def test_libreoffice_bridge_disabled_by_default(monkeypatch):
 
 
 def test_libreoffice_pdf_path_skipped_when_disabled(monkeypatch):
-    from app.core import converter as conv
+    from aduport.core import converter as conv
 
     monkeypatch.setattr(settings, "libreoffice_enabled", False)
     assert conv._try_libreoffice_pdf(b"PK", "docx", "pdf", "a.docx") is None
 
 
 def test_docling_semantic_labels_map_to_ast_nodes():
-    from app.core.document_model import Blockquote, Footnote, HorizontalRule, MathBlock
+    from aduport.core.document_model import Blockquote, Footnote, HorizontalRule, MathBlock
     from types import SimpleNamespace
 
     items = [
@@ -183,7 +247,7 @@ def test_docx_text_table_gridspan_without_anydoc():
     from docx import Document
     from io import BytesIO
 
-    from app.importers.docx_text import try_extract_docx_model
+    from aduport.importers.docx_text import try_extract_docx_model
 
     buf = BytesIO()
     doc = Document()
@@ -236,5 +300,5 @@ def test_stream_dual_path_above_threshold(monkeypatch):
 
 def test_contributing_and_ecosystem_docs_exist():
     assert (_ROOT / "CONTRIBUTING.md").is_file()
-    eco = (_ROOT / "enterprise" / "ECOSYSTEM_STRATEGY.md").read_text(encoding="utf-8")
-    assert "66.2" in eco
+    assert (_ROOT / "enterprise" / "README.md").is_file()
+    assert (_ROOT / "ENTERPRISE.md").is_file()

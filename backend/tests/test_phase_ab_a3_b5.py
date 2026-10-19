@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     DocumentModel,
     Image,
     MathBlock,
@@ -15,10 +15,10 @@ from app.core.document_model import (
     Paragraph,
     SmartArt,
 )
-from app.core.exceptions import OcrUnavailableError
-from app.core.format_detect import detect_source_format
-from app.exporters import latex_exporter, odt_exporter, pptx_exporter
-from app.exporters.omml import extract_math_blocks_from_document_xml
+from aduport.core.exceptions import OcrUnavailableError
+from aduport.core.format_detect import detect_source_format
+from aduport.exporters import latex_exporter, odt_exporter, pptx_exporter
+from aduport.exporters.omml import extract_math_blocks_from_document_xml
 
 
 TINY_PNG = (
@@ -86,10 +86,10 @@ def test_b1_latex_includegraphics_and_assets():
     )
     tex = latex_exporter.export_latex(model)
     assert r"\includegraphics" in tex
-    assert "mdbridge_img_0.png" in tex
+    assert "aduport_img_0.png" in tex
     assets = model.metadata.get("latex_assets") or {}
-    assert "mdbridge_img_0.png" in assets
-    assert assets["mdbridge_img_0.png"]["bytes"] == len(TINY_PNG)
+    assert "aduport_img_0.png" in assets
+    assert assets["aduport_img_0.png"]["bytes"] == len(TINY_PNG)
 
 
 def test_b3_ocr_unavailable_dict_flags():
@@ -103,7 +103,7 @@ def test_b3_ocr_unavailable_dict_flags():
 def test_b4_health_exposes_pdf_export(client=None):
     from fastapi.testclient import TestClient
 
-    from main import app
+    from main import aduport
 
     with TestClient(app) as tc:
         r = tc.get("/api/health/detail")

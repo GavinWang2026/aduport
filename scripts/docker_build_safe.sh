@@ -15,8 +15,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KIND="${1:-slim}"
-TAG="${TAG:-md-bridge-backend:local}"
-TMP="${MDBRIDGE_DOCKER_CTX:-/tmp/md-bridge-build}"
+TAG="${TAG:-aduport-backend:local}"
+TMP="${ADUPORT_DOCKER_CTX:-/tmp/aduport-build}"
 
 case "$KIND" in
   slim) DOCKERFILE="backend/Dockerfile.slim" ;;

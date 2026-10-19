@@ -1,14 +1,16 @@
-# Publish md-bridge to PyPI (Trusted Publishing / OIDC preferred).
+# Publish AduPort to PyPI (Trusted Publishing / OIDC preferred).
 #
 # IMPORTANT: the published sdist/wheel is Python-only. Vendored anydoc
-# (native/anydoc → mdbridge_native._doc) is NOT built or uploaded here.
-# Full-program delivery = Docker (INSTALL_NATIVE=1) or scripts/build_native.sh.
+# (native/anydoc → aduport_native._doc) is NOT built or uploaded here.
+# Prebuilt native wheels: .github/workflows/native-wheels.yml → GitHub Releases
+# (scripts/install_native_wheel.sh). Full image path: Docker INSTALL_NATIVE=1
+# or scripts/build_native.sh.
 #
 # One-time setup on https://pypi.org :
-#   1. Create project "md-bridge" (or claim name)
+#   1. Create project "AduPort" (or claim name)
 #   2. Publishing → Add a new pending publisher
 #      - Owner: <github-org-or-user>
-#      - Repository: md-bridge
+#      - Repository: AduPort
 #      - Workflow: publish.yml
 #      - Environment: pypi
 #
@@ -37,14 +39,14 @@ jobs:
         working-directory: backend
     environment:
       name: pypi
-      url: https://pypi.org/p/md-bridge
+      url: https://pypi.org/p/AduPort
     permissions:
       contents: read
       id-token: write  # Trusted Publishing (OIDC)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
@@ -62,7 +64,7 @@ jobs:
 
       - name: Upload to PyPI
         if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run) }}
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
         with:
           packages-dir: backend/dist
           # For token auth instead of OIDC, set PYPI_API_TOKEN and use:

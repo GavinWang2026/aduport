@@ -1,5 +1,5 @@
 [workspace]
-# md-bridge vendors only the Python binding crate; node/ and wasm/ are not part
+# AduPort vendors only the Python binding crate; node/ and wasm/ are not part
 # of the fused program and are excluded so `cargo`/maturin build a single target.
 members = ["python"]
 # cargo-fuzz keeps its own lockfile and nightly-only dependencies.
@@ -35,4 +35,6 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 
 [profile.release]
 lto = "thin"
-strip = "symbols"
+# macOS 27 dyld rejects a release dylib whose symbol-string pool is only
+# 4-byte aligned. Rust 1.97's strip pass does that; leave symbols in place.
+strip = "none"

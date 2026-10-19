@@ -1,0 +1,133 @@
+# Build portable aduport-native wheels (manylinux + macOS).
+#
+# Product boundary: main `AduPort` PyPI stays Python-only (publish.yml).
+# These wheels ship as GitHub Release assets / workflow artifacts so hosts
+# can `pip install` without compiling Rust (scripts/install_native_wheel.sh).
+#
+# Trigger: release published, tag v*, or manual dispatch.
+
+name: Native wheels
+
+on:
+  release:
+    types: [published]
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1
+        with:
+          working-directory: native/anydoc/python
+          target: x86_64
+          manylinux: "2_28"
+          args: --release --out dist
+          sccache: "true"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-manylinux-x86_64
+          path: native/anydoc/python/dist/*.whl
+
+  linux-aarch64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1
+        with:
+          working-directory: native/anydoc/python
+          target: aarch64
+          manylinux: "2_28"
+          args: --release --out dist
+          sccache: "true"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-manylinux-aarch64
+          path: native/anydoc/python/dist/*.whl
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-13
+            target: x86_64
+          - os: macos-14
+            target: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1
+        with:
+          working-directory: native/anydoc/python
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          sccache: "true"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-macos-${{ matrix.target }}
+          path: native/anydoc/python/dist/*.whl
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b  # v1
+        with:
+          working-directory: native/anydoc/python
+          target: x64
+          args: --release --out dist
+          sccache: "true"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: wheels-windows-x64
+          path: native/anydoc/python/dist/*.whl
+
+  pack:
+    needs: [linux-x86_64, linux-aarch64, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+        with:
+          path: wheelhouse
+          pattern: wheels-*
+          merge-multiple: true
+      - name: Pack tarball
+        run: |
+          set -euo pipefail
+          VER=$(grep -E '^version[[:space:]]*=' native/anydoc/python/Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          mkdir -p dist
+          ls -la wheelhouse/
+          # v13 P3-8: reject unexpected / secret-bearing wheel contents
+          python scripts/audit_native_wheels.py wheelhouse/
+          tar -czf "dist/aduport-native-wheels-${VER}.tar.gz" -C wheelhouse .
+          (cd dist && sha256sum "aduport-native-wheels-${VER}.tar.gz" > SHA256SUMS.txt)
+          echo "Packed aduport-native-wheels-${VER}.tar.gz"
+          cat dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: aduport-native-wheels-bundle
+          path: |
+            dist/aduport-native-wheels-*.tar.gz
+            dist/SHA256SUMS.txt
+      - name: Attach to GitHub Release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VER=$(grep -E '^version[[:space:]]*=' native/anydoc/python/Cargo.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "dist/aduport-native-wheels-${VER}.tar.gz" \
+            dist/SHA256SUMS.txt \
+            --clobber

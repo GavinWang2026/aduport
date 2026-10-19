@@ -5,14 +5,14 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import DocumentModel, Table
-from app.core.exceptions import FileTooLargeError
-from app.core.safe_zip import ZipInflateBudget
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.core.document_model import DocumentModel, Table
+from aduport.core.exceptions import FileTooLargeError
+from aduport.core.safe_zip import ZipInflateBudget
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
 
 
 def test_xlsx_import_respects_max_sheets_with_warning(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "xlsx_max_sheets", 64)
     tables = [Table(name=f"S{i}", rows=[["h"], [str(i)]]) for i in range(10)]
@@ -29,7 +29,7 @@ def test_xlsx_import_respects_max_sheets_with_warning(monkeypatch):
 
 
 def test_xlsx_import_no_truncation_under_cap(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "xlsx_max_sheets", 64)
     tables = [Table(name=f"S{i}", rows=[[str(i)]]) for i in range(5)]
@@ -42,8 +42,8 @@ def test_xlsx_import_no_truncation_under_cap(monkeypatch):
 
 def test_xlsx_import_sheet_read_honors_inflate_budget(monkeypatch):
     """Import must use ZipInflateBudget on sheet XML (oversized member → skip, no unbounded read)."""
-    from app.config import settings
-    from app.core import safe_zip
+    from aduport.config import settings
+    from aduport.core import safe_zip
 
     monkeypatch.setattr(settings, "xlsx_max_sheets", 64)
     blob = export_xlsx(DocumentModel(nodes=[Table(name="A", rows=[["ok", "1"]])]))
@@ -65,8 +65,8 @@ def test_xlsx_import_sheet_read_honors_inflate_budget(monkeypatch):
         def __init__(self, limit=None):
             super().__init__(limit=8_000)
 
-    monkeypatch.setattr("app.exporters.xlsx_exporter.ZipInflateBudget", TinyBudget)
-    from app.core.exceptions import CorruptedFileError
+    monkeypatch.setattr("aduport.exporters.xlsx_exporter.ZipInflateBudget", TinyBudget)
+    from aduport.core.exceptions import CorruptedFileError
 
     try:
         import_xlsx(out.getvalue(), "bomb.xlsx")

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.document_model import Table
-from app.importers.ole_biff8 import parse_biff8_workbook
-from app.importers.ole_cfb import read_cfb_stream
-from app.importers.ole_office import import_ppt, import_xls
-from app.importers.ole_ppt import extract_ppt_texts
+from aduport.core.document_model import Table
+from aduport.importers.ole_biff8 import parse_biff8_workbook
+from aduport.importers.ole_cfb import read_cfb_stream
+from aduport.importers.ole_office import import_ppt, import_xls
+from aduport.importers.ole_ppt import extract_ppt_texts
 from tests._ole_fixtures import (
     build_minimal_biff8_workbook,
     build_minimal_ppt,

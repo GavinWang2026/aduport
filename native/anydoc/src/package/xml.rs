@@ -210,6 +210,7 @@ pub fn parse_xml(bytes: &[u8]) -> Result<Element, ConvertError> {
         Element { ns: None, local: String::new(), attrs: Vec::new(), children: Vec::new() };
     let mut stack: Vec<Element> = Vec::new();
     let mut nodes: usize = 0;
+    let mut dom_bytes: usize = 0;
     let mut recovered = false;
 
     loop {
@@ -225,11 +226,14 @@ pub fn parse_xml(bytes: &[u8]) -> Result<Element, ConvertError> {
                     });
                 }
                 bump_nodes(&mut nodes)?;
-                stack.push(start_to_element(&e, &reader, &mut interner));
+                let elem = start_to_element(&e, &reader, &mut interner);
+                charge_dom_bytes(&mut dom_bytes, elem_dom_cost(&elem))?;
+                stack.push(elem);
             }
             Event::Empty(e) => {
                 bump_nodes(&mut nodes)?;
                 let elem = start_to_element(&e, &reader, &mut interner);
+                charge_dom_bytes(&mut dom_bytes, elem_dom_cost(&elem))?;
                 attach(&mut stack, &mut root, Node::Elem(elem));
             }
             Event::End(end) => match stack.pop() {
@@ -248,6 +252,7 @@ pub fn parse_xml(bytes: &[u8]) -> Result<Element, ConvertError> {
                 };
                 if !text.is_empty() {
                     bump_nodes(&mut nodes)?;
+                    charge_dom_bytes(&mut dom_bytes, text.len())?;
                     push_text(&mut stack, &mut root, text);
                 }
             }
@@ -255,11 +260,13 @@ pub fn parse_xml(bytes: &[u8]) -> Result<Element, ConvertError> {
                 let name = String::from_utf8_lossy(e.as_ref()).into_owned();
                 let resolved = resolve_entity(&name).unwrap_or_else(|| format!("&{name};"));
                 bump_nodes(&mut nodes)?;
+                charge_dom_bytes(&mut dom_bytes, resolved.len())?;
                 push_text(&mut stack, &mut root, resolved);
             }
             Event::CData(e) => {
                 let text = String::from_utf8_lossy(e.as_ref()).into_owned();
                 bump_nodes(&mut nodes)?;
+                charge_dom_bytes(&mut dom_bytes, text.len())?;
                 push_text(&mut stack, &mut root, text);
             }
             Event::Eof => break,
@@ -323,6 +330,31 @@ fn bump_nodes(nodes: &mut usize) -> Result<(), ConvertError> {
         return Err(ConvertError::ResourceLimit {
             limit: "max_xml_nodes",
             detail: format!("part exceeds {} xml nodes", limits::MAX_XML_NODES),
+        });
+    }
+    Ok(())
+}
+
+fn elem_dom_cost(elem: &Element) -> usize {
+    let mut n = elem.local.len();
+    if let Some(ns) = &elem.ns {
+        n = n.saturating_add(ns.len());
+    }
+    for a in &elem.attrs {
+        n = n.saturating_add(a.local.len()).saturating_add(a.value.len());
+        if let Some(ns) = &a.ns {
+            n = n.saturating_add(ns.len());
+        }
+    }
+    n
+}
+
+fn charge_dom_bytes(dom_bytes: &mut usize, add: usize) -> Result<(), ConvertError> {
+    *dom_bytes = dom_bytes.saturating_add(add);
+    if *dom_bytes > limits::MAX_XML_DOM_BYTES {
+        return Err(ConvertError::ResourceLimit {
+            limit: "max_xml_dom_bytes",
+            detail: format!("part DOM exceeds {} bytes", limits::MAX_XML_DOM_BYTES),
         });
     }
     Ok(())

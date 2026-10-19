@@ -6,4 +6,4 @@ services:
       args:
         INSTALL_OCR: "1"
     environment:
-      MDBRIDGE_OCR_ENABLED: "true"
+      ADUPORT_OCR_ENABLED: "true"

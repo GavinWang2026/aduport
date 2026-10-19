@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     CodeBlock,
     DocumentModel,
     Heading,
@@ -16,11 +16,11 @@ from app.core.document_model import (
     RichText,
     Table,
 )
-from app.core.converter import convert
-from app.core.css_sanitize import sanitize_custom_css as scss, sanitize_font_family
-from app.exporters.md_exporter import export_md
-from app.exporters.pdf_exporter import _render_html
-from app.importers.md_importer import import_md
+from aduport.core.converter import convert
+from aduport.core.css_sanitize import sanitize_custom_css as scss, sanitize_font_family
+from aduport.exporters.md_exporter import export_md
+from aduport.exporters.pdf_exporter import _render_html
+from aduport.importers.md_importer import import_md
 
 
 def _sample_model() -> DocumentModel:
@@ -89,7 +89,7 @@ def test_md_heading_code_hr_fence():
     assert "# H1" in out or "H1" in out
     assert "console.log" in out
     assert "---" in out
-    from app.core.document_model import HorizontalRule
+    from aduport.core.document_model import HorizontalRule
 
     assert any(isinstance(n, HorizontalRule) for n in model.nodes)
 

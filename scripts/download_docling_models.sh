@@ -12,7 +12,7 @@ if [[ -f .venv/bin/activate ]]; then
   source .venv/bin/activate
 fi
 
-export HF_ENDPOINT="${MDBRIDGE_HF_ENDPOINT:-${HF_ENDPOINT:-https://hf-mirror.com}}"
+export HF_ENDPOINT="${ADUPORT_HF_ENDPOINT:-${HF_ENDPOINT:-https://hf-mirror.com}}"
 echo "Using HF_ENDPOINT=$HF_ENDPOINT"
 
 python - <<'PY'
@@ -32,6 +32,6 @@ download_models(
     with_rapidocr=True,
     with_easyocr=False,
 )
-print("Done. Set MDBRIDGE_DOCLING_ARTIFACTS_PATH=", out)
+print("Done. Set ADUPORT_DOCLING_ARTIFACTS_PATH=", out)
 print("Or leave empty — docling will use ~/.cache/docling/models")
 PY

@@ -5,7 +5,7 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Chart,
     DocumentModel,
     Heading,
@@ -14,10 +14,10 @@ from app.core.document_model import (
     SpeakerNote,
     Table,
 )
-from app.exporters.odp_exporter import export_odp
-from app.exporters.ods_exporter import export_ods
-from app.importers.odp_importer import import_odp
-from app.importers.ods_importer import import_ods
+from aduport.exporters.odp_exporter import export_odp
+from aduport.exporters.ods_exporter import export_ods
+from aduport.importers.odp_importer import import_odp
+from aduport.importers.ods_importer import import_ods
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
@@ -98,7 +98,7 @@ def test_odp_notes_and_image_roundtrip():
 
 
 def test_ods_cell_span_export():
-    from app.core.document_model import TableCell
+    from aduport.core.document_model import TableCell
 
     model = DocumentModel(
         nodes=[

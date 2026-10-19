@@ -5,6 +5,10 @@ on:
     branches: [main, master]
   pull_request:
 
+# v13 P2-4: least-privilege default token
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -12,8 +16,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: Install deps
@@ -24,10 +28,10 @@ jobs:
       - name: Ruff
         run: ruff check app tests
       - name: Pytest + coverage
-        run: pytest -q --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
+        run: pytest -q -m "not integration" --tb=short --cov=app --cov-report=term-missing --cov-fail-under=78
         env:
-          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
-          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          ADUPORT_PRIVATE_SAMPLES_REQUIRED: "1"
       - name: Golden xlsx / span regression (no native)
         run: |
           pytest -q tests/test_golden_ast_xlsx.py tests/test_golden_xlsx_pipeline.py \
@@ -35,8 +39,7 @@ jobs:
             tests/test_target_format_registry.py tests/test_target_format_span_meta.py \
             tests/test_observability_pack.py --tb=short
       - name: pip-audit
-        run: pip-audit --strict || pip-audit
-        continue-on-error: true
+        run: pip-audit --strict
 
   # D: 保真度 + 安全默认值回归门禁（跌破即 fail）
   fidelity-gates:
@@ -45,8 +48,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: Install deps
@@ -55,8 +58,8 @@ jobs:
           pip install -e ".[dev]"
       - name: Fidelity / security / depth gates
         env:
-          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
-          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          ADUPORT_PRIVATE_SAMPLES_REQUIRED: "1"
         run: |
           pytest -q --tb=short \
             tests/test_ast_exporter_matrix.py \
@@ -90,6 +93,7 @@ jobs:
             tests/test_private_samples_optional.py \
             tests/test_v5_defect_closure.py \
             tests/test_v6_t1_t4_closure.py \
+            tests/test_audit_2026_09_fixes.py \
             tests/test_d24_d30_closure.py \
             tests/test_ab_contract.py \
             tests/test_sprint_illusion_ab_weasy.py \
@@ -104,7 +108,16 @@ jobs:
             tests/test_exporter_spans.py \
             tests/test_v11_features.py \
             tests/test_v8_bc_roadmap_gates.py \
-            tests/test_v8_bcd_depth_roadmap.py
+            tests/test_v8_bcd_depth_roadmap.py \
+            tests/test_fidelity_golden_v15.py \
+            tests/test_v15_features.py \
+            tests/test_v16_roundtrip_fidelity.py \
+            tests/test_v17_roundtrip_fidelity.py \
+            tests/test_recheck_v2_gates.py
+      - name: Format matrix check
+        env:
+          PYTHONPATH: .
+        run: python ../outputs/format_matrix.py --check
 
   # Optional customer acceptance corpus (defaults to in-repo sample_pack proxy)
   private-samples:
@@ -113,8 +126,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: Install deps
@@ -123,8 +136,8 @@ jobs:
           pip install -e ".[dev]"
       - name: Private / acceptance sample gate
         env:
-          MDBRIDGE_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
-          MDBRIDGE_PRIVATE_SAMPLES_REQUIRED: "1"
+          ADUPORT_PRIVATE_SAMPLES_DIR: ${{ github.workspace }}/backend/tests/fixtures/sample_pack
+          ADUPORT_PRIVATE_SAMPLES_REQUIRED: "1"
         run: |
           pytest -q --tb=short \
             tests/test_private_samples_optional.py \
@@ -137,8 +150,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -155,15 +168,15 @@ jobs:
   native-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87  # stable
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@5cb072d7354962be830356aa6b146f7612846014  # v2.7.5
         with:
           workspaces: native/anydoc -> native/anydoc/target
       - name: Create venv + install backend
@@ -177,15 +190,15 @@ jobs:
       - name: Cargo clippy (T26)
         working-directory: native/anydoc
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Build mdbridge_native
+      - name: Build aduport_native
         run: bash scripts/build_native.sh
       - name: Assert no firecrawl-anydoc
         run: |
           backend/.venv/bin/python - <<'PY'
           import importlib.util as u
           assert u.find_spec("anydoc") is None, "firecrawl-anydoc must not be installed"
-          import mdbridge_native._doc  # noqa: F401
-          print("OK mdbridge_native only")
+          import aduport_native._doc  # noqa: F401
+          print("OK aduport_native only")
           PY
       - name: Fixture tests (docx/rtf/…)
         working-directory: backend

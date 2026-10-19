@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from app.core.converter import SUPPORTED_TARGET_FORMATS
-from app.core.document_model import DocumentModel, Table, TableCell
-from app.core.registry import ensure_builtin_plugins, get_exporter
-from app.exporters.latex_exporter import export_latex
-from app.exporters.md_exporter import export_md
-from app.exporters.rtf_exporter import export_rtf
-from app.exporters.txt_exporter import export_txt
+from aduport.core.converter import SUPPORTED_TARGET_FORMATS
+from aduport.core.document_model import DocumentModel, Table, TableCell
+from aduport.core.registry import ensure_builtin_plugins, get_exporter
+from aduport.exporters.latex_exporter import export_latex
+from aduport.exporters.md_exporter import export_md
+from aduport.exporters.rtf_exporter import export_rtf
+from aduport.exporters.txt_exporter import export_txt
 
 
 def _span_table() -> Table:

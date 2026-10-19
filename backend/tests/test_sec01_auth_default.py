@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from main import app
+from aduport.config import settings
+from main import aduport
 
 
 def test_require_auth_blocks_anonymous(monkeypatch):
@@ -13,7 +13,7 @@ def test_require_auth_blocks_anonymous(monkeypatch):
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "api_keys", "")
     monkeypatch.setattr(settings, "basic_auth", "")
-    monkeypatch.delenv("MDBRIDGE_DEV_OK", raising=False)
+    monkeypatch.delenv("ADUPORT_DEV_OK", raising=False)
     c = TestClient(app)
     assert c.get("/api/health").status_code == 200
     r = c.post(
@@ -48,7 +48,7 @@ def test_dev_ok_allows_anonymous(monkeypatch):
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "api_keys", "")
     monkeypatch.setattr(settings, "basic_auth", "")
-    monkeypatch.setenv("MDBRIDGE_DEV_OK", "1")
+    monkeypatch.setenv("ADUPORT_DEV_OK", "1")
     c = TestClient(app)
     r = c.post(
         "/api/convert",
@@ -64,7 +64,7 @@ def test_dev_ok_ignored_without_debug(monkeypatch):
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "api_keys", "")
     monkeypatch.setattr(settings, "basic_auth", "")
-    monkeypatch.setenv("MDBRIDGE_DEV_OK", "1")
+    monkeypatch.setenv("ADUPORT_DEV_OK", "1")
     c = TestClient(app)
     r = c.post(
         "/api/convert",

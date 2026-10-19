@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Blockquote,
     CodeBlock,
     Heading,
@@ -16,8 +16,8 @@ from app.core.document_model import (
     Paragraph,
     Table,
 )
-from app.importers import anydoc_bridge as bridge
-from app.importers.anydoc_bridge import (
+from aduport.importers import anydoc_bridge as bridge
+from aduport.importers.anydoc_bridge import (
     _InlineBuilder,
     _convert_block,
     _convert_list,

@@ -2,26 +2,45 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import FormatSelect from './components/FormatSelect.vue'
 import FileUploader from './components/FileUploader.vue'
+import DocumentReader from './components/DocumentReader.vue'
+import OpsPanel from './components/OpsPanel.vue'
+import DocumentTools from './components/DocumentTools.vue'
+import TaskBoard from './components/TaskBoard.vue'
+import RagBrowser from './components/RagBrowser.vue'
+import FidelityMatrix from './components/FidelityMatrix.vue'
 import { message } from './toast'
 import {
   convertBatchZip,
   convertDocument,
+  convertDocumentSync,
+  createAuthSession,
   downloadServerJob,
   fetchFormats,
   fetchHealth,
+  fetchHealthDetail,
   fetchLicense,
   fetchMetricsPreview,
+  fetchTenants,
   fetchUsage,
   getApiKey,
   listServerJobs,
+  resumeServerJob,
+  reprocessServerJob,
   setApiKey,
+  subscribeJobEvents,
   type LicensePayload,
   type ServerJob,
+  type TenantPublic,
   type UsagePayload,
+  type HealthDetailPayload,
 } from './api'
-import type { ConvertJob, ConvertOptions, HistoryItem, SourceFormat, SourceFormatOption, TargetFormat } from './types'
-import { DEFAULT_CONVERT_OPTIONS, EXPORT_SHALLOW_FORMATS, SOURCE_FORMAT_ORDER, detectFormat, formatLabel } from './types'
+import type { ConvertJob, ConvertOptions, HistoryItem, JobStatusPayload, SourceFormat, SourceFormatOption, TargetFormat } from './types'
+import { DEFAULT_CONVERT_OPTIONS, EXPORT_SHALLOW_FORMATS, SOURCE_FORMAT_ORDER, TEXT_LEVEL_SOURCE_FORMATS, TEXT_MARKERS_TARGET_FORMATS, detectFormat, formatLabel } from './types'
 import { t, type Locale as UILocale } from './i18n'
+import { sanitizePreviewHtml } from './sanitize'
+import { compareTextFidelity, isTextComparableSource, readFileAsText, type FidelityTextCompare } from './fidelityDiff'
+import { diffMarkdown, reviewMarkdown, type AstDiff, type ReviewDiff } from './astDiff'
+import { parseRagElements } from './ragBrowse'
 
 const sourceFormats: SourceFormat[] = [...SOURCE_FORMAT_ORDER]
 const targetFormats: TargetFormat[] = [
@@ -29,21 +48,32 @@ const targetFormats: TargetFormat[] = [
   'azw3', 'kf8', 'latex', 'csv', 'odt', 'ods', 'odp', 'json', 'rag', 'xlsx', 'rtf',
 ]
 
-const locale = ref<UILocale>((localStorage.getItem('mdbridge-locale') as UILocale) || 'zh')
-const theme = ref<'dark' | 'light'>((localStorage.getItem('mdbridge-theme') as 'dark' | 'light') || 'dark')
+const locale = ref<UILocale>((localStorage.getItem('aduport-locale') as UILocale) || 'zh')
+const theme = ref<'dark' | 'light'>((localStorage.getItem('aduport-theme') as 'dark' | 'light') || 'dark')
 const activeTab = ref<'convert' | 'tasks' | 'ops'>('convert')
 const sourceFormat = ref<SourceFormatOption>('auto')
 const targetFormat = ref<TargetFormat>('md')
 const showAdvanced = ref(false)
 const convertOpts = ref<ConvertOptions>({ ...DEFAULT_CONVERT_OPTIONS })
 const jobs = ref<ConvertJob[]>([])
+let healthTimer = 0
 const converting = ref(false)
+const useSyncConvert = ref(false)
 const zipping = ref(false)
 const apiOnline = ref(false)
+const healthCaps = ref<HealthDetailPayload | null>(null)
 const previewText = ref('')
 const previewKind = ref<'md' | 'html'>('md')
+const previewReaderKind = ref<'pdf' | 'epub' | null>(null)
+const previewBlob = ref<Blob | null>(null)
 const previewTitle = ref('')
-const previewMode = ref<'md' | 'render'>('md')
+const previewMode = ref<'md' | 'render' | 'reader' | 'diff' | 'matrix'>('md')
+const fidelityNotes = ref<string[]>([])
+const fidelityStats = ref<{ sourceBytes: number; resultBytes: number; sourceName: string } | null>(null)
+const fidelityText = ref<FidelityTextCompare | null>(null)
+const fidelityAst = ref<AstDiff | null>(null)
+const fidelityReview = ref<ReviewDiff | null>(null)
+const tenants = ref<TenantPublic[]>([])
 const previewFullscreen = ref(false)
 const history = ref<HistoryItem[]>([])
 const serverJobs = ref<ServerJob[]>([])
@@ -58,16 +88,45 @@ const jobFilter = ref<'all' | 'active' | 'done' | 'error'>('all')
 const uploader = ref<{ openDirectory: () => void } | null>(null)
 /** Target formats that cannot be used as source (from GET /api/formats). */
 const exportOnlyFormats = ref<Set<string>>(new Set())
-/** Shallow export targets (ODS/ODP/KF) — honesty tags from API or local fallback. */
+/** Shallow export targets — honesty tags from API or local fallback. */
 const exportShallowFormats = ref<Set<string>>(new Set(EXPORT_SHALLOW_FORMATS))
+/** Targets that keep markers only, not layout (csv/txt). */
+const textMarkersTargetFormats = ref<Set<string>>(new Set(TEXT_MARKERS_TARGET_FORMATS))
+/** Source formats that are text-level / degraded fidelity (from API tiers). */
+const textLevelSourceFormats = ref<Set<string>>(new Set(TEXT_LEVEL_SOURCE_FORMATS))
+/** Targets whose structure loss is an accepted format limit (pdf/csv/txt/rtf). */
+const structureLimitTargets = ref<Set<string>>(new Set())
 let pollTimer: ReturnType<typeof setInterval> | null = null
+const jobEventSubs = new Map<string, { close: () => void }>()
 
-const HISTORY_KEY = 'mdbridge-history'
+const HISTORY_KEY = 'aduport-history'
 const tt = (key: Parameters<typeof t>[1]) => t(locale.value, key)
 
 const needsPdfOpts = computed(() => targetFormat.value === 'pdf')
 const needsDocxOpts = computed(() => targetFormat.value === 'docx')
-const needsAdvanced = computed(() => needsPdfOpts.value || needsDocxOpts.value)
+const needsRagOpts = computed(() => targetFormat.value === 'rag')
+const needsOcrOpts = computed(() => sourceFormat.value === 'pdf' || sourceFormat.value === 'auto')
+const capabilityTips = computed(() => {
+  const tips: string[] = []
+  const caps = healthCaps.value
+  if (!caps) return tips
+  const ocr = caps.capabilities?.ocr
+  if (ocr && !ocr.enabled) {
+    tips.push(tt('capOcrOff'))
+  } else if (ocr && ocr.enabled && ocr.ready === false) {
+    tips.push(tt('capOcrNotReady'))
+  }
+  if (caps.capabilities?.native_office && !caps.capabilities.native_office.enabled) {
+    tips.push(tt('capNativeOff'))
+  }
+  if (caps.pdf_export && caps.pdf_export.weasyprint_available === false) {
+    tips.push(tt('capWeasyOff'))
+  }
+  return tips
+})
+const needsAdvanced = computed(
+  () => needsPdfOpts.value || needsDocxOpts.value || needsRagOpts.value || needsOcrOpts.value,
+)
 
 function activeConvertOptions(): ConvertOptions | undefined {
   if (!needsAdvanced.value) return undefined
@@ -84,13 +143,27 @@ function activeConvertOptions(): ConvertOptions | undefined {
     out.pdf_toc = !!o.pdf_toc
   }
   if (needsDocxOpts.value && o.docx_theme) out.docx_theme = o.docx_theme
+  if (needsRagOpts.value) {
+    if (o.rag_max_chars != null) out.rag_max_chars = Number(o.rag_max_chars)
+    if (o.rag_chunk_overlap != null) out.rag_chunk_overlap = Number(o.rag_chunk_overlap)
+    out.embed = !!o.embed
+    if (o.embed_backend) out.embed_backend = o.embed_backend
+    out.vector_persist = !!o.vector_persist
+  }
+  if (needsOcrOpts.value) {
+    out.force_ocr = !!o.force_ocr
+    if (o.pdf_engine) out.pdf_engine = o.pdf_engine
+    if (o.ocr_engine) out.ocr_engine = o.ocr_engine
+    out.cache_bypass = !!o.cache_bypass
+    out.skip_pdf_sidecar = !!o.force_ocr || !!o.skip_pdf_sidecar
+  }
   return out
 }
 
 function applyTheme(next: 'dark' | 'light') {
   theme.value = next
   document.documentElement.setAttribute('data-theme', next)
-  localStorage.setItem('mdbridge-theme', next)
+  localStorage.setItem('aduport-theme', next)
 }
 
 onMounted(async () => {
@@ -102,6 +175,7 @@ onMounted(async () => {
   }
   apiOnline.value = await fetchHealth()
   if (!apiOnline.value) message.warning(tt('apiWarn'))
+  healthCaps.value = await fetchHealthDetail()
   const fmts = await fetchFormats()
   if (fmts?.export_only) {
     exportOnlyFormats.value = new Set(
@@ -112,17 +186,31 @@ onMounted(async () => {
   if (shallow?.length) {
     exportShallowFormats.value = new Set(shallow.map((x) => x.toLowerCase()))
   }
+  const markers = fmts?.fidelity_tiers?.text_markers
+  if (markers?.length) {
+    textMarkersTargetFormats.value = new Set(markers.map((x) => x.toLowerCase()))
+  }
+  const textLevel = fmts?.fidelity_tiers?.text_level
+  if (textLevel?.length) {
+    textLevelSourceFormats.value = new Set(textLevel.map((x) => x.toLowerCase()))
+  }
+  const limits = fmts?.structure_limits
+  if (limits && Object.keys(limits).length) {
+    structureLimitTargets.value = new Set(Object.keys(limits).map((x) => x.toLowerCase()))
+  }
   await refreshServerJobs()
   startPolling()
-  // keep online badge fresh (PDF/docling can make API look offline)
-  window.setInterval(() => {
+  healthTimer = window.setInterval(() => {
     void fetchHealth().then((ok) => {
       apiOnline.value = ok
     })
   }, 5000)
 })
 
-onUnmounted(() => stopPolling())
+onUnmounted(() => {
+  stopPolling()
+  if (healthTimer) window.clearInterval(healthTimer)
+})
 
 watch([activeTab, autoRefresh], () => {
   stopPolling()
@@ -136,19 +224,32 @@ watch(activeTab, (tab) => {
 async function refreshOps() {
   opsLoading.value = true
   try {
-    const [u, l, m] = await Promise.all([fetchUsage(), fetchLicense(), fetchMetricsPreview()])
+    const [u, l, m, tenantList] = await Promise.all([
+      fetchUsage(),
+      fetchLicense(),
+      fetchMetricsPreview(),
+      fetchTenants(),
+    ])
     usageInfo.value = u
     licenseInfo.value = l
     metricsPreview.value = m || ''
+    tenants.value = tenantList
   } finally {
     opsLoading.value = false
   }
 }
 
-function saveApiKey() {
+async function saveApiKey() {
   setApiKey(apiKeyDraft.value)
-  apiKeyDraft.value = getApiKey()
-  message.success(tt('apiKeySaved'))
+  try {
+    await createAuthSession(apiKeyDraft.value)
+    apiKeyDraft.value = ''
+    message.success(tt('apiKeySaved'))
+  } catch {
+    /* Auth disabled / session optional — keep draft for header fallback */
+    apiKeyDraft.value = getApiKey()
+    message.success(tt('apiKeySaved'))
+  }
   void checkApi()
   if (activeTab.value === 'ops') void refreshOps()
 }
@@ -157,11 +258,72 @@ async function checkApi() {
   apiOnline.value = await fetchHealth()
 }
 
+function upsertServerJob(payload: JobStatusPayload) {
+  const idx = serverJobs.value.findIndex((j) => j.id === payload.id)
+  const row: ServerJob = {
+    id: payload.id,
+    filename: payload.filename || (idx >= 0 ? serverJobs.value[idx].filename : ''),
+    source_format: payload.source_format || (idx >= 0 ? serverJobs.value[idx].source_format : ''),
+    target_format: payload.target_format || (idx >= 0 ? serverJobs.value[idx].target_format : ''),
+    status: payload.status,
+    progress: payload.progress ?? 0,
+    stage: payload.stage || (idx >= 0 ? serverJobs.value[idx].stage : ''),
+    error: payload.error,
+    code: payload.code,
+    result_filename: payload.result_filename,
+    created_at: payload.created_at ?? (idx >= 0 ? serverJobs.value[idx].created_at : Date.now() / 1000),
+    resumable: Boolean(payload.resumable),
+    reprocessable: Boolean(payload.reprocessable),
+  }
+  if (idx >= 0) serverJobs.value[idx] = { ...serverJobs.value[idx], ...row }
+  else serverJobs.value.unshift(row)
+}
+
+function syncJobEventSubscriptions() {
+  if (!autoRefresh.value || activeTab.value !== 'tasks') {
+    for (const sub of jobEventSubs.values()) sub.close()
+    jobEventSubs.clear()
+    return
+  }
+
+  const activeIds = new Set(
+    serverJobs.value
+      .filter((j) => j.status === 'queued' || j.status === 'running')
+      .map((j) => j.id),
+  )
+
+  for (const [id, sub] of jobEventSubs.entries()) {
+    if (!activeIds.has(id)) {
+      sub.close()
+      jobEventSubs.delete(id)
+    }
+  }
+
+  for (const job of serverJobs.value) {
+    if (!activeIds.has(job.id) || jobEventSubs.has(job.id)) continue
+    const sub = subscribeJobEvents(job.id, {
+      onProgress: (payload) => {
+        upsertServerJob(payload)
+        if (payload.status === 'done' || payload.status === 'error') {
+          sub.close()
+          jobEventSubs.delete(job.id)
+        }
+      },
+      onError: () => {
+        sub.close()
+        jobEventSubs.delete(job.id)
+      },
+    })
+    jobEventSubs.set(job.id, sub)
+  }
+}
+
 function startPolling() {
   if (!autoRefresh.value || activeTab.value !== 'tasks') return
+  void refreshServerJobs()
   pollTimer = setInterval(() => {
     void refreshServerJobs()
-  }, 2500)
+  }, 8000)
 }
 
 function stopPolling() {
@@ -169,6 +331,8 @@ function stopPolling() {
     clearInterval(pollTimer)
     pollTimer = null
   }
+  for (const sub of jobEventSubs.values()) sub.close()
+  jobEventSubs.clear()
 }
 
 const doneCount = computed(() => jobs.value.filter((j) => j.status === 'done').length)
@@ -181,29 +345,42 @@ const successRate = computed(() => {
   return `${((historyOkCount.value / history.value.length) * 100).toFixed(1)}%`
 })
 
-const filteredServerJobs = computed(() => {
-  const list = serverJobs.value
-  if (jobFilter.value === 'all') return list
-  if (jobFilter.value === 'active') {
-    return list.filter((j) => j.status === 'queued' || j.status === 'running')
-  }
-  if (jobFilter.value === 'done') return list.filter((j) => j.status === 'done')
-  return list.filter((j) => j.status === 'error')
-})
 
 const sourceOptions = computed(() => [
   { value: 'auto', label: formatLabel('auto', locale.value) },
-  ...sourceFormats.map((f) => ({ value: f, label: formatLabel(f, locale.value) })),
+  ...sourceFormats.map((f) => {
+    const textLevel = textLevelSourceFormats.value.has(f)
+    let label = formatLabel(f, locale.value)
+    if (textLevel) label = `${label} · ${tt('exportShallowTag')}`
+    return {
+      value: f,
+      label,
+      hint: textLevel ? tt('exportShallowHint') : undefined,
+    }
+  }),
 ])
 
 const targetOptions = computed(() =>
   targetFormats.map((f) => {
     const only = exportOnlyFormats.value.has(f)
     const shallow = exportShallowFormats.value.has(f)
+    const markers = textMarkersTargetFormats.value.has(f)
+    const limited = structureLimitTargets.value.has(f)
     let label = formatLabel(f, locale.value)
-    if (only) label = `${label} · ${tt('exportOnlyTag')}`
-    else if (f === 'csv') label = `${label} · ${tt('csvTableOnlyShort')}`
+    if (f === 'rag') label = `${label} · ${tt('exportOnlyTag')}`
+    else if (only) label = `${label} · ${tt('exportOnlyTag')}`
+    else if (markers) label = `${label} · ${tt('textMarkersTag')}`
+    else if (limited) label = `${label} · ${tt('structureLimitTag')}`
     else if (shallow) label = `${label} · ${tt('exportShallowTag')}`
+    const limitHint = !limited
+      ? undefined
+      : f === 'pdf'
+        ? tt('structureLimitPdf')
+        : f === 'txt'
+          ? tt('structureLimitTxt')
+          : f === 'rtf'
+            ? tt('structureLimitRtf')
+            : undefined
     return {
       value: f,
       label,
@@ -211,9 +388,13 @@ const targetOptions = computed(() =>
         ? tt('exportOnlyHint')
         : f === 'csv'
           ? tt('csvTableOnly')
-          : shallow
-            ? tt('exportShallowHint')
-            : undefined,
+          : markers
+            ? tt('textMarkersHint')
+            : limitHint
+              ? limitHint
+              : shallow
+                ? tt('exportShallowHint')
+                : undefined,
     }
   }),
 )
@@ -225,15 +406,29 @@ function extractPreviewBody(html: string): string {
 
 const renderedPreview = computed(() => {
   if (!previewText.value) return ''
-  if (previewKind.value === 'html') {
-    return extractPreviewBody(previewText.value)
-  }
-  return simpleMarkdown(previewText.value)
+  const raw =
+    previewKind.value === 'html'
+      ? extractPreviewBody(previewText.value)
+      : simpleMarkdown(previewText.value)
+  return sanitizePreviewHtml(raw)
+})
+
+const ragElements = computed(() => parseRagElements(previewText.value))
+
+/** Sandboxed iframe document — eliminates parent-document v-html injection surface. */
+const previewSrcdoc = computed(() => {
+  const body = renderedPreview.value
+  if (!body) return ''
+  const css =
+    'body{margin:0;padding:20px;font:14px/1.55 system-ui,sans-serif;color:#1a1a1a;word-break:break-word}' +
+    'h1,h2,h3{margin:.6em 0 .35em}code{font-family:ui-monospace,monospace;background:#f2f2f2;padding:1px 5px;border-radius:4px}' +
+    'pre{overflow:auto}img{max-width:100%}'
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${body}</body></html>`
 })
 
 function setLocale(next: UILocale) {
   locale.value = next
-  localStorage.setItem('mdbridge-locale', next)
+  localStorage.setItem('aduport-locale', next)
 }
 
 function toggleTheme() {
@@ -280,6 +475,10 @@ function enqueueFiles(files: File[], fromDir = false) {
   }
 }
 
+function onUploadReject(msg: string) {
+  message.warning(msg)
+}
+
 function onFilesSelected(files: File[]) {
   enqueueFiles(files, false)
 }
@@ -324,7 +523,14 @@ async function convertAll() {
       if (sourceFormat.value === 'auto') job.sourceFormat = 'auto'
       job.progress = 0
       try {
-        const result = await convertDocument(
+        const result = useSyncConvert.value
+          ? await convertDocumentSync(
+              job.file,
+              job.sourceFormat,
+              job.targetFormat,
+              activeConvertOptions(),
+            )
+          : await convertDocument(
           job.file,
           job.sourceFormat,
           job.targetFormat,
@@ -336,11 +542,66 @@ async function convertAll() {
         )
         job.result = result
         job.status = 'done'
+        if (result.exportWarnings?.length) {
+          fidelityNotes.value = [...result.exportWarnings]
+          message.warning(
+            locale.value === 'zh'
+              ? `转换完成，但有 ${result.exportWarnings.length} 条保真度提示：${result.exportWarnings[0]}`
+              : `Done with ${result.exportWarnings.length} fidelity note(s): ${result.exportWarnings[0]}`,
+          )
+        } else {
+          fidelityNotes.value = []
+        }
+        fidelityStats.value = {
+          sourceBytes: job.file.size,
+          resultBytes: result.blob.size,
+          sourceName: job.relativePath || job.file.name,
+        }
+        fidelityText.value = null
+        fidelityAst.value = null
+        fidelityReview.value = null
+        const srcFmt = String(job.sourceFormat || sourceFormat.value || '')
+        if (isTextComparableSource(job.file.name, srcFmt === 'auto' ? (detectFormat(job.file.name) || undefined) : srcFmt)) {
+          const srcText = await readFileAsText(job.file)
+          let resultText = result.preview || ''
+          if (!resultText && (job.targetFormat === 'md' || job.targetFormat === 'txt' || job.targetFormat === 'html')) {
+            try {
+              resultText = await result.blob.text()
+            } catch {
+              resultText = ''
+            }
+          }
+          if (srcText != null && resultText) {
+            fidelityText.value = compareTextFidelity(srcText, resultText)
+            fidelityAst.value = diffMarkdown(srcText, resultText)
+            fidelityReview.value = reviewMarkdown(srcText, resultText)
+          } else {
+            fidelityText.value = {
+              available: false,
+              reason: 'binary_or_empty',
+              approximateOnly: true,
+              sourceChars: 0,
+              resultChars: 0,
+              retentionPct: 0,
+              samples: [],
+            }
+          }
+        }
         if (result.preview) {
           previewText.value = result.preview
           previewTitle.value = result.filename
           previewKind.value = job.targetFormat === 'html' ? 'html' : 'md'
           if (job.targetFormat === 'html') previewMode.value = 'render'
+          else if (job.targetFormat === 'rag' || job.targetFormat === 'json') previewMode.value = 'md'
+        }
+        if (job.targetFormat === 'pdf' || job.targetFormat === 'epub') {
+          previewBlob.value = result.blob
+          previewReaderKind.value = job.targetFormat
+          previewTitle.value = result.filename
+          previewMode.value = 'reader'
+        } else {
+          previewReaderKind.value = null
+          previewBlob.value = null
         }
         pushHistory({
           id: job.id,
@@ -447,8 +708,10 @@ function removeJob(id: string) {
 async function refreshServerJobs() {
   try {
     serverJobs.value = await listServerJobs()
+    syncJobEventSubscriptions()
   } catch {
     serverJobs.value = []
+    syncJobEventSubscriptions()
   }
 }
 
@@ -457,6 +720,26 @@ async function onDownloadServerJob(job: ServerJob) {
     await downloadServerJob(job.id, job.result_filename || `converted.${job.target_format}`)
   } catch (err: unknown) {
     message.error(err instanceof Error ? err.message : tt('failed'))
+  }
+}
+
+async function onResumeServerJob(job: ServerJob) {
+  try {
+    await resumeServerJob(job.id)
+    message.success(tt('resumeOk'))
+    await refreshServerJobs()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : tt('resumeFail'))
+  }
+}
+
+async function onReprocessServerJob(job: ServerJob) {
+  try {
+    await reprocessServerJob(job.id)
+    message.success(tt('resumeOk'))
+    await refreshServerJobs()
+  } catch (err: unknown) {
+    message.error(err instanceof Error ? err.message : tt('resumeFail'))
   }
 }
 
@@ -633,6 +916,9 @@ function simpleMarkdown(src: string): string {
               <span class="md-p-sub">{{ tt('dragDrop') }}</span>
             </div>
             <div class="md-workspace">
+              <div v-if="capabilityTips.length" class="md-cap-tips" data-testid="cap-tips">
+                <p v-for="(tip, i) in capabilityTips" :key="i">{{ tip }}</p>
+              </div>
               <div class="md-fmt-grid">
                 <FormatSelect
                   v-model="sourceFormat"
@@ -709,16 +995,74 @@ function simpleMarkdown(src: string): string {
                       <option value="minimal">minimal</option>
                     </select>
                   </label>
+                  <template v-if="needsRagOpts">
+                    <label class="md-field">
+                      <span>{{ tt('ragMaxChars') }}</span>
+                      <input
+                        v-model.number="convertOpts.rag_max_chars"
+                        type="number"
+                        min="200"
+                        max="20000"
+                        step="100"
+                        data-testid="rag-max-chars"
+                      />
+                    </label>
+                    <label class="md-field">
+                      <span>{{ tt('ragChunkOverlap') }}</span>
+                      <input
+                        v-model.number="convertOpts.rag_chunk_overlap"
+                        type="number"
+                        min="0"
+                        max="4000"
+                        step="50"
+                        data-testid="rag-chunk-overlap"
+                      />
+                    </label>
+                    <label class="md-field md-field--check">
+                      <input v-model="convertOpts.embed" type="checkbox" data-testid="rag-embed" />
+                      <span>{{ tt('ragEmbed') }}</span>
+                    </label>
+                    <label v-if="convertOpts.embed" class="md-field md-field--check">
+                      <input v-model="convertOpts.vector_persist" type="checkbox" data-testid="rag-vector-persist" />
+                      <span>{{ tt('ragVectorPersist') }}</span>
+                    </label>
+                    <p class="md-adv__hint">{{ tt('ragOptsHint') }}</p>
+                  </template>
+                  <template v-if="needsOcrOpts">
+                    <label class="md-field md-field--check">
+                      <input v-model="convertOpts.force_ocr" type="checkbox" data-testid="force-ocr" />
+                      <span>{{ tt('forceOcr') }}</span>
+                    </label>
+                    <label class="md-field">
+                      <span>{{ tt('pdfEngine') }}</span>
+                      <select v-model="convertOpts.pdf_engine" data-testid="pdf-engine">
+                        <option value="">auto (config)</option>
+                        <option value="text">text</option>
+                        <option value="docling">docling</option>
+                        <option value="ocr">ocr</option>
+                        <option value="mineru">mineru</option>
+                        <option value="paddleocr_vl">paddleocr_vl</option>
+                      </select>
+                    </label>
+                    <label class="md-field md-field--check">
+                      <input v-model="convertOpts.cache_bypass" type="checkbox" data-testid="cache-bypass" />
+                      <span>{{ tt('cacheBypass') }}</span>
+                    </label>
+                    <p class="md-adv__hint">{{ tt('ocrOptsHint') }}</p>
+                  </template>
                 </div>
               </div>
 
               <FileUploader
                 ref="uploader"
                 :disabled="converting || zipping"
-                :text="tt('uploadText')"
+                :text-before="tt('uploadTextBefore')"
+                :text-emphasis="tt('uploadTextEmphasis')"
+                :text-after="tt('uploadTextAfter')"
                 :hint="tt('uploadHint')"
                 @files-selected="onFilesSelected"
                 @directory-selected="onDirectorySelected"
+                @reject="onUploadReject"
               />
 
               <div v-if="jobs.length" class="md-files">
@@ -753,8 +1097,12 @@ function simpleMarkdown(src: string): string {
                   @click="convertAll"
                 >                  <span v-if="converting" class="md-spin" />
                   <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" /></svg>
-                  {{ tt('start') }}
+                  {{ useSyncConvert ? tt('syncConvert') : tt('start') }}
                 </button>
+                <label class="md-check">
+                  <input v-model="useSyncConvert" type="checkbox" data-testid="chk-sync-convert" />
+                  {{ tt('syncConvert') }}
+                </label>
                 <button type="button" class="md-btn md-btn--g" :disabled="!jobs.length || zipping" @click="downloadZipBatch">
                   <span v-if="zipping" class="md-spin" />
                   <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8" /><path d="M1 3h22v5H1z" /><path d="M10 12h4" /></svg>
@@ -794,16 +1142,134 @@ function simpleMarkdown(src: string): string {
             <div class="md-pv-tabs">
               <button type="button" :class="{ on: previewMode === 'md' }" @click="previewMode = 'md'">{{ tt('previewMd') }}</button>
               <button type="button" :class="{ on: previewMode === 'render' }" @click="previewMode = 'render'">{{ tt('previewRender') }}</button>
+              <button
+                v-if="previewText"
+                type="button"
+                data-testid="tab-fidelity-matrix"
+                :class="{ on: previewMode === 'matrix' }"
+                @click="previewMode = 'matrix'"
+              >
+                {{ tt('fidelityMatrix') }}
+              </button>
+              <button
+                v-if="fidelityNotes.length || fidelityStats || fidelityText"
+                type="button"
+                data-testid="tab-fidelity-diff"
+                :class="{ on: previewMode === 'diff' }"
+                @click="previewMode = 'diff'"
+              >
+                {{ tt('fidelityDiff') }}
+              </button>
+              <button
+                v-if="previewReaderKind"
+                type="button"
+                :class="{ on: previewMode === 'reader' }"
+                @click="previewMode = 'reader'"
+              >
+                {{ previewReaderKind === 'pdf' ? 'PDF' : 'EPUB' }}
+              </button>
             </div>
             <div class="md-pv-body">
-              <div v-if="!previewText" class="md-pv-empty">
+              <div v-if="!previewText && !previewReaderKind && previewMode !== 'diff'" class="md-pv-empty">
                 <div class="frame">
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h16v18H4z" /><path d="M8 9h3M8 13h3M13 9h3M8 17h8" /></svg>
                 </div>
                 <p>{{ tt('previewEmpty') }}</p>
               </div>
-              <pre v-else-if="previewMode === 'md'" class="md-pv-doc">{{ previewText }}</pre>
-              <div v-else class="md-pv-render" v-html="renderedPreview" />
+              <pre v-else-if="previewMode === 'md' && !ragElements.length" class="md-pv-doc">{{ previewText }}</pre>
+              <RagBrowser
+                v-else-if="previewMode === 'md'"
+                :tt="tt"
+                :elements="ragElements"
+              />
+              <DocumentReader
+                v-else-if="previewMode === 'reader'"
+                :blob="previewBlob"
+                :kind="previewReaderKind"
+                :title="previewTitle"
+              />
+              <div v-else-if="previewMode === 'diff'" class="md-pv-diff" data-testid="fidelity-diff-panel">
+                <div v-if="fidelityStats" class="md-pv-diff__stats">
+                  <div><b>{{ tt('fidelitySource') }}</b>：{{ fidelityStats.sourceName }} · {{ formatBytes(fidelityStats.sourceBytes) }}</div>
+                  <div><b>{{ tt('fidelityResult') }}</b>：{{ previewTitle || '—' }} · {{ formatBytes(fidelityStats.resultBytes) }}</div>
+                </div>
+                <div
+                  v-if="fidelityText?.available"
+                  class="md-pv-diff__text"
+                  data-testid="fidelity-text-compare"
+                >
+                  <div class="md-pv-diff__retention">
+                    <b>{{ tt('fidelityRetention') }}</b>：
+                    <span data-testid="fidelity-retention-pct">{{ fidelityText.retentionPct }}%</span>
+                    <span class="md-pv-diff__chars">
+                      （{{ tt('fidelitySource') }} {{ fidelityText.sourceChars }}
+                      → {{ tt('fidelityResult') }} {{ fidelityText.resultChars }} {{ tt('fidelityChars') }}）
+                    </span>
+                  </div>
+                  <p class="md-pv-diff__hint">{{ tt('fidelityTextHint') }}</p>
+                  <div v-if="fidelityAst" class="md-pv-diff__text" data-testid="fidelity-ast-diff">
+                    <div class="md-pv-diff__retention">
+                      <b>{{ tt('fidelityAst') }}</b>：
+                      {{ fidelityAst.equal ? tt('fidelityAstEqual') : fidelityAst.changes.map((c) => c.op).join(', ') }}
+                    </div>
+                    <p class="md-pv-diff__hint">{{ tt('fidelityAstHint') }}</p>
+                    <ul v-if="fidelityAst.changes.length" class="md-pv-diff__list">
+                      <li v-for="(change, i) in fidelityAst.changes" :key="`ast-${i}`">
+                        <span class="md-pv-diff__miss">{{ change.op }}</span>
+                        {{ change.path }}
+                      </li>
+                    </ul>
+                  </div>
+                  <div v-if="fidelityReview" class="md-pv-diff__text" data-testid="fidelity-review">
+                    <div class="md-pv-diff__retention">
+                      <b>{{ tt('fidelityReview') }}</b>：
+                      {{
+                        fidelityReview.added.length || fidelityReview.removed.length
+                          ? `+${fidelityReview.added.length} / -${fidelityReview.removed.length}`
+                          : tt('fidelityReviewEqual')
+                      }}
+                    </div>
+                    <p class="md-pv-diff__hint">{{ tt('fidelityReviewHint') }}</p>
+                    <ul v-if="fidelityReview.added.length || fidelityReview.removed.length" class="md-pv-diff__list">
+                      <li v-for="(note, i) in fidelityReview.added" :key="`rev-add-${i}`">
+                        <span class="md-pv-diff__miss">+</span>
+                        {{ note.kind }} · {{ note.author }} · {{ note.text }}
+                      </li>
+                      <li v-for="(note, i) in fidelityReview.removed" :key="`rev-del-${i}`">
+                        <span class="md-pv-diff__miss">-</span>
+                        {{ note.kind }} · {{ note.author }} · {{ note.text }}
+                      </li>
+                    </ul>
+                  </div>
+                  <ul v-if="fidelityText.samples.length" class="md-pv-diff__list">
+                    <li v-for="(line, i) in fidelityText.samples" :key="`s-${i}`">
+                      <span class="md-pv-diff__miss">{{ tt('fidelityMissingLine') }}</span> {{ line }}
+                    </li>
+                  </ul>
+                </div>
+                <p v-else-if="fidelityText && !fidelityText.available" class="md-pv-diff__empty">
+                  {{ tt('fidelityTextSkip') }}
+                </p>
+                <ul v-if="fidelityNotes.length" class="md-pv-diff__list">
+                  <li v-for="(note, i) in fidelityNotes" :key="i">{{ note }}</li>
+                </ul>
+                <p v-else-if="!fidelityText?.available && !fidelityNotes.length" class="md-pv-diff__empty">
+                  {{ tt('fidelityDiffEmpty') }}
+                </p>
+              </div>
+              <FidelityMatrix
+                v-else-if="previewMode === 'matrix'"
+                :tt="tt"
+                :text="previewText"
+              />
+              <iframe
+                v-else
+                class="md-pv-render md-pv-frame"
+                title="preview"
+                sandbox=""
+                referrerpolicy="no-referrer"
+                :srcdoc="previewSrcdoc"
+              />
             </div>
           </section>
         </div>
@@ -866,134 +1332,40 @@ function simpleMarkdown(src: string): string {
         </div>
       </template>
 
-      <section v-else-if="activeTab === 'ops'" class="md-panel">
-        <div class="md-p-head">
-          <div class="md-p-title"><span class="k" />{{ tt('opsTitle') }}</div>
-          <button type="button" class="md-btn md-btn--g" :disabled="opsLoading" @click="refreshOps">
-            {{ opsLoading ? tt('opsLoading') : tt('refreshJobs') }}
-          </button>
-        </div>
-        <p class="md-p-sub" style="margin:0 0 14px">{{ tt('opsHint') }}</p>
-        <div class="md-adv" style="margin-bottom:14px">
-          <div class="md-field" style="flex:1;min-width:240px">
-            <span>{{ tt('apiKeyLabel') }}</span>
-            <input
-              v-model="apiKeyDraft"
-              type="password"
-              class="md-input"
-              data-testid="api-key-input"
-              autocomplete="off"
-              :placeholder="tt('apiKeyPh')"
-              @keyup.enter="saveApiKey"
-            >
-          </div>
-          <button type="button" class="md-btn md-btn--p" data-testid="api-key-save" style="align-self:flex-end" @click="saveApiKey">
-            {{ tt('apiKeySave') }}
-          </button>
-        </div>
-        <p class="md-p-sub" style="margin:0 0 14px;font-size:12px;opacity:.8">{{ tt('apiKeyHint') }}</p>
-        <div class="md-stat-row" style="margin-bottom:16px">
-          <div class="md-stat">
-            <b class="blue">{{ usageInfo?.conversions_today ?? '—' }}</b>
-            <span>{{ tt('opsToday') }}</span>
-          </div>
-          <div class="md-stat">
-            <b class="green">{{ usageInfo?.conversions_total ?? '—' }}</b>
-            <span>{{ tt('opsTotal') }}</span>
-          </div>
-          <div class="md-stat">
-            <b class="gray">{{ usageInfo?.conversions_failed ?? '—' }}</b>
-            <span>{{ tt('opsFailed') }}</span>
-          </div>
-        </div>
-        <div class="md-adv" style="margin-bottom:14px">
-          <div class="md-field">
-            <span>{{ tt('opsTenant') }}</span>
-            <code class="mono">{{ usageInfo?.tenant_id || '—' }}</code>
-          </div>
-          <div class="md-field">
-            <span>{{ tt('opsLicense') }}</span>
-            <code class="mono">
-              {{
-                licenseInfo
-                  ? (licenseInfo.required ? tt('opsLicenseRequired') : tt('opsLicenseOpen'))
-                    + (licenseInfo.license ? ` · ${JSON.stringify(licenseInfo.license).slice(0, 120)}` : '')
-                  : '—'
-              }}
-            </code>
-          </div>
-        </div>
-        <div class="md-p-title" style="margin-bottom:8px">{{ tt('opsMetrics') }}</div>
-        <pre class="md-metrics-pre">{{ metricsPreview || tt('opsMetricsEmpty') }}</pre>
-      </section>
+      <div v-else-if="activeTab === 'ops'" class="md-ops-stack">
+        <OpsPanel
+          :tt="tt"
+          :ops-loading="opsLoading"
+          :api-key-draft="apiKeyDraft"
+          :usage-info="usageInfo"
+          :license-info="licenseInfo"
+          :metrics-preview="metricsPreview"
+          :tenants="tenants"
+          @update:api-key-draft="apiKeyDraft = $event"
+          @save="saveApiKey"
+          @refresh="refreshOps"
+        />
+        <DocumentTools :tt="tt" />
+      </div>
 
-      <section v-else class="md-panel">
-        <div class="md-p-head">
-          <div class="md-p-title"><span class="k" />{{ tt('serverJobs') }}</div>
-        </div>
-        <div class="md-tasks-toolbar">
-          <label class="md-check">
-            <input v-model="autoRefresh" type="checkbox" />
-            {{ tt('autoRefresh') }}
-          </label>
-          <div class="md-seg">
-            <button type="button" :class="{ active: jobFilter === 'all' }" @click="jobFilter = 'all'">{{ tt('filterAll') }}</button>
-            <button type="button" :class="{ active: jobFilter === 'active' }" @click="jobFilter = 'active'">{{ tt('filterActive') }}</button>
-            <button type="button" :class="{ active: jobFilter === 'done' }" @click="jobFilter = 'done'">{{ tt('filterDone') }}</button>
-            <button type="button" :class="{ active: jobFilter === 'error' }" @click="jobFilter = 'error'">{{ tt('filterError') }}</button>
-          </div>
-          <button type="button" class="md-btn md-btn--g" @click="refreshServerJobs">{{ tt('refreshJobs') }}</button>
-        </div>
-        <div v-if="!filteredServerJobs.length" class="md-empty-pad">{{ tt('serverJobsEmpty') }}</div>
-        <div v-else class="md-table-wrap">
-          <table class="md-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>File</th>
-                <th>Route</th>
-                <th>Status</th>
-                <th>{{ tt('progress') }}</th>
-                <th>{{ tt('createdAt') }}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in filteredServerJobs" :key="row.id">
-                <td class="mono">{{ row.id.slice(0, 8) }}</td>
-                <td class="mono">{{ row.filename }}</td>
-                <td>{{ row.source_format }} → {{ row.target_format }}</td>
-                <td>
-                  <span
-                    class="md-st"
-                    :class="{
-                      wait: row.status === 'queued',
-                      run: row.status === 'running',
-                      ready: row.status === 'done',
-                      bad: row.status === 'error',
-                    }"
-                  >{{ row.status }}</span>
-                </td>
-                <td>
-                  <div class="md-bar" style="flex:none;width:90px">
-                    <i :style="{ width: `${Math.round((row.progress || 0) * 100)}%` }" />
-                  </div>
-                </td>
-                <td>{{ formatTime(row.created_at) }}</td>
-                <td>
-                  <button v-if="row.status === 'done'" type="button" class="md-link" @click="onDownloadServerJob(row)">
-                    {{ tt('download') }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <TaskBoard
+        v-else
+        :tt="tt"
+        :jobs="serverJobs"
+        :filter="jobFilter"
+        :auto-refresh="autoRefresh"
+        :format-time="formatTime"
+        @update:filter="jobFilter = $event"
+        @update:auto-refresh="autoRefresh = $event"
+        @refresh="refreshServerJobs"
+        @download="onDownloadServerJob"
+        @reprocess="onReprocessServerJob"
+        @resume="onResumeServerJob"
+      />
     </main>
 
     <footer class="md-foot">
-      <div class="md-foot-l"><b>md-bridge</b> · MIT License · {{ tt('footerPrivacy') }}</div>
+      <div class="md-foot-l"><b>AduPort</b> · Apache-2.0 · {{ tt('footerPrivacy') }}</div>
       <div class="md-trust">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5l8-3Z" />

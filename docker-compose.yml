@@ -5,7 +5,7 @@ services:
       dockerfile: backend/Dockerfile
       args:
         INSTALL_NATIVE: "${INSTALL_NATIVE:-1}"
-    container_name: md-bridge-backend
+    container_name: aduport-backend
     # Bind to loopback only — do not expose on LAN by default
     ports:
       - "127.0.0.1:8000:8000"
@@ -14,21 +14,38 @@ services:
       - .env
     environment:
       - TZ=Asia/Shanghai
-      - MDBRIDGE_JOB_DB_PATH=/data/jobs.sqlite3
-      - MDBRIDGE_AUDIT_LOG_PATH=/data/logs/audit.jsonl
+      - ADUPORT_JOB_DB_PATH=/data/jobs.sqlite3
+      - ADUPORT_AUDIT_LOG_PATH=/data/logs/audit.jsonl
     volumes:
-      - mdbridge-data:/data
+      - aduport-data:/data
+    # v13 P2-3: container hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Writable data volume; tmpfs for scratch
+    tmpfs:
+      - /tmp:size=64m,mode=1777
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: md-bridge-frontend
+    container_name: aduport-frontend
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8081:8080"
     depends_on:
       - backend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /var/cache/nginx:size=16m,mode=1777
+      - /var/run:size=8m,mode=1777
 
 volumes:
-  mdbridge-data:
+  aduport-data:

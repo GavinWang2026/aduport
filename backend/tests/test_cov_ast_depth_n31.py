@@ -5,16 +5,16 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.core.document_model import (
+from aduport.core.document_model import (
     Chart,
     DocumentModel,
     Footnote,
     Paragraph,
 )
-from app.exporters.docx_exporter import export_docx
-from app.exporters.pptx_exporter import export_pptx
-from app.importers.docx_ooxml import enrich_docx_model
-from app.importers.docx_text import try_extract_docx_model
+from aduport.exporters.docx_exporter import export_docx
+from aduport.exporters.pptx_exporter import export_pptx
+from aduport.importers.docx_ooxml import enrich_docx_model
+from aduport.importers.docx_text import try_extract_docx_model
 
 
 def test_docx_embeds_drawingml_chart_and_roundtrips():

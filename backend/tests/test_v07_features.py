@@ -5,15 +5,15 @@ from __future__ import annotations
 import zipfile
 from io import BytesIO
 
-from app.config import settings
-from app.core.converter import SUPPORTED_TARGET_FORMATS, convert
-from app.core.document_model import DocumentModel, Heading, Image, Paragraph
-from app.core.safe_fetch import is_safe_url
-from app.core.spill import SpillBuffer
-from app.exporters.epub_exporter import export_epub
-from app.exporters.html_exporter import export_html
-from app.exporters.pdf_exporter import _normalize_page_size, _render_html
-from app.exporters.txt_exporter import export_txt
+from aduport.config import settings
+from aduport.core.converter import SUPPORTED_TARGET_FORMATS, convert
+from aduport.core.document_model import DocumentModel, Heading, Image, Paragraph
+from aduport.core.safe_fetch import is_safe_url
+from aduport.core.spill import SpillBuffer
+from aduport.exporters.epub_exporter import export_epub
+from aduport.exporters.html_exporter import export_html
+from aduport.exporters.pdf_exporter import _normalize_page_size, _render_html
+from aduport.exporters.txt_exporter import export_txt
 
 
 def test_target_formats_expanded():
@@ -96,7 +96,7 @@ def test_remote_image_placeholder_without_fetch(monkeypatch):
     model = DocumentModel(
         nodes=[Image(data=b"", alt_text="pic|https://example.com/a.png", mime_type="image/png")]
     )
-    from app.core.remote_images import resolve_remote_images
+    from aduport.core.remote_images import resolve_remote_images
 
     out = resolve_remote_images(model)
     assert out.nodes[0].data == b""

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.core.document_model import CodeBlock, Heading, Image, ListItem, Paragraph, Table
-from app.importers import _docling_utils as du
+from aduport.core.document_model import CodeBlock, Heading, Image, ListItem, Paragraph, Table
+from aduport.importers import _docling_utils as du
 
 
 class _FakeImg:

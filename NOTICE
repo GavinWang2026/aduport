@@ -1,0 +1,21 @@
+AduPort
+Copyright 2026 Gavin Wang & HYHT Company
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software developed as part of the anydoc project
+(https://github.com/firecrawl/anydoc), vendored under native/anydoc/ and
+distributed under the MIT License:
+
+    Copyright (c) 2026 Sideguide Technologies Inc.
+
+The anydoc tree is kept under its original MIT terms and is not relicensed by
+this project. See native/anydoc/LICENSE for the full text.
+
+Third-party dependencies and their licenses are listed in
+THIRD_PARTY_NOTICES.md.
+
+"AduPort" and "阿渡港" are names of this project. The Apache License, Version
+2.0, Section 6 does not grant permission to use these names, logos, or product
+names except as required for reasonable and customary use in describing the
+origin of the work.

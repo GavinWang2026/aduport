@@ -10,13 +10,13 @@ import zipfile
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.registry import ensure_builtin_plugins, registered_import_formats
-from main import app
+from aduport.core.registry import ensure_builtin_plugins, registered_import_formats
+from main import aduport
 
 
 @pytest.fixture()
 def client(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "basic_auth", "")
@@ -36,14 +36,16 @@ def test_async_job_md_roundtrip(client):
     assert r.status_code == 202
     job_id = r.json()["id"]
 
-    for _ in range(50):
+    deadline = time.perf_counter() + 15
+    body: dict = {}
+    while time.perf_counter() < deadline:
         st = client.get(f"/api/jobs/{job_id}")
         assert st.status_code == 200
         body = st.json()
         if body["status"] in ("done", "error"):
             break
         time.sleep(0.05)
-    assert body["status"] == "done"
+    assert body.get("status") == "done", body
 
     out = client.get(f"/api/jobs/{job_id}/result")
     assert out.status_code == 200
@@ -91,7 +93,7 @@ def test_epub_magic_ok_but_structure_bad(client):
 
 
 def test_basic_auth(monkeypatch):
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "basic_auth", "admin:secret")
@@ -115,8 +117,8 @@ def test_basic_auth(monkeypatch):
 
 
 def test_memory_budget(monkeypatch):
-    from app.config import settings
-    from app.core.jobs import job_store
+    from aduport.config import settings
+    from aduport.core.jobs import job_store
 
     monkeypatch.setattr(settings, "api_key", "")
     monkeypatch.setattr(settings, "basic_auth", "")

@@ -652,6 +652,15 @@ impl<'a> Parser<'a> {
             match token {
                 Token::Open => {
                     self.flush_pending();
+                    if self.stack.len() >= crate::package::limits::MAX_RTF_GROUP_DEPTH {
+                        return Err(ConvertError::ResourceLimit {
+                            limit: "max_rtf_group_depth",
+                            detail: format!(
+                                "RTF group nesting exceeds {}",
+                                crate::package::limits::MAX_RTF_GROUP_DEPTH
+                            ),
+                        });
+                    }
                     self.stack.push(self.state);
                     if self.state.capture == Capture::Math
                         && let Some(math) = &mut self.dest.math

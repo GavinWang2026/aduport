@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.converter import convert
+from aduport.core.converter import convert
 
 _PACK = Path(__file__).resolve().parent / "fixtures" / "sample_pack"
 _MANIFEST = json.loads((_PACK / "manifest.json").read_text(encoding="utf-8"))

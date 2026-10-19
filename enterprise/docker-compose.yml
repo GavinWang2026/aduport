@@ -12,8 +12,8 @@ services:
         INSTALL_OCR: "${INSTALL_OCR:-1}"
         # Set "0" to skip Hub bake when mirrors/Xet fail; mount models at runtime instead
         BAKE_DOCLING_MODELS: "${BAKE_DOCLING_MODELS:-1}"
-    image: md-bridge-backend:enterprise
-    container_name: md-bridge-backend
+    image: aduport-backend:enterprise
+    container_name: aduport-backend
     ports:
       - "127.0.0.1:8000:8000"
     restart: unless-stopped
@@ -21,43 +21,58 @@ services:
       - .env
     environment:
       TZ: Asia/Shanghai
-      MDBRIDGE_DOCLING_OFFLINE: "true"
-      MDBRIDGE_OCR_ENABLED: "${MDBRIDGE_OCR_ENABLED:-true}"
-      MDBRIDGE_JOB_DB_PATH: /data/jobs.sqlite3
-      MDBRIDGE_AUDIT_LOG_PATH: /data/logs/audit.jsonl
-      MDBRIDGE_VIRUS_SCAN_FAIL_CLOSED: "true"
+      ADUPORT_DOCLING_OFFLINE: "true"
+      ADUPORT_OCR_ENABLED: "${ADUPORT_OCR_ENABLED:-true}"
+      ADUPORT_JOB_DB_PATH: /data/jobs.sqlite3
+      ADUPORT_AUDIT_LOG_PATH: /data/logs/audit.jsonl
+      ADUPORT_VIRUS_SCAN_FAIL_CLOSED: "true"
     volumes:
-      - mdbridge-data:/data
+      - aduport-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m,mode=1777
 
   frontend:
     build:
       context: ../frontend
       dockerfile: Dockerfile
-    image: md-bridge-frontend:enterprise
-    container_name: md-bridge-frontend
+    image: aduport-frontend:enterprise
+    container_name: aduport-frontend
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - backend
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+      - /var/cache/nginx:size=16m,mode=1777
+      - /var/run:size=8m,mode=1777
 
   prometheus:
     profiles: ["observability"]
     image: prom/prometheus:v2.54.1
-    container_name: md-bridge-prometheus
+    container_name: aduport-prometheus
     restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../docs/ops/prometheus/alert_rules.yml:/etc/prometheus/rules/mdbridge.yml:ro
+      - ../docs/ops/prometheus/alert_rules.yml:/etc/prometheus/rules/aduport.yml:ro
     depends_on:
       - backend
 
   alertmanager:
     profiles: ["observability"]
     image: prom/alertmanager:v0.27.0
-    container_name: md-bridge-alertmanager
+    container_name: aduport-alertmanager
     restart: unless-stopped
     ports:
       - "127.0.0.1:9093:9093"
@@ -65,4 +80,4 @@ services:
       - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
 
 volumes:
-  mdbridge-data:
+  aduport-data:

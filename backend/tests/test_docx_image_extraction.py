@@ -12,9 +12,9 @@ from io import BytesIO
 from docx import Document
 from docx.shared import Inches
 
-from app.core.document_model import Image
-from app.exporters.md_exporter import export_md
-from app.importers.docx_importer import import_docx
+from aduport.core.document_model import Image
+from aduport.exporters.md_exporter import export_md
+from aduport.importers.docx_importer import import_docx
 
 _PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -59,11 +59,11 @@ def test_docx_pure_image_paragraph_not_swallowed():
 
 def test_docx_image_survives_md_html_docx_targets():
     """P0 upgrade: images must reach major targets, not only AST."""
-    from app.core.converter import convert
-    from app.core.document_model import Image
-    from app.exporters.docx_exporter import export_docx
-    from app.exporters.html_exporter import export_html
-    from app.importers.docx_importer import import_docx
+    from aduport.core.converter import convert
+    from aduport.core.document_model import Image
+    from aduport.exporters.docx_exporter import export_docx
+    from aduport.exporters.html_exporter import export_html
+    from aduport.importers.docx_importer import import_docx
 
     raw = _docx_with_images()
     model = import_docx(raw, filename="multi.docx")
@@ -92,7 +92,7 @@ def _docx_with_table_image() -> bytes:
 
 
 def test_docx_table_cell_image_extracted():
-    from app.core.document_model import Table
+    from aduport.core.document_model import Table
 
     model = import_docx(_docx_with_table_image(), filename="tbl-img.docx")
     tables = [n for n in model.nodes if isinstance(n, Table)]
@@ -101,7 +101,7 @@ def test_docx_table_cell_image_extracted():
     assert len(cell_imgs) >= 1, "表内 w:tc drawing 应进入 TableCell.images"
     assert all(len(i.data) > 0 for i in cell_imgs)
 
-    from app.core.converter import convert
+    from aduport.core.converter import convert
 
     md = convert(
         _docx_with_table_image(), "docx", "md", filename="tbl-img.docx", skip_magic=True

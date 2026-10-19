@@ -7,14 +7,14 @@ import zipfile
 
 import pytest
 
-from app.core.converter import convert
-from app.core.document_model import DocumentModel, Paragraph, Table
-from app.core.exceptions import CorruptedFileError, InvalidDocumentError, OcrUnavailableError
-from app.exporters.txt_exporter import export_txt
-from app.importers import ocr_engine as oe
-from app.importers.doc_importer import import_doc
-from app.importers.ole_office import import_ppt, import_xls, import_xlsb, import_pps, import_pot
-from app.importers.txt_importer import import_txt
+from aduport.core.converter import convert
+from aduport.core.document_model import DocumentModel, Paragraph, Table
+from aduport.core.exceptions import CorruptedFileError, InvalidDocumentError, OcrUnavailableError
+from aduport.exporters.txt_exporter import export_txt
+from aduport.importers import ocr_engine as oe
+from aduport.importers.doc_importer import import_doc
+from aduport.importers.ole_office import import_pot, import_pps, import_ppt, import_xls, import_xlsb
+from aduport.importers.txt_importer import import_txt
 from tests._ole_fixtures import build_cfb_with_stream, build_minimal_ppt, build_minimal_xls
 
 
@@ -28,9 +28,14 @@ def test_txt_import_utf8_and_roundtrip():
     assert b"SENT_TXT_COLD" in back
 
 
-def test_txt_import_rejects_non_utf8():
-    with pytest.raises(InvalidDocumentError, match="UTF-8"):
-        import_txt("你好".encode("gbk"), "bad.txt")
+def test_txt_import_rejects_undecodable_bytes():
+    with pytest.raises(InvalidDocumentError, match="GB18030"):
+        import_txt(b"\xff\xfe\x00\x00\xff", "bad.txt")
+
+
+def test_txt_import_accepts_gb18030():
+    model = import_txt("你好".encode("gbk"), "cn.txt")
+    assert "你好" in model.nodes[0].plain_text()
 
 
 def test_ole_xls_structured_cold_path():
@@ -91,7 +96,7 @@ def test_ocr_no_available_engine_raises(monkeypatch):
 def test_doc_importer_ole_text_fallback(monkeypatch):
     # Force docling path to fail so OLE text scrape is exercised.
     monkeypatch.setattr(
-        "app.importers._docling_converter.get_office_converter",
+        "aduport.importers._docling_converter.get_office_converter",
         lambda: (_ for _ in ()).throw(ImportError("no docling")),
         raising=False,
     )
@@ -110,7 +115,7 @@ def test_doc_importer_ole_text_fallback(monkeypatch):
 
 def test_doc_importer_empty_ole_raises(monkeypatch):
     monkeypatch.setattr(
-        "app.importers.doc_importer._ole_extract_text",
+        "aduport.importers.doc_importer._ole_extract_text",
         lambda _data: "   ",
     )
     blob = build_cfb_with_stream("WordDocument", b"\x00" * 64)
@@ -142,7 +147,7 @@ def test_xlsb_mislabeled_xlsx_and_true_bin_gate(monkeypatch):
     with zipfile.ZipFile(true_bin, "w") as zf:
         zf.writestr("xl/workbook.bin", b"\x00BIN")
     monkeypatch.setattr(
-        "app.importers.anydoc_bridge.should_handle",
+        "aduport.importers.anydoc_bridge.should_handle",
         lambda _fmt: False,
         raising=False,
     )

@@ -1,7 +1,7 @@
 # The wheel version: pyproject.toml reads `version` from here (maturin's
 # dynamic version), so bump it together with the workspace release version.
 [package]
-name = "mdbridge-native"
+name = "aduport-native"
 version = "0.2.4"
 edition = "2024"
 description = "Python bindings for anydoc"

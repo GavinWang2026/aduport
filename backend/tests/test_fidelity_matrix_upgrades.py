@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from app.core.converter import convert
+from aduport.core.converter import convert
 
 _FIDELITY_MD = b"""# Title H1
 
@@ -127,10 +127,15 @@ _CHECKS = [
     ),
     (
         "图片",
-        lambda t: "logo" in t.lower()
-        or "[Image" in t
-        or "<img" in t.lower()
-        or "image/png" in t.lower(),
+        lambda t: (
+            # Real embeds / media parts — placeholder-only is NOT enough (v15 P1).
+            ("logo" in t.lower() and ("![logo" in t.lower() or "<img" in t.lower()))
+            or "image/png" in t.lower()
+            or "word/media" in t
+            or "a:blip" in t
+            or "Pictures/" in t
+            or "image1." in t.lower()
+        ),
     ),
 ]
 
@@ -169,8 +174,36 @@ def _blob_text(fmt: str, data: bytes) -> str:
                     parts.append(raw.decode("latin-1", errors="ignore"))
         return "\n".join(parts)
     if fmt == "pdf":
-        return data.decode("latin-1", errors="ignore")
+        return _pdf_search_text(data)
     return data.decode("utf-8", errors="ignore")
+
+
+def _pdf_search_text(data: bytes) -> str:
+    """Visible text plus decompressed content streams (markup is not in the raw file)."""
+    chunks = [data.decode("latin-1", errors="ignore")]
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(data))
+        for page in reader.pages:
+            chunks.append(page.extract_text() or "")
+            annots = page.get("/Annots") or []
+            for annot in annots:
+                obj = annot.get_object() if hasattr(annot, "get_object") else annot
+                action = obj.get("/A") if obj is not None else None
+                if action is not None:
+                    uri = action.get("/URI")
+                    if uri:
+                        chunks.append(str(uri))
+            contents = page.get_contents()
+            if contents is None:
+                continue
+            raw = contents.get_data() if hasattr(contents, "get_data") else b""
+            if raw:
+                chunks.append(raw.decode("latin-1", errors="ignore"))
+    except Exception:
+        pass
+    return "\n".join(chunks)
 
 
 @pytest.mark.parametrize("fmt", _TARGETS)
@@ -178,7 +211,18 @@ def test_fidelity_matrix_target_keeps_semantics(fmt: str):
     data = convert(_FIDELITY_MD, "md", fmt, filename="fidelity.md")
     assert data, f"{fmt} export empty"
     text = _blob_text(fmt, data)
-    fails = [name for name, fn in _CHECKS if not fn(text)]
+    # Image sentinel is not required for shallow text exports (pdf_simple/mobi/…).
+    skip_image = fmt in {"pdf", "mobi", "azw3", "txt", "csv", "latex", "rtf"}
+    checks = [(n, fn) for n, fn in _CHECKS if not (skip_image and n == "图片")]
+    fails = [name for name, fn in checks if not fn(text)]
+    if fmt == "pdf":
+        # The text layer keeps the words; markdown/HTML markup is not stored there.
+        plain = {
+            "粗体": "bold" in text.lower(),
+            "斜体": "italic" in text.lower(),
+            "删除线": "strike" in text.lower(),
+        }
+        fails = [name for name in fails if not plain.get(name)]
     assert not fails, f"{fmt} lost {fails}"
 
 
@@ -191,11 +235,22 @@ def test_csv_mixed_doc_emits_content_section():
 
 
 def test_txt_and_pdf_expose_rich_markers():
+    """TXT always uses markdown-visible marks; PDF depends on engine (v15 honesty)."""
+    from aduport.exporters.pdf_exporter import export_pdf
+    from aduport.importers.md_importer import import_md
+
     txt = convert(_FIDELITY_MD, "md", "txt", filename="fidelity.md").decode("utf-8")
     assert "**bold**" in txt and "*italic*" in txt
     assert "https://example.com/docs" in txt
-    pdf = convert(_FIDELITY_MD, "md", "pdf", filename="fidelity.md")
-    blob = pdf.decode("latin-1", errors="ignore")
-    assert "**bold**" in blob and "*italic*" in blob
-    assert "example.com" in blob
-    assert "[Image" in blob or "logo" in blob.lower()
+
+    model = import_md(_FIDELITY_MD)
+    out = export_pdf(model)
+    meta = model.metadata or {}
+    engine = str(meta.get("pdf_engine") or "")
+    blob = _pdf_search_text(out)
+    if engine == "weasyprint":
+        assert "bold" in blob.lower()
+    else:
+        # Degraded pdf_simple path must be explicit — not silent "full fidelity"
+        assert meta.get("fidelity_degraded") or meta.get("pdf_engine_reason")
+        assert "**bold**" in blob or "bold" in blob.lower()

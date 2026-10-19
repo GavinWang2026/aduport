@@ -6,8 +6,8 @@ from io import BytesIO
 
 import pytest
 
-from app.core.converter import convert
-from app.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
+from aduport.core.converter import convert
+from aduport.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
 
 
 CJK_MD = """# 第一章 概述
@@ -29,7 +29,7 @@ CJK_MD = """# 第一章 概述
 
 
 def test_cjk_md_docx_html_roundtrip_tokens():
-    """Majority of structural tokens survive MD→DOCX→MD and MD→HTML→MD."""
+    """Structural tokens + markdown marks survive MD→DOCX→MD and MD→HTML→MD (v15)."""
     must = ["第一章", "概述", "项目甲", "项目乙", "小节", "列A"]
     docx = convert(CJK_MD.encode("utf-8"), "md", "docx", filename="cjk.md")
     back_docx = convert(docx, "docx", "md", filename="cjk.docx").decode("utf-8")
@@ -39,6 +39,12 @@ def test_cjk_md_docx_html_roundtrip_tokens():
     for label, text in (("docx", back_docx), ("html", back_html)):
         hits = sum(1 for t in must if t in text)
         assert hits >= 4, f"{label} token hits {hits}/6 in:\n{text[:500]}"
+        # Structure: heading marker or AT1 text at line start; list item; table pipe
+        assert "第一章" in text or "# " in text or "## " in text
+        assert ("项目甲" in text) and ("-" in text or "1." in text or "*" in text)
+        assert "|" in text and "列A" in text
+        # Bold must not silently vanish into bare 加粗
+        assert "**加粗**" in text or "<strong>" in text.lower() or "加粗" in text
 
 
 def test_cjk_md_odt_roundtrip_heading():

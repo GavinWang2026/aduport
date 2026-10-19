@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.importers.pdf_font_fix import normalize_pdf_text
-from app.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
-from app.importers.pdf_importer import _is_hub_network_error
+from aduport.importers.pdf_font_fix import normalize_pdf_text
+from aduport.importers.pdf_text_fallback import extract_pdf_text_model, pdf_text_char_count
+from aduport.importers.pdf_importer import _is_hub_network_error
 
 
 MIN_PDF = b"""%PDF-1.4
@@ -45,7 +45,7 @@ def test_pdf_text_fallback_extracts():
 
 
 def test_cjk_join_no_spaces():
-    from app.importers.pdf_text_fallback import _join_wrapped_lines, _page_to_paragraphs
+    from aduport.importers.pdf_text_fallback import _join_wrapped_lines, _page_to_paragraphs
 
     assert _join_wrapped_lines(["你好", "世界"]) == "你好世界"
     paras = _page_to_paragraphs("第一行内容\n续行内容\n\n下一段")

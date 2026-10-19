@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start md-bridge API (sets Homebrew library path for WeasyPrint on macOS)
+# Start AduPort API (sets Homebrew library path for WeasyPrint on macOS)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
@@ -17,8 +17,8 @@ elif [[ -d /usr/local/lib ]]; then
 fi
 
 # Hugging Face mirror for docling model downloads (override with empty to use official)
-if [[ -n "${MDBRIDGE_HF_ENDPOINT:-}" ]]; then
-  export HF_ENDPOINT="${MDBRIDGE_HF_ENDPOINT}"
+if [[ -n "${ADUPORT_HF_ENDPOINT:-}" ]]; then
+  export HF_ENDPOINT="${ADUPORT_HF_ENDPOINT}"
 elif [[ -z "${HF_ENDPOINT:-}" ]]; then
   # Default China-friendly mirror; set HF_ENDPOINT=https://huggingface.co to force official
   export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
@@ -27,15 +27,15 @@ fi
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 # Opt-in only: --reload + PDFium SIGTRAP can leave a half-dead worker while the
-# parent still answers /health ("在线" but converts crash). Use MDBRIDGE_RELOAD=1 for DIY.
+# parent still answers /health ("在线" but converts crash). Use ADUPORT_RELOAD=1 for DIY.
 EXTRA_ARGS=()
-if [[ "${MDBRIDGE_RELOAD:-0}" == "1" ]]; then
+if [[ "${ADUPORT_RELOAD:-0}" == "1" ]]; then
   EXTRA_ARGS+=(--reload)
 fi
 # Trust reverse-proxy X-Forwarded-For for rate-limit / audit IP (P1 #22)
-if [[ "${MDBRIDGE_PROXY_HEADERS:-1}" == "1" ]]; then
+if [[ "${ADUPORT_PROXY_HEADERS:-1}" == "1" ]]; then
   EXTRA_ARGS+=(--proxy-headers)
-  EXTRA_ARGS+=(--forwarded-allow-ips="${MDBRIDGE_TRUSTED_PROXY_CIDR:-127.0.0.1,::1}")
+  EXTRA_ARGS+=(--forwarded-allow-ips="${ADUPORT_TRUSTED_PROXY_CIDR:-127.0.0.1,::1}")
 fi
 
 exec uvicorn main:app --host "$HOST" --port "$PORT" "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}" "$@"

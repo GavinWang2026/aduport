@@ -7,9 +7,9 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import settings
-from app.core.jobs import Job
-from main import app
+from aduport.config import settings
+from aduport.core.jobs import Job
+from main import aduport
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ def test_job_endpoints_require_token(monkeypatch, client):
 
 def test_health_ready_native_gate(monkeypatch, client):
     monkeypatch.setattr(settings, "native_required", True)
-    import app.importers.anydoc_bridge as ab
+    import aduport.importers.anydoc_bridge as ab
 
     monkeypatch.setattr(ab, "anydoc_available", lambda: False)
     r = client.get("/api/health/ready")

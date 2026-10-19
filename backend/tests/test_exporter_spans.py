@@ -5,8 +5,8 @@ from __future__ import annotations
 import io
 import zipfile
 
-from app.core.document_model import DocumentModel, Heading, Paragraph, Table, TableCell, TextBox
-from app.exporters import docx_exporter, html_render, md_exporter, odt_exporter, pptx_exporter, rtf_exporter
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, Table, TableCell, TextBox
+from aduport.exporters import docx_exporter, html_render, md_exporter, odt_exporter, pptx_exporter, rtf_exporter
 
 
 def _col_span_table() -> Table:
@@ -67,7 +67,7 @@ def test_html_header_rows():
 
 def test_html_span_respects_first_row_header_off(monkeypatch):
     """v8 P1: origin_* alone must not force spans path past header switch."""
-    from app.config import settings
+    from aduport.config import settings
 
     monkeypatch.setattr(settings, "table_first_row_header", False)
     # Plain cells that only carry origin self-coords (md import illusion)
@@ -153,7 +153,7 @@ def test_md_row_span_native_html():
 
 
 def test_md_span_import_roundtrip():
-    from app.importers.md_importer import import_md
+    from aduport.importers.md_importer import import_md
 
     raw = md_exporter.export_md(DocumentModel(nodes=[_col_span_table()])).encode()
     model = import_md(raw)
@@ -204,7 +204,7 @@ def test_pptx_row_span_merge():
 
 
 def test_latex_col_span():
-    from app.exporters.latex_exporter import export_latex
+    from aduport.exporters.latex_exporter import export_latex
 
     out = export_latex(DocumentModel(nodes=[_col_span_table()]))
     assert r"\multicolumn{2}" in out
@@ -212,15 +212,15 @@ def test_latex_col_span():
 
 
 def test_latex_row_span():
-    from app.exporters.latex_exporter import export_latex
+    from aduport.exporters.latex_exporter import export_latex
 
     out = export_latex(DocumentModel(nodes=[_row_span_table()]))
     assert r"\multirow{2}" in out
 
 
 def test_latex_col_span_import_roundtrip():
-    from app.exporters.latex_exporter import export_latex
-    from app.importers.latex_importer import import_latex
+    from aduport.exporters.latex_exporter import export_latex
+    from aduport.importers.latex_importer import import_latex
 
     raw = export_latex(DocumentModel(nodes=[_col_span_table()]))
     model = import_latex(raw.encode(), "span.tex")
@@ -231,8 +231,8 @@ def test_latex_col_span_import_roundtrip():
 
 
 def test_latex_row_span_import_roundtrip():
-    from app.exporters.latex_exporter import export_latex
-    from app.importers.latex_importer import import_latex
+    from aduport.exporters.latex_exporter import export_latex
+    from aduport.importers.latex_importer import import_latex
 
     raw = export_latex(DocumentModel(nodes=[_row_span_table()]))
     model = import_latex(raw.encode(), "span.tex")
@@ -248,7 +248,7 @@ def test_latex_row_span_import_roundtrip():
 
 
 def test_txt_col_span_native_html():
-    from app.exporters.txt_exporter import export_txt
+    from aduport.exporters.txt_exporter import export_txt
 
     out = export_txt(DocumentModel(nodes=[_col_span_table()]))
     assert 'colspan="2"' in out
@@ -268,7 +268,7 @@ def test_rtf_col_span_native():
 
 
 def test_rtf_col_span_import_roundtrip():
-    from app.importers.rtf_importer import import_rtf
+    from aduport.importers.rtf_importer import import_rtf
 
     raw = rtf_exporter.export_rtf(DocumentModel(nodes=[_col_span_table()]))
     model = import_rtf(raw, "span.rtf")
@@ -286,7 +286,7 @@ def test_rtf_col_span_import_roundtrip():
 
 
 def test_pptx_meta_nodes_not_duplicated_in_content():
-    from app.core.document_model import Comment, Footnote
+    from aduport.core.document_model import Comment, Footnote
 
     model = DocumentModel(
         title="Meta",

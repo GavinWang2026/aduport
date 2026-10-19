@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from app.core.document_model import DocumentModel, Heading, Paragraph, Table
-from app.core.registry import ensure_builtin_plugins, get_exporter, registered_export_formats
-from app.exporters.rtf_exporter import export_rtf
-from app.exporters.xlsx_exporter import export_xlsx, import_xlsx
-from app.importers.rtf_importer import import_rtf
+from aduport.core.document_model import DocumentModel, Heading, Paragraph, Table
+from aduport.core.registry import ensure_builtin_plugins, get_exporter, registered_export_formats
+from aduport.exporters.rtf_exporter import export_rtf
+from aduport.exporters.xlsx_exporter import export_xlsx, import_xlsx
+from aduport.importers.rtf_importer import import_rtf
 
 
 def test_registry_includes_rtf_xlsx_odt():

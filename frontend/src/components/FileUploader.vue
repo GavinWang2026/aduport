@@ -1,20 +1,47 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   disabled?: boolean
+  /** @deprecated prefer textBefore / textEmphasis / textAfter (no v-html) */
   text?: string
+  textBefore?: string
+  textEmphasis?: string
+  textAfter?: string
   hint?: string
-}>()
+  maxBytes?: number
+}>(), {
+  textBefore: '',
+  textEmphasis: '',
+  textAfter: '',
+  maxBytes: 100 * 1024 * 1024,
+})
 
 const emit = defineEmits<{
   filesSelected: [files: File[]]
   directorySelected: [files: File[]]
+  reject: [message: string]
 }>()
 
 const dragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const dirInput = ref<HTMLInputElement | null>(null)
+
+function filterFiles(files: File[]): File[] {
+  const ok: File[] = []
+  for (const file of files) {
+    if (!file.size) {
+      emit('reject', `空文件已跳过：${file.name}`)
+      continue
+    }
+    if (file.size > props.maxBytes) {
+      emit('reject', `文件过大（>${Math.round(props.maxBytes / (1024 * 1024))}MB）：${file.name}`)
+      continue
+    }
+    ok.push(file)
+  }
+  return ok
+}
 
 function openFiles() {
   fileInput.value?.click()
@@ -26,14 +53,14 @@ function openDirectory() {
 
 function onFileChange(e: Event) {
   const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
+  const files = filterFiles(Array.from(input.files ?? []))
   if (files.length) emit('filesSelected', files)
   input.value = ''
 }
 
 function onDirectoryChange(e: Event) {
   const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
+  const files = filterFiles(Array.from(input.files ?? []))
   if (files.length) emit('directorySelected', files)
   input.value = ''
 }
@@ -56,7 +83,7 @@ function onDragLeave(e: DragEvent) {
 function onDrop(e: DragEvent) {
   e.preventDefault()
   dragging.value = false
-  const files = Array.from(e.dataTransfer?.files ?? [])
+  const files = filterFiles(Array.from(e.dataTransfer?.files ?? []))
   if (files.length) emit('filesSelected', files)
 }
 
@@ -84,7 +111,11 @@ defineExpose({ openDirectory })
           <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
         </svg>
       </div>
-      <p class="md-drop__title" v-html="text" />
+      <p class="md-drop__title">
+        <slot>
+          {{ textBefore }}<strong>{{ textEmphasis }}</strong>{{ textAfter }}
+        </slot>
+      </p>
       <p class="md-drop__hint">{{ hint }}</p>
       <div class="md-chips">
         <span class="md-chip">PDF</span>

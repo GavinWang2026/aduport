@@ -1,18 +1,18 @@
-# md-bridge
+# AduPort
 
 Local bidirectional document converter (PDF / DOCX / Markdown / ODT / …).
 
 ## Install
 
 ```bash
-pip install md-bridge
+pip install aduport
 # optional heavy deps:
-pip install 'md-bridge[office]'    # docling for DOCX/PDF/PPTX rich import
-pip install 'md-bridge[images]'    # Pillow image compress
-pip install 'md-bridge[all]'
+pip install 'aduport[office]'    # docling for DOCX/PDF/PPTX rich import
+pip install 'aduport[images]'    # Pillow image compress
+pip install 'aduport[all]'
 ```
 
-### High-fidelity Office import (anydoc / `mdbridge_native`)
+### High-fidelity Office import (anydoc / `aduport_native`)
 
 The PyPI wheel is **Python-only** and does **not** ship the Rust extension.
 Enterprise / Docker images compile it in multi-stage builds (`INSTALL_NATIVE=1`).
@@ -29,15 +29,15 @@ Without the extension, anydoc-only formats (`xlsb`, `ods`, binary `ppt`, …) ra
 ## CLI
 
 ```bash
-mdbridge convert input.md -t docx -o out.docx
-mdbridge batch ./in ./out -f md -t html
-mdbridge serve   # FastAPI on :8000
+aduport convert input.md -t docx -o out.docx
+aduport batch ./in ./out -f md -t html
+aduport serve   # FastAPI on :8000
 ```
 
 ## Python SDK
 
 ```python
-from app.core.converter import convert
+from aduport.core.converter import convert
 
 out = convert(open("a.md", "rb").read(), "md", "docx")
 ```

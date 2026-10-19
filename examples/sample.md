@@ -1,4 +1,4 @@
-# md-bridge 示例文档
+# AduPort 示例文档
 
 这是一个 **Markdown** 示例，用于测试转换功能。
 
@@ -11,7 +11,7 @@
 ## 代码示例
 
 ```python
-from app.core.converter import convert
+from aduport.core.converter import convert
 
 result = convert(b"# Hello", "md", "docx")
 ```
