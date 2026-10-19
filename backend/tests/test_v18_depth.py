@@ -15,7 +15,7 @@ from aduport.core.converter import convert
 from aduport.core.exceptions import EmptyFileError, InvalidDocumentError
 from aduport.exporters.export_warnings import get_last_export_warnings
 from aduport.sdk import capabilities
-from main import aduport
+from main import app
 
 _PNG = bytes.fromhex(
     "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
@@ -141,7 +141,7 @@ def test_capabilities_report_pdf_engine():
 def test_cli_and_mcp_expose_ops_surfaces():
     from typer.testing import CliRunner
 
-    from aduport.cli import aduport as cli
+    from aduport.cli import app as cli
 
     help_text = CliRunner().invoke(cli, ["--help"]).stdout
     for name in ("jobs", "fidelity", "vectors", "rag-feedback", "usage", "watch"):

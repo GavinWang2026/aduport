@@ -19,7 +19,7 @@ from aduport.core.converter import convert
 from aduport.core.document_model import CodeBlock, Comment, DocumentModel, Heading, Paragraph, Revision
 from aduport.core.pdf_pages import extract_pages, merge_pdfs, page_count, rotate_pdf, split_pdf
 from aduport.core.redact import redact_text, watermark_text
-from main import aduport
+from main import app
 
 
 def _pdf(width: float, height: float) -> bytes:

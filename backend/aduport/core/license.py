@@ -130,6 +130,10 @@ _WEAK_SECRET_SHA256 = frozenset(
         "e2186dbdb1bb4193608605e84f33208765b5693b55edd4f730a719a100eeea6f",
         "aa2f65175ec7f11be8d9ddc895547f06226660c485c85c410c3424de6f9db394",
         "c10d4ea28ff52d55ed9d438cf0a85d87881897501178ee8a863501f12b3b78d0",
+        # 改名后的同名占位符：md-bridge → AduPort / aduport。三份都要在表内，
+        # 否则改名本身就把黑名单绕过去了（曾实测：测试红、占位符可用作签发密钥）。
+        "bb262850854567858a9b8910160f073da6f229555989b63b36f14a159efaa8ed",  # AduPort-...
+        "ecac84e32c05ad58019370f6fa34ccf6e49df0d49db10cae7a23f54e4db8aafe",  # aduport-...
     }
 )
 
@@ -138,7 +142,11 @@ def _secret_is_weak(raw: str) -> bool:
     text = (raw or "").strip()
     if len(text) < 16:
         return True
-    return _secret_digest(text) in _WEAK_SECRET_SHA256
+    if _secret_digest(text) in _WEAK_SECRET_SHA256:
+        return True
+    # 结构判据兜底：精确摘要表挡不住“下次再改名”或客户手填的变体。
+    lowered = text.lower()
+    return "change-me" in lowered or "changeme" in lowered or "placeholder" in lowered
 
 
 def _signing_secret() -> bytes:

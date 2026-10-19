@@ -103,7 +103,7 @@ def test_b3_ocr_unavailable_dict_flags():
 def test_b4_health_exposes_pdf_export(client=None):
     from fastapi.testclient import TestClient
 
-    from main import aduport
+    from main import app
 
     with TestClient(app) as tc:
         r = tc.get("/api/health/detail")

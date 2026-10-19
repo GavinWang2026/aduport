@@ -23,7 +23,7 @@ _MAX_MEMBERS = 64
 def import_zip(source_bytes: bytes, filename: str = "archive.zip") -> DocumentModel:
     """Import a ZIP by converting each supported member into one document.
 
-    Uses :mod:`app.core.safe_zip` budgets. Nested ZIPs are skipped. Unsupported
+    Uses :mod:`aduport.core.safe_zip` budgets. Nested ZIPs are skipped. Unsupported
     members are noted as paragraphs rather than failing the whole archive.
     """
     try:

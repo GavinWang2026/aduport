@@ -82,7 +82,7 @@ def test_fast_markdown_still_raises_other_bridge_errors(monkeypatch):
 def test_doctor_does_not_call_disabled_ocr_ready(monkeypatch):
     from typer.testing import CliRunner
 
-    from aduport.cli import aduport
+    from aduport.cli import app
 
     monkeypatch.setattr("aduport.config.settings.ocr_enabled", False)
     monkeypatch.setattr("aduport.config.settings.license_required", False)

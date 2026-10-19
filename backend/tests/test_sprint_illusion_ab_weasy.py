@@ -140,7 +140,7 @@ def test_ab_roundtrip_over_stream_threshold(ab_benchmark):
 def test_health_exposes_illusion_and_weasy_flags():
     from fastapi.testclient import TestClient
 
-    from main import aduport
+    from main import app
 
     client = TestClient(app)
     r = client.get("/api/health/detail")

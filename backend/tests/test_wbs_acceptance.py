@@ -17,7 +17,7 @@ from aduport.exporters.docx_exporter import export_docx
 from aduport.exporters.md_exporter import export_md
 from aduport.exporters.pdf_exporter import _render_html
 from aduport.importers.md_importer import import_md
-from main import aduport
+from main import app
 
 
 def test_md_to_docx_preserves_table_and_bold():

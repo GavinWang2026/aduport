@@ -30,7 +30,7 @@ from aduport.core.exceptions import ERROR_CODES
 from aduport.core.registry import get_exporter, get_importer
 from aduport.exporters.html_render import _pdf_markdown_appendix
 from aduport.exporters.rag_elements import export_rag_elements
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

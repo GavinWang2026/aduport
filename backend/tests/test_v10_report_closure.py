@@ -12,7 +12,7 @@ from aduport.core.license import _signing_secret
 from aduport.core.metrics import metrics
 from aduport.core.safe_fetch import fetch_bytes
 from aduport.core.stream_convert import _html_head
-from main import aduport
+from main import app
 
 
 @pytest.fixture()
@@ -50,7 +50,7 @@ def test_vectors_search_rejects_bad_top_k(client):
 def test_doctor_cli_runs(monkeypatch):
     from typer.testing import CliRunner
 
-    from aduport.cli import aduport
+    from aduport.cli import app
 
     monkeypatch.setattr("aduport.config.settings.ocr_enabled", False)
     monkeypatch.setattr("aduport.config.settings.license_required", False)

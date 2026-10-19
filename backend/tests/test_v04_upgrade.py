@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from aduport.core.registry import ensure_builtin_plugins, registered_import_formats
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

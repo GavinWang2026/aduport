@@ -58,7 +58,7 @@ out = convert(open("in.docx", "rb").read(), "docx", "md", filename="in.docx")
 
 ## 插件边界
 
-- 注册：`register_importer` / `register_exporter`（`app.core.registry`）
+- 注册：`register_importer` / `register_exporter`（`aduport.core.registry`）
 - 自定义导入：返回 `DocumentModel`；自定义导出：接收 `DocumentModel` → `bytes`
 - anydoc 快通道（目标=md）可跳过 AST；模型通道仍会映射到 `DocumentModel`
 

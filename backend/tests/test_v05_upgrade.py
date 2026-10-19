@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from aduport.core.registry import ensure_builtin_plugins, registered_import_formats
 from aduport.core.virus_scan import VirusDetectedError, scan_bytes
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

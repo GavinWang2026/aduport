@@ -16,7 +16,7 @@ from aduport.importers.docx_ooxml import enrich_docx_model
 from aduport.importers.html_importer import import_html
 from aduport.importers.md_importer import import_md
 from aduport.importers.pdf_font_fix import normalize_pdf_text
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

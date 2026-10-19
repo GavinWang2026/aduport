@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from aduport.config import settings
 from aduport.core.exceptions import ERROR_CODES
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

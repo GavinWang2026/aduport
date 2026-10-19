@@ -149,7 +149,7 @@ aduport license-check -k "<token>"
 
 ## 7. 批量 / 脚本化签发（可选）
 
-多客户批量签发用 Python 脚本（复用 `app.core.license.issue_license`）：
+多客户批量签发用 Python 脚本（复用 `aduport.core.license.issue_license`）：
 
 ```python
 import os

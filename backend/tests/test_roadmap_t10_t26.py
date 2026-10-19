@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from aduport.config import settings
 from aduport.core.document_model import DocumentModel, Paragraph, RichText
 from aduport.core.jobs import Job, JobStatus, job_store
-from main import aduport
+from main import app
 
 _ROOT = Path(__file__).resolve().parents[2]
 

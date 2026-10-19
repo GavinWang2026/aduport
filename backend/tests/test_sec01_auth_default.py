@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from aduport.config import settings
-from main import aduport
+from main import app
 
 
 def test_require_auth_blocks_anonymous(monkeypatch):

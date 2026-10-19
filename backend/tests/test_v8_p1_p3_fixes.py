@@ -14,7 +14,7 @@ from aduport.exporters.html_render import _render_table_html
 from aduport.exporters.md_exporter import export_md
 from aduport.exporters.pdf_exporter import export_pdf
 from aduport.importers.docx_text import try_extract_docx_model
-from main import aduport
+from main import app
 
 ROOT = Path(__file__).resolve().parents[2]
 

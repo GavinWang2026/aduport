@@ -35,7 +35,7 @@ cd backend && python -m aduport.cli convert report.docx -t md -o report.md
 
 ## HTTP API
 
-With the API running (`uvicorn app.main:app` or Docker Compose):
+With the API running (`uvicorn main:app` from `backend/`, or Docker Compose):
 
 ```bash
 curl -sS -F "file=@report.docx" -F "target_format=md" \

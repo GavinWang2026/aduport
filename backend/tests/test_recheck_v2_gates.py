@@ -61,7 +61,7 @@ def test_mineru_probe_imports_the_pipeline(monkeypatch):
 def test_doctor_enabled_ocr_is_not_ready_when_probe_fails(monkeypatch):
     from typer.testing import CliRunner
 
-    from aduport.cli import aduport
+    from aduport.cli import app
 
     monkeypatch.setattr(settings, "ocr_enabled", True)
     monkeypatch.setattr(settings, "license_required", False)

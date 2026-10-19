@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from aduport.config import settings
 from aduport.core.tenants import clear_tenant_cache
-from main import aduport
+from main import app
 
 _PACK = Path(__file__).resolve().parent / "fixtures" / "sample_pack"
 

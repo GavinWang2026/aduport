@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from typer.testing import CliRunner
 
-from aduport.cli import aduport as cli_app
+from aduport.cli import app as cli_app
 from aduport.config import settings
 from aduport.core.converter import convert
 from aduport.core.css_sanitize import prefer_subsettable_cjk
@@ -18,7 +18,7 @@ from aduport.core.document_model import DocumentModel, Heading, Paragraph, Table
 from aduport.core.registry import ensure_builtin_plugins, get_importer
 from aduport.exporters.csv_exporter import export_csv
 from aduport.exporters.pdf_exporter import export_pdf
-from main import aduport
+from main import app
 
 ROOT = Path(__file__).resolve().parents[2]
 

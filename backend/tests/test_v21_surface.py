@@ -19,7 +19,7 @@ from aduport.core.exceptions import AduPortError
 from aduport.core.jobs import Job, JobStatus, JobStore
 from aduport.exporters.pdf_exporter import export_pdf
 from aduport.importers.pdf_text_fallback import _join_wrapped_lines, _page_to_paragraphs
-from main import aduport
+from main import app
 
 
 @pytest.fixture()
@@ -280,6 +280,10 @@ def test_worker_deadline_fires_without_polling(monkeypatch):
 
     store = JobStore()
     monkeypatch.setattr(settings, "convert_timeout_seconds", 1)
+    # 这条用例测的是「进程内线程 + 墙钟截止」这条路径。默认 convert_isolate=True 时
+    # 截止由 convert_isolated 自己负责，本用例已把 convert_isolated 换成会挂住的桩，
+    # 于是永远等不到超时（曾实测：job.code 恒为 None）。必须显式关掉 isolate。
+    monkeypatch.setattr(settings, "convert_isolate", False)
     started = threading.Event()
     release = threading.Event()
 

@@ -562,7 +562,9 @@ def _add_content_slide(prs: Presentation, title: str, nodes: list) -> None:
             continue
 
         if isinstance(node, ListItem):
-            plain_lines = _node_lines(node, marker=False)
+            # 任务项必须带上勾选状态：body placeholder 里的项目符号是版式自带的，
+            # 只写纯文本会把 “已完成/未完成” 这个语义整段丢掉（曾实测丢 [x]）。
+            plain_lines = _node_lines(node, marker=node.checked is not None)
             if plain_lines and _append_body_placeholder(
                 slide, plain_lines[0][0], plain_lines[0][1]
             ):

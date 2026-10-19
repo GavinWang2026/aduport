@@ -15,7 +15,7 @@ from aduport.core.exceptions import FileTooLargeError, MemoryBudgetError
 from aduport.core.jobs import job_store
 from aduport.core.license import LicenseInfo
 from aduport.core.safe_zip import ZipInflateBudget, read_zip_member
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

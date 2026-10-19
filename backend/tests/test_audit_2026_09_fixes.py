@@ -393,7 +393,7 @@ class TestSecondPassFixes:
 
     def test_health_status_omits_jobs(self, monkeypatch):
         from fastapi.testclient import TestClient
-        from main import aduport
+        from main import app
 
         monkeypatch.setattr("aduport.config.settings.require_auth", False)
         client = TestClient(app)

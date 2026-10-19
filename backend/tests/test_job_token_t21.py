@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from aduport.config import settings
 from aduport.core.jobs import Job
-from main import aduport
+from main import app
 
 
 @pytest.fixture

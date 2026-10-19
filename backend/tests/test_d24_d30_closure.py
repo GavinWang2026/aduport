@@ -27,7 +27,7 @@ from aduport.importers.md_importer import (
     _parse_blockquote,
     import_md,
 )
-from main import aduport
+from main import app
 
 
 class _SlowUpload:

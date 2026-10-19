@@ -115,7 +115,7 @@ def test_stream_all_chunks_fail_raises(monkeypatch):
 
 def test_formats_notes_xlsb_requires_anydoc():
     from fastapi.testclient import TestClient
-    from main import aduport
+    from main import app
 
     with TestClient(app) as tc:
         r = tc.get("/api/formats")

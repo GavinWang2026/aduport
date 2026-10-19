@@ -14,7 +14,7 @@ from aduport.core.registry import (
     registered_import_formats,
 )
 from aduport.core.security import validate_upload
-from main import aduport
+from main import app
 
 
 @pytest.fixture()

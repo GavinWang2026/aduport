@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from main import aduport
+from main import app
 
 
 def test_formats_exposes_fidelity_tiers():
@@ -70,7 +70,7 @@ def test_formats_exposes_fidelity_tiers():
         assert set(page_grade.get("grades") or {}) == {"A", "B", "C", "D"}
         assert "success_rate" not in page_grade
     from aduport import TARGET_STRUCTURE_LIMITS
-    from aduport.cli import aduport as cli_app
+    from aduport.cli import app as cli_app
     from typer.testing import CliRunner
 
     assert TARGET_STRUCTURE_LIMITS == {}

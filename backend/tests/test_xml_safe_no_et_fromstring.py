@@ -20,7 +20,7 @@ def test_no_bare_et_fromstring_in_app():
                 continue
             if _FORBIDDEN.search(line):
                 hits.append(f"{path.relative_to(_APP.parent)}:{i}: {line.strip()}")
-    assert not hits, "use app.core.xml_safe.fromstring:\n" + "\n".join(hits)
+    assert not hits, "use aduport.core.xml_safe.fromstring:\n" + "\n".join(hits)
 
 
 def test_xml_safe_module_exists():
