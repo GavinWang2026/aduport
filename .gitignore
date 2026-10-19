@@ -43,6 +43,8 @@ frontend/playwright-report/
 outputs/
 backend/logs/
 backend/data/
+/data/
+/logs/
 *.sqlite3
 
 .paddle_home/
